@@ -4,19 +4,83 @@ v1: Parse R/lme4-style formula strings into fixed-effect terms,
     random-effect groups, and response variable.
 """
 from __future__ import annotations
+import re
+from hbsaemp._exceptions import FormulaError
 __all__: list[str] = ["parse_formula"]
 
 
 def parse_formula(formula: str) -> dict:
-    """Parse a formula string into components.
+    """Parse an R/lme4-style formula string into its components.
+
+    Handles standard fixed-effect formulas, random-intercept terms
+    ``(1|group)``, and binomial response syntax ``y | trials(n) ~ ...``
+    (only the response name before ``|`` is captured).
 
     Args:
-        formula: R/lme4-style formula, e.g. ``"y ~ x1 + x2 + (1|group)"``.
+        formula: R/lme4-style formula string, e.g.
+            ``"y ~ x1 + x2 + (1|group)"`` or
+            ``"y | trials(n) ~ x1 + x2"``.
 
     Returns:
-        Dict with keys ``response``, ``fixed``, ``random_groups``.
+        Dict with keys:
+
+        - ``"response"`` (:class:`str`): left-hand-side response name.
+        - ``"fixed"`` (:class:`list[str]`): fixed-effect predictor names.
+        - ``"random_groups"`` (:class:`list[str]`): grouping factor names
+          from ``(.*|group)`` terms.
 
     Raises:
-        NotImplementedError: In v0.
+        FormulaError: If ``"~"`` is absent or the response cannot be parsed.
+
+    Examples:
+        >>> parse_formula("y ~ x1 + x2 + (1|area)")
+        {'response': 'y', 'fixed': ['x1', 'x2'], 'random_groups': ['area']}
+
+        >>> parse_formula("y ~ x1")
+        {'response': 'y', 'fixed': ['x1'], 'random_groups': []}
+
+        >>> parse_formula("y | trials(n) ~ x1 + (1|g)")
+        {'response': 'y', 'fixed': ['x1'], 'random_groups': ['g']}
     """
-    raise NotImplementedError("parse_formula() requires v1 (formulae package).")
+    if "~" not in formula:
+        raise FormulaError(
+            "Formula must contain '~' separating response from predictors.",
+            formula=formula,
+        )
+
+    lhs, rhs = formula.split("~", 1)
+
+    # Response: first identifier on lhs (before any '|' or whitespace)
+    response_match = re.match(r"\s*(\w+)", lhs)
+    if not response_match:
+        raise FormulaError(
+            "Cannot parse response variable from formula LHS.",
+            formula=formula,
+        )
+    response = response_match.group(1)
+
+    # Extract all random-effect grouping factors: (anything | groupname)
+    # \s* around the group name supports R-style spacing: (1 | group)
+    random_groups: list[str] = re.findall(r"\([^|)]*\|\s*([A-Za-z_]\w*)\s*\)", rhs)
+
+    # Remove all parenthesised groups (random effects) from RHS, then parse fixed
+    rhs_fixed = re.sub(r"\([^)]*\)", "", rhs)
+    fixed: list[str] = []
+    for token in rhs_fixed.split("+"):
+        term = token.strip()
+        if not term or term in ("0", "1", "-1"):
+            continue
+        if not re.match(r"^[A-Za-z_]\w*$", term):
+            raise FormulaError(
+                f"Formula term {term!r} is not a valid column identifier. "
+                f"Pre-compute any transformations (e.g. log, interactions) "
+                f"in the DataFrame before calling create_model().",
+                formula=formula,
+            )
+        fixed.append(term)
+
+    return {
+        "response": response,
+        "fixed": fixed,
+        "random_groups": random_groups,
+    }

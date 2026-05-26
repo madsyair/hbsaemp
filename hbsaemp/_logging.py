@@ -9,7 +9,6 @@ Default: NullHandler (silent). Call :func:`configure_logging` to opt in.
 from __future__ import annotations
 
 import logging
-from typing import Union
 
 __all__ = ["PACKAGE_LOGGER_NAME", "DEFAULT_LOG_FORMAT", "DEFAULT_DATE_FORMAT",
            "get_logger", "configure_logging"]
@@ -44,7 +43,7 @@ def get_logger(name: str | None = None) -> logging.Logger:
 
 
 def configure_logging(
-    level: Union[int, str] = logging.INFO,
+    level: int | str = logging.INFO,
     *,
     fmt: str | None = None,
     datefmt: str | None = None,

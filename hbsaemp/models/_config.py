@@ -35,10 +35,11 @@ class ModelConfig:
     ----------------------------------
     .. code-block:: text
 
-        ModelConfig.draws          →  model.fit(draws=...)
-        ModelConfig.tune           →  model.fit(tune=...)      # warmup
-        ModelConfig.chains         →  model.fit(chains=...)
-        ModelConfig.cores          →  model.fit(cores=...)
+        ModelConfig              →  model.fit(inference_method="mcmc")  # always NUTS/HMC
+        ModelConfig.draws        →  model.fit(draws=...)
+        ModelConfig.tune         →  model.fit(tune=...)      # warmup
+        ModelConfig.chains       →  model.fit(chains=...)
+        ModelConfig.cores        →  model.fit(cores=...)
         ModelConfig.target_accept  →  model.fit(target_accept=...)
         ModelConfig.random_seed    →  model.fit(random_seed=...)
 
@@ -111,6 +112,7 @@ class ModelConfig:
             Dict suitable for ``**`` unpacking into ``model.fit()``.
         """
         return {
+            "inference_method": "mcmc",
             "draws": self.draws,
             "tune": self.tune,
             "chains": self.chains,

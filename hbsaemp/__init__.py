@@ -1,4 +1,4 @@
-"""hbsaemp v0.0.0 — Hierarchical Bayesian Small Area Estimation.
+"""hbsaemp v1.0.0 — Hierarchical Bayesian Small Area Estimation.
 
 A Python port of R package ``hbsaems`` (Choir et al., 2025).
 Design: **one function for all models**, like ``caret::train()``.
@@ -21,11 +21,11 @@ Quick start::
     estimate_areas(m1)                   # RSE, MSE, RMSE, CI      (alias: hbsae)
     launch_app()                         # GUI dashboard           (≡ run_sae_app)
 
-Roadmap: 0.0.0=template | 1.0.0=Bambi | 2.0.0=spatial (PyMC)
+Status: v1.0.0=Bambi | v2.0.0=spatial (PyMC, planned)
 """
 from __future__ import annotations
 import sys
-__version__: str = "0.0.0"
+__version__: str = "1.0.0"
 if sys.version_info < (3, 11):
     raise RuntimeError(f"hbsaemp requires Python >= 3.11 (got {sys.version}).")
 

@@ -34,8 +34,6 @@ To add a new family (e.g. for v2+ spatial models)::
 
 from __future__ import annotations
 
-from typing import Any
-
 import pandas as pd
 
 from hbsaemp._exceptions import ModelRegistryError
@@ -66,6 +64,47 @@ MODEL_REGISTRY: dict[str, type[BaseModel]] = {
 
 
 # ---------------------------------------------------------------------------
+# _FAMILY_PARAMS — single source of truth for family-specific kwargs
+# ---------------------------------------------------------------------------
+# Maps family → {model-side kwarg name: user-facing kwarg name in create_model}.
+# Used by create_model() to forward only relevant kwargs, and by update_model()
+# to extract only the relevant attrs from the existing model instance.
+# Invariant: keys mirror `self._<attr>` names on each subclass, so that
+# `getattr(model, f"_{mparam}")` always works from update_model().
+_FAMILY_PARAMS: dict[str, dict[str, str]] = {
+    "gaussian":  {"sampling_var_col": "sampling_var", "link": "link"},
+    "lognormal": {"sampling_var_col": "sampling_var", "link": "link"},
+    "beta":      {"n_col": "n", "deff_col": "deff",
+                  "squeeze": "squeeze", "link": "link"},
+    "binomial":  {"trials_col": "trials", "link": "link"},
+}
+
+
+def _validate_family_args(family: str, provided: set[str]) -> None:
+    """Reject user-facing kwargs not in the chosen family's spec (P0-2).
+
+    Derives the allowed set from :data:`_FAMILY_PARAMS` so family knowledge
+    stays in one place — the values of ``_FAMILY_PARAMS[family]`` are the
+    user-facing argument names ``create_model()`` accepts for that family.
+
+    Args:
+        family: Family name (already verified to be in MODEL_REGISTRY).
+        provided: Set of user-facing kwarg names the caller actually passed
+            (``None``-valued args and ``squeeze=False`` are excluded upstream).
+
+    Raises:
+        ValueError: When ``provided - allowed`` is non-empty.
+    """
+    allowed = set(_FAMILY_PARAMS[family].values())
+    invalid = provided - allowed
+    if invalid:
+        raise ValueError(
+            f"Argument(s) not valid for family={family!r}: {sorted(invalid)}. "
+            f"Valid for {family!r}: {sorted(allowed)}."
+        )
+
+
+# ---------------------------------------------------------------------------
 # create_model() — unified entry point (= caret's train())
 # ---------------------------------------------------------------------------
 
@@ -85,9 +124,13 @@ def create_model(
     # ^ beta: column name for survey sample size  (to compute phi)
     deff: str | None = None,
     # ^ beta: column name for design effect       (to compute phi)
+    sampling_var: str | None = None,
+    # ^ gaussian/lognormal FH: column name for sampling variance D_i
     link: str | None = None,
     # ^ override default link for the family
-    **kwargs: Any,
+    squeeze: bool = False,
+    # ^ beta: apply Smithson-Verkuilen squeeze (y*(n-1)+0.5)/n before fitting;
+    #   use only for datasets with boundary values y=0 or y=1
 ) -> BaseModel:
     """Create an unfitted HBSAE model — the single entry point for all families.
 
@@ -124,8 +167,16 @@ def create_model(
         n: *Beta only.* Column with survey sample size.
             Used with *deff* to compute :math:`\\phi_i = n_i / \\text{deff}_i - 1`.
         deff: *Beta only.* Column with design effect.  Must accompany *n*.
+        sampling_var: *Gaussian / Lognormal FH only.* Column with known sampling
+            variances :math:`D_i`.  When provided, adds
+            ``"sigma ~ 0 + offset(log_sqrt_D)"`` to pin residual error to the
+            direct-estimate variance (Fay-Herriot setup).
         link: Override the family default link function.
-        **kwargs: Additional keyword arguments forwarded to the model class.
+        squeeze: *Beta only.* Apply Smithson-Verkuilen squeeze
+            ``(y*(n-1)+0.5)/n`` to the response before fitting.
+            Default ``False`` — fits on the original direct-estimate
+            proportions.  Set ``True`` only when the dataset contains
+            boundary values ``y=0`` or ``y=1`` (requires *n* and *deff*).
 
     Returns:
         An *unfitted* :class:`BaseModel` subclass.  Call ``.fit()`` to run
@@ -177,6 +228,27 @@ def create_model(
             registered=sorted(MODEL_REGISTRY),
         )
 
+    # P0-2 — cross-family argument validation (fail-fast on stray kwargs).
+    # `squeeze` is a bool with safe default False; only squeeze=True counts as
+    # user-provided. Other optional cols/link are "provided" iff not None.
+    if not isinstance(squeeze, bool):
+        raise TypeError(
+            f"`squeeze` must be a bool, got {type(squeeze).__name__!r}."
+        )
+
+    _provided_optional: set[str] = {
+        name for name, val in {
+            "sampling_var": sampling_var,
+            "n": n, "deff": deff,
+            "trials": trials, "link": link,
+        }.items()
+        if val is not None
+    }
+    if squeeze is True:
+        _provided_optional.add("squeeze")
+
+    _validate_family_args(family, _provided_optional)
+
     # Family-specific parameter validation
     if family == "binomial" and trials is None:
         raise ValueError(
@@ -201,6 +273,14 @@ def create_model(
         family, len(data), resolved_formula,
     )
 
+    # Family-aware dispatch: only forward kwargs the chosen model accepts.
+    user_kw: dict[str, object] = {
+        "sampling_var": sampling_var,
+        "n": n, "deff": deff, "squeeze": squeeze,
+        "trials": trials, "link": link,
+    }
+    family_kw = {mp: user_kw[up] for mp, up in _FAMILY_PARAMS[family].items()}
+
     model_class = MODEL_REGISTRY[family]
     return model_class(
         resolved_formula,
@@ -210,14 +290,7 @@ def create_model(
         priors=priors,
         group=group,
         handle_missing=handle_missing,
-        # Beta-specific
-        n_col=n,
-        deff_col=deff,
-        # Binomial-specific
-        trials_col=trials,
-        # Common optional
-        link=link,
-        **kwargs,
+        **family_kw,
     )
 
 

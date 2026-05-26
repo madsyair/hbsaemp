@@ -1,4 +1,6 @@
 """hbsaemp.diagnostics — convergence, prior check, model comparison."""
+from __future__ import annotations
+
 from hbsaemp.diagnostics.convergence import ConvergenceResult, check_convergence, hbcc
 from hbsaemp.diagnostics.prior_check import PriorCheckResult, check_prior, hbpc
 from hbsaemp.diagnostics.comparison import ComparisonResult, compare_models, hbmc

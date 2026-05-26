@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 # ===========================================================================
 [project]
 name        = "hbsaemp"
-version     = "0.0.0"
+version     = "1.0.0"
 description = "Hierarchical Bayesian Small Area Estimation — caret-style unified interface"
 readme      = "README.md"
 license     = { text = "GPL-3.0-or-later" }
@@ -24,12 +24,11 @@ classifiers = [
 ]
 
 # ---------------------------------------------------------------------------
-# Version roadmap:
-#   0.0.0  — template: architecture + stubs, NO Bambi/PyMC required
-#   1.0.0  — Bambi implementation: pip install "hbsaemp[bambi]"
-#   2.0.0  — Spatial extension:    pip install "hbsaemp[spatial]"
+# Version status:
+#   1.0.0  — Bambi implementation: pip install "hbsaemp[bambi]"  ← current
+#   2.0.0  — Spatial extension:    pip install "hbsaemp[spatial]" (planned)
 # ---------------------------------------------------------------------------
-# v0.0.0 core deps: only numpy + pandas (stubs only, no MCMC)
+# Core deps (all versions): numpy + pandas only — no MCMC required at import
 dependencies = [
     "numpy>=1.26.0",
     "pandas>=2.0.0",
