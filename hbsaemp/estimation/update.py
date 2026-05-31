@@ -1,11 +1,8 @@
-"""Update a fitted HBSAE model with new config or data.
+"""`update_model` (alias `update_hbm`) — full refit with new data/config.
 
-Python equivalent of R hbsaems::update_hbm().
-
-v0: update_model() stub.
-v1: Refit from scratch with a new :class:`~hbsaemp.models._config.ModelConfig`
-    and / or new data.  This is a full refit (not resumed sampling); see the
-    :func:`update_model` docstring for rationale.
+This is a complete refit, not resumed sampling: all posterior draws in the
+returned `ModelResult` are new. The source model is updated in place so
+subsequent `model.predict()` / `model.result` reflect the new fit.
 """
 from __future__ import annotations
 
@@ -16,7 +13,7 @@ import pandas as pd
 from hbsaemp._logging import get_logger
 from hbsaemp.models._base import BaseModel, ModelResult
 from hbsaemp.models._config import ModelConfig
-from hbsaemp.models._factory import _FAMILY_PARAMS
+from hbsaemp.models._family_spec import FAMILY_SPECS
 
 logger = get_logger(__name__)
 __all__: list[str] = ["update_model", "update_hbm"]
@@ -32,64 +29,33 @@ def update_model(
     chains: int | None = None,
     cores: int | None = None,
 ) -> ModelResult:
-    """Refit a model with a new config and / or new data.
+    """Full refit with optional new data and/or sampler overrides.
 
-    Python equivalent of ``update_hbm()`` in R hbsaems.
-
-    .. note::
-        **v1 semantics: full refit, not resumed sampling.**
-        This function creates a fresh model with the updated settings and
-        calls ``fit()`` from scratch.  All posterior draws in the returned
-        :class:`~hbsaemp.models._base.ModelResult` are new.  The original
-        *model* object's ``_result`` is updated in-place so that subsequent
-        ``model.predict()`` and ``model.result`` calls reflect the new fit.
-
-    Useful when you want to:
-
-    * Increase draws for better convergence:
-      ``update_model(m, draws=4000)``
-    * Refit on a refreshed dataset:
-      ``update_model(m, new_data=new_df)``
-    * Combine both:
-      ``update_model(m, new_data=new_df, draws=2000, chains=4)``
+    Either pass a full replacement `config`, or individual overrides
+    (`draws`, `tune`, `chains`, `cores`) applied via `dataclasses.replace`
+    on the model's current config (ignored when `config` is supplied).
+    Updates *model* in place — its `.result`/`.data`/`.config` reflect the new
+    fit, so chained `update_model()` calls start from current state.
 
     Args:
-        model: A fitted :class:`~hbsaemp.models._base.BaseModel`.
-        new_data: Optional new :class:`pandas.DataFrame`.  When provided,
-            the model is refit on *new_data*.  When ``None``, the original
-            training data is reused.
-        config: Full replacement :class:`~hbsaemp.models._config.ModelConfig`.
-            When supplied, *draws*, *tune*, *chains*, *cores* are ignored.
-        draws: Override draws per chain.
-        tune: Override warmup steps.
-        chains: Override number of chains.
-        cores: Override number of cores.
-
-    Returns:
-        A fresh :class:`~hbsaemp.models._base.ModelResult` from the refit.
-        The *model* object is also updated so that ``model.result`` and
-        ``model.predict()`` reflect the new fit.
+        model: Fitted `BaseModel`.
+        new_data: Optional new DataFrame; `None` reuses the original training
+            data.
+        config: Full replacement `ModelConfig`.
+        draws, tune, chains, cores: Individual sampler overrides.
 
     Raises:
-        ModelNotFittedError: If *model* has not been fitted.
-        TypeError: If *new_data* is not a :class:`pandas.DataFrame`.
-
-    Examples::
-
-        # More draws for convergence
-        result = update_model(model, draws=4000)
-
-        # Refit on new data
-        result = update_model(model, new_data=refreshed_df, draws=2000)
+        ModelNotFittedError: If `model` has not been fitted.
+        TypeError: If `new_data` is supplied but not a DataFrame.
     """
-    # ── guard ─────────────────────────────────────────────────────────────────
+    # guard
     _ = model.result  # raises ModelNotFittedError if not fitted
     if new_data is not None and not isinstance(new_data, pd.DataFrame):
         raise TypeError(
             f"new_data must be a pandas DataFrame, got {type(new_data).__name__!r}."
         )
 
-    # ── resolve config ────────────────────────────────────────────────────────
+    # resolve config
     if config is not None:
         new_config: ModelConfig = config
     else:
@@ -104,7 +70,7 @@ def update_model(
             overrides["cores"] = cores
         new_config = dataclasses.replace(model._config, **overrides)
 
-    # ── resolve data ──────────────────────────────────────────────────────────
+    # resolve data
     target_data: pd.DataFrame = (
         new_data if new_data is not None else model._data
     )
@@ -117,14 +83,11 @@ def update_model(
         "None (reuse original)" if new_data is None else f"shape={new_data.shape}",
     )
 
-    # ── build new model of same type ──────────────────────────────────────────
-    # Family-aware dispatch via _FAMILY_PARAMS (single source of truth in
-    # _factory.py): only forward the attrs the original model actually stores.
-    # Each key in _FAMILY_PARAMS[family] mirrors a `self._<key>` attribute on
-    # the corresponding subclass — see _factory._FAMILY_PARAMS docstring.
+    # Rebuild the same subclass, forwarding only its family attrs.
+    # FAMILY_SPECS[family].user_params keys mirror `self._<key>` on the model.
     family_attrs = {
         mp: getattr(model, f"_{mp}")
-        for mp in _FAMILY_PARAMS[model._family]
+        for mp in FAMILY_SPECS[model._family].user_params
     }
     new_model: BaseModel = type(model)(
         model._formula,
@@ -137,10 +100,10 @@ def update_model(
         **family_attrs,
     )
 
-    # ── refit ─────────────────────────────────────────────────────────────────
+    # refit
     new_result: ModelResult = new_model.fit()
 
-    # ── update original model in-place so model.predict() uses new result ────
+    # update original model in-place so model.predict() uses new result
     # Sync ALL mutable state so chained updates start from the current fit,
     # not the original construction values.
     model._result = new_result

@@ -67,6 +67,22 @@ def test_model_config_custom():
     assert kw["draws"] == 2000 and kw["chains"] == 2
 
 
+def test_sampler_kwargs_include_response_params():
+    """to_sampler_kwargs() must always emit include_response_params=True (Bambi 0.18+)."""
+    assert hb.ModelConfig().to_sampler_kwargs().get("include_response_params") is True
+
+
+def test_sampler_kwargs_custom_config_preserves_response_params():
+    assert hb.ModelConfig(draws=500, chains=2).to_sampler_kwargs().get("include_response_params") is True
+
+
+def test_sampler_kwargs_uses_pymc_inference_method():
+    """to_sampler_kwargs() must emit canonical 'pymc' (not deprecated 'mcmc')."""
+    kw = hb.ModelConfig().to_sampler_kwargs()
+    assert kw.get("inference_method") == "pymc"
+    assert kw.get("inference_method") != "mcmc"  # deprecated alias in Bambi 0.18
+
+
 @pytest.mark.parametrize("bad,exc", [
     ({"draws": 0}, ValueError),
     ({"tune": -1}, ValueError),
@@ -77,6 +93,19 @@ def test_model_config_custom():
 def test_model_config_validation(bad, exc):
     with pytest.raises(exc):
         hb.ModelConfig(**bad)
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"draws": 1},
+    {"tune": 0},
+    {"chains": 1},
+    {"target_accept": 0.5},
+])
+def test_model_config_valid_boundaries(kwargs):
+    """Boundary values that must construct without raising."""
+    cfg = hb.ModelConfig(**kwargs)
+    for k, v in kwargs.items():
+        assert getattr(cfg, k) == v
 
 
 # ---------------------------------------------------------------------------
@@ -108,11 +137,9 @@ def test_create_model_all_families(small_df, cfg):
     m1 = hb.create_model("y ~ x1",       family="gaussian",  data=small_df, group="group", config=cfg)
     m2 = hb.create_model("y_beta ~ x1",  family="beta",       data=small_df, n="n", deff="deff", config=cfg)
     m3 = hb.create_model("y_binom ~ x1", family="binomial",   data=small_df, trials="n", config=cfg)
-    m4 = hb.create_model("y_pos ~ x1",   family="lognormal",  data=small_df, group="group", config=cfg)
     assert type(m1).__name__ == "GaussianModel"
     assert type(m2).__name__ == "BetaModel"
     assert type(m3).__name__ == "BinomialModel"
-    assert type(m4).__name__ == "LognormalModel"
 
 
 def test_hbm_alias_identical_to_create_model(small_df, cfg):
@@ -135,11 +162,49 @@ def test_create_model_no_double_re(small_df, cfg):
     assert m.formula.count("(1|group)") == 1
 
 
+def test_create_model_no_double_re_spaced(small_df, cfg):
+    """Spaced `(1 | group)` must NOT be double-injected (P1-5 Bug 1).
+
+    The old literal substring check (`"(1|group)" not in formula`) missed the
+    spaced form and appended a duplicate; the structural parse_formula check
+    recognises it. Formula must be returned verbatim."""
+    m = hb.create_model("y ~ x1 + (1 | group)", family="gaussian",
+                        data=small_df, group="group", config=cfg)
+    assert m.formula == "y ~ x1 + (1 | group)"
+    assert m.formula.count("group") == 1
+
+
+def test_create_model_no_inject_when_random_slope_uses_group(small_df, cfg):
+    """A random slope `(x1 | group)` already covers `group` — don't add
+    `(1|group)` on top (P1-5 Bug 2)."""
+    m = hb.create_model("y ~ x1 + (x1 | group)", family="gaussian",
+                        data=small_df, group="group", config=cfg)
+    assert m.formula == "y ~ x1 + (x1 | group)"
+    assert "(1|group)" not in m.formula
+
+
+def test_create_model_injects_group_when_formula_has_other_group(small_df, cfg):
+    """Explicit RE for a DIFFERENT group does not satisfy `group=` — the
+    requested group is still injected (P1-5 Case 5)."""
+    df = small_df.assign(other_group=small_df["group"])
+    m = hb.create_model("y ~ x1 + (1 | other_group)", family="gaussian",
+                        data=df, group="group", config=cfg)
+    assert "(1 | other_group)" in m.formula
+    assert "(1|group)" in m.formula
+
+
 def test_create_model_unknown_family(small_df, cfg):
     with pytest.raises(hb.ModelRegistryError) as exc_info:
         hb.create_model("y ~ x1", family="tweedie", data=small_df, config=cfg)
     assert exc_info.value.family == "tweedie"
     assert "gaussian" in exc_info.value.registered
+
+
+def test_create_model_lognormal_reserved_for_v2(small_df, cfg):
+    with pytest.raises(hb.ModelRegistryError, match="planned for V2") as exc_info:
+        hb.create_model("y_pos ~ x1", family="lognormal", data=small_df, config=cfg)
+    assert exc_info.value.family == "lognormal"
+    assert "lognormal" not in exc_info.value.registered
 
 
 def test_create_model_binomial_requires_trials(small_df, cfg):
@@ -160,11 +225,11 @@ def test_create_model_bad_data_type(cfg):
 
 
 # ---------------------------------------------------------------------------
-# P0-2 — cross-family argument validation
+# Cross-family argument validation
 # ---------------------------------------------------------------------------
-# `_FAMILY_PARAMS` in _factory.py defines which user-facing kwargs each
-# family accepts. Anything else must be rejected by create_model() with a
-# ValueError before the model is constructed — so users do not get a
+# `FAMILY_SPECS` (in _family_spec.py, read by _factory.py) defines which
+# user-facing kwargs each family accepts. Anything else must be rejected by
+# create_model() with a ValueError before the model is constructed — so users do not get a
 # silently misconfigured model from a typo'd or mis-routed argument.
 
 class TestCreateModelCrossFamilyValidation:
@@ -173,11 +238,6 @@ class TestCreateModelCrossFamilyValidation:
         with pytest.raises(ValueError, match="not valid for family='gaussian'"):
             hb.create_model("y ~ x1", family="gaussian", data=small_df,
                             trials="n", config=cfg)
-
-    def test_lognormal_rejects_n(self, small_df, cfg):
-        with pytest.raises(ValueError, match="not valid for family='lognormal'"):
-            hb.create_model("y_pos ~ x1", family="lognormal", data=small_df,
-                            n="n", config=cfg)
 
     def test_beta_rejects_sampling_var(self, small_df, cfg):
         with pytest.raises(ValueError, match="not valid for family='beta'"):
@@ -194,12 +254,10 @@ class TestCreateModelCrossFamilyValidation:
 
     @pytest.mark.parametrize("family,extra", [
         ("gaussian",  {"sampling_var": "deff"}),
-        ("lognormal", {}),
         ("binomial",  {"trials": "n"}),
     ])
     def test_non_beta_rejects_squeeze_true(self, family, extra, small_df, cfg):
-        formula = {"gaussian": "y ~ x1", "lognormal": "y_pos ~ x1",
-                   "binomial": "y_binom ~ x1"}[family]
+        formula = {"gaussian": "y ~ x1", "binomial": "y_binom ~ x1"}[family]
         with pytest.raises(ValueError, match="squeeze"):
             hb.create_model(formula, family=family, data=small_df,
                             squeeze=True, config=cfg, **extra)
@@ -220,9 +278,9 @@ class TestCreateModelCrossFamilyValidation:
 def test_create_model_rejects_unknown_kwargs(small_df, cfg):
     """Unknown / mistyped kwargs must fail fast (no silent _kwargs sink).
 
-    Regression test for P0-1: BaseModel used to swallow unknown kwargs into
+    Regression test: BaseModel used to swallow unknown kwargs into
     self._kwargs, which both hid typos and caused duplicate-kwarg TypeError
-    on subsequent update_model() calls. With _FAMILY_PARAMS dispatch in
+    on subsequent update_model() calls. With FAMILY_SPECS dispatch in
     _factory.py and **kwargs removed from BaseModel.__init__, unknown
     kwargs must raise TypeError at construction time.
     """
@@ -328,6 +386,7 @@ class TestDataLayer:
             )
 
     def test_validator_lognormal_nonpositive(self, data_lognormal):
+        """Retain the positive-response contract for the planned V2 family."""
         bad = data_lognormal.copy()
         bad.loc[0, "y"] = -1.0
         with pytest.raises(hb.DataValidationError):
@@ -364,6 +423,13 @@ class TestDataLayer:
         """-np.inf in a predictor must be rejected."""
         bad = data_gaussian.copy()
         bad.loc[0, "x1"] = -np.inf
+        with pytest.raises(hb.DataValidationError, match="Infinite"):
+            hb.DataValidator().validate(bad, "y", ["x1"], family="gaussian")
+
+    def test_validator_neg_inf_in_response_rejected(self, data_gaussian):
+        """-np.inf in the response column must also be rejected (symmetry with +inf)."""
+        bad = data_gaussian.copy()
+        bad.loc[0, "y"] = -np.inf
         with pytest.raises(hb.DataValidationError, match="Infinite"):
             hb.DataValidator().validate(bad, "y", ["x1"], family="gaussian")
 
@@ -515,7 +581,8 @@ def test_result_dataclasses_constructable():
     assert pr.prior_predictive_plot is None
 
     comp = hb.ComparisonResult()
-    assert comp.loo is None and comp.waic is None
+    assert comp.loo is None
+    assert comp.compare_plot is None
 
     ae = hb.AreaEstimatesResult()
     assert ae.result_table.empty
@@ -605,7 +672,7 @@ def test_load_dataset_unknown():
 # ---------------------------------------------------------------------------
 
 def test_registry_contents():
-    assert set(hb.MODEL_REGISTRY.keys()) == {"gaussian", "beta", "binomial", "lognormal"}
+    assert set(hb.MODEL_REGISTRY.keys()) == {"gaussian", "beta", "binomial"}
     for cls in hb.MODEL_REGISTRY.values():
         assert issubclass(cls, hb.BaseModel)
 

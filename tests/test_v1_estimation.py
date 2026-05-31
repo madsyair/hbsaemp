@@ -151,13 +151,34 @@ class TestEstimateAreasOutOfSample:
         assert _EXPECTED_COLS.issubset(set(result.result_table.columns))
 
     def test_ci_prob_narrower_at_50(self, beta_fitted):
-        """50% HDI should be narrower than 95% HDI."""
+        """50% HDI must be strictly narrower than 95% HDI for every area.
+
+        beta_fitted is seeded (random_seed=42), so this is deterministic.
+        Asserting per-area rather than mean width catches a partial regression
+        where one area collapses to width≈0.
+        """
         r95 = hb.estimate_areas(beta_fitted, ci_prob=0.95)
         r50 = hb.estimate_areas(beta_fitted, ci_prob=0.50)
-        width95 = (r95.result_table["ci_upper"] - r95.result_table["ci_lower"]).mean()
-        width50 = (r50.result_table["ci_upper"] - r50.result_table["ci_lower"]).mean()
-        assert width50 < width95, \
-            f"50% CI ({width50:.4f}) not narrower than 95% CI ({width95:.4f})"
+        width95 = r95.result_table["ci_upper"] - r95.result_table["ci_lower"]
+        width50 = r50.result_table["ci_upper"] - r50.result_table["ci_lower"]
+        assert (width50 < width95).all(), (
+            f"50% HDI not strictly narrower than 95% HDI in all areas; "
+            f"min(width95 - width50) = {(width95 - width50).min():.4f}"
+        )
+
+    def test_estimate_areas_in_sample_correct_after_oos(self, beta_fitted, data_beta):
+        """In-sample estimates must be identical before and after an OOS call.
+
+        Regression guard: predict() must not mutate result.idata['mu'] in place
+        (inplace=False). Otherwise an intervening OOS estimate_areas() would
+        corrupt the in-sample mu and the next in-sample call returns wrong
+        numbers. The module-scoped fixture also makes this a cross-test
+        leakage regression.
+        """
+        is_before = hb.estimate_areas(beta_fitted)
+        _ = hb.estimate_areas(beta_fitted, new_data=data_beta.head(5).reset_index(drop=True))
+        is_after = hb.estimate_areas(beta_fitted)
+        pd.testing.assert_frame_equal(is_before.result_table, is_after.result_table)
 
 
 # ---------------------------------------------------------------------------
@@ -205,26 +226,26 @@ class TestEstimateAreasGaussian:
         assert len(result.result_table) == len(gaussian_fitted.result.data)
 
     def test_gaussian_uses_posterior_mu(self, gaussian_fitted):
-        """estimate_areas() must use posterior of μ_i (kind='response_params'),
-        not the posterior predictive.  The posterior of μ has strictly smaller
-        variance than the posterior predictive (no added sampling variance D_i),
-        so SD must be positive and strictly less than the observed data range.
+        """estimate_areas() must use posterior of mu, not posterior predictive.
+
+        Direct check: posterior mu draws have strictly smaller per-area SD than
+        posterior predictive draws, because mu omits the residual sampling
+        variance. Comparing against the predictive SD is a tight contract
+        check; comparing against the observed y-range is fragile when data
+        variance is high.
         """
         result = hb.estimate_areas(gaussian_fitted)
-        df = result.result_table
-        # All SDs positive (posterior of mu has uncertainty)
-        assert (df["sd"] > 0).all()
-        # SD < observed y range (shrinkage: posterior of mu is tighter than raw obs)
-        y_range = float(
-            gaussian_fitted.result.data[
-                gaussian_fitted.result.extra["response"]
-            ].max()
-            - gaussian_fitted.result.data[
-                gaussian_fitted.result.extra["response"]
-            ].min()
+        latent_sd = result.result_table["sd"].values
+        pp_draws = gaussian_fitted.predict(kind="response")
+        pp_sd = pp_draws.std(axis=0)
+        assert (latent_sd > 0).all(), "Posterior of mu has zero uncertainty — unexpected"
+        # Latent strictly less than predictive (excludes sampling variance).
+        # rtol=1e-3 absorbs MCMC noise without masking a swapped extraction.
+        assert (latent_sd < pp_sd * (1 - 1e-3)).all(), (
+            f"estimate_areas() SD not strictly less than predictive SD — "
+            f"likely returned posterior predictive instead of posterior of mu. "
+            f"max(latent_sd - pp_sd) = {(latent_sd - pp_sd).max():.4f}"
         )
-        assert (df["sd"] < y_range).all(), \
-            f"Posterior SD exceeds observed range — likely using posterior predictive."
 
 
 # ---------------------------------------------------------------------------
@@ -279,9 +300,9 @@ class TestUpdateModel:
 
 
 # ---------------------------------------------------------------------------
-# update_model() — regression tests for P0-1 (duplicate-kwarg TypeError)
+# update_model() — regression tests for the duplicate-kwarg TypeError
 # ---------------------------------------------------------------------------
-# Before the _FAMILY_PARAMS dispatch fix, BaseModel.__init__ swallowed
+# Before the FAMILY_SPECS dispatch fix, BaseModel.__init__ swallowed
 # unrelated family kwargs into self._kwargs; update_model() then forwarded
 # both explicit family kwargs AND **model._kwargs, producing
 # "TypeError: got multiple values for keyword argument" on the FIRST update
@@ -289,11 +310,7 @@ class TestUpdateModel:
 
 
 def _build_and_fit(family: str, df: pd.DataFrame) -> hb.BaseModel:
-    """Tiny MCMC fit (draws=120, chains=2) per family for regression tests.
-
-    Lognormal is intentionally excluded — it requires the response to be
-    already on log scale, which must be handled per-test (see test_update_lognormal).
-    """
+    """Tiny MCMC fit (draws=120, chains=2) per active family."""
     cfg = hb.ModelConfig(draws=120, tune=120, chains=2, cores=1,
                          target_accept=0.9, random_seed=42)
     if family == "beta":
@@ -311,8 +328,7 @@ def _build_and_fit(family: str, df: pd.DataFrame) -> hb.BaseModel:
             "y ~ x1 + (1|group)", family="gaussian", data=df, config=cfg,
         )
     else:
-        raise ValueError(f"Unsupported family in _build_and_fit: {family!r}. "
-                         "Use test_update_lognormal for lognormal (log-scale response required).")
+        raise ValueError(f"Unsupported family in _build_and_fit: {family!r}.")
     model.fit()
     return model
 
@@ -334,20 +350,6 @@ class TestUpdateModelAllFamilies:
         m = _build_and_fit("binomial", data_binomial)
         result = hb.update_model(m, draws=80, tune=80)
         assert result.is_fitted
-
-    def test_update_lognormal(self, data_lognormal):
-        # Lognormal requires the response on log scale (per CLAUDE.md).
-        df = data_lognormal.copy()
-        df["y_log"] = np.log(df["y"])
-        cfg = hb.ModelConfig(draws=120, tune=120, chains=2, cores=1,
-                             target_accept=0.9, random_seed=42)
-        m = hb.create_model(
-            "y_log ~ x1 + (1|group)", family="lognormal", data=df, config=cfg,
-        )
-        m.fit()
-        result = hb.update_model(m, draws=80, tune=80)
-        assert result.is_fitted
-
 
 class TestUpdateModelChained:
     """Chained updates: the duplicate-kwarg bug surfaced on the SECOND call.

@@ -1,35 +1,8 @@
-"""Abstract base class and result container for all HBSAE models.
+"""BaseModel and ModelResult — concrete fit/predict pipeline shared by all families.
 
-:class:`BaseModel` defines the unified interface that makes hbsaemp work
-like caret: every family (Gaussian, Beta, Binomial, Lognormal) inherits
-this and exposes identical ``fit()`` / ``predict()`` / ``summary()`` methods.
-
-Since v1+, ``fit()`` and ``predict()`` are **concrete** in :class:`BaseModel`.
-The MCMC pipeline (parse → validate → preprocess → Bambi → store result)
-and the predictive draw extraction are shared across all families.
-Subclasses customise only the family-specific parts via small hooks:
-
-* :meth:`_extra_pipeline_kwargs` *(abstract)* — kwargs forwarded to validator
-  and preprocessor.
-* :meth:`_build_formula_and_link` *(abstract)* — Bambi formula + link spec.
-* :meth:`_extra_result_dict` *(abstract)* — family-specific keys merged into
-  ``ModelResult.extra``.
-* :meth:`_pre_fit_checks` *(optional)* — early guards before ``bambi`` import.
-* :meth:`_bambi_family` *(optional)* — override the Bambi family string.
-
-:class:`ModelResult` is the concrete dataclass returned by ``fit()``,
-analogous to the object returned by ``caret::train()``.
-
-Naming rationale
-----------------
-.. code-block:: text
-
-    Before (R-style acronyms)  →  After (Python descriptive)
-    ─────────────────────────     ──────────────────────────
-    HBModel                    →  BaseModel
-    HBMFit                     →  ModelResult
-    HBMControl                 →  ModelConfig   (see _config.py)
-    HBMGaussian                →  GaussianModel (see _gaussian.py)
+The MCMC pipeline (parse formula -> validate -> preprocess -> Bambi -> store
+result) lives in `BaseModel.fit()`; subclasses supply only small hooks
+(`_build_formula_and_link`, `_workaround_priors`, etc.).
 """
 
 from __future__ import annotations
@@ -38,7 +11,7 @@ import abc
 import warnings
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pandas as pd
@@ -46,6 +19,7 @@ import pandas as pd
 from hbsaemp._exceptions import ModelNotFittedError
 from hbsaemp._logging import get_logger
 from hbsaemp._types import FamilyLiteral, FormulaStr, PriorDict
+from hbsaemp.models._family_spec import FAMILY_SPECS, FamilySpec
 
 if TYPE_CHECKING:
     from hbsaemp.models._config import ModelConfig
@@ -55,30 +29,23 @@ logger = get_logger(__name__)
 __all__: list[str] = ["BaseModel", "ModelResult"]
 
 
-# ---------------------------------------------------------------------------
-# ModelResult — concrete result container  (was HBMFit)
-# ---------------------------------------------------------------------------
+# ModelResult
 
 @dataclass
 class ModelResult:
-    """Result container for a fitted HBSAE model.
-
-    In v0 all fields are ``None`` / defaults.
-    In v1: ``backend_model`` holds a ``bambi.Model``,
-           ``idata`` holds an ``arviz.InferenceData``.
+    """Container returned by `BaseModel.fit()`.
 
     Attributes:
-        backend_model: The fitted backend model (``bambi.Model`` in v1).
-        idata: Posterior samples as ``arviz.InferenceData`` (v1).
-        formula: Formula string used for fitting.
-        family: Distribution family (user-facing label — e.g. ``"lognormal"``
-            even when the Bambi backend family is ``"gaussian"``).
-        data: The cleaned DataFrame used for fitting.
-        config: MCMC configuration used for this fit.
-        priors: Prior specification dict, or ``None`` for auto priors.
-        is_fitted: ``True`` after ``fit()`` completes.
-        fitted_at: UTC datetime when ``fit()`` completed.
-        extra: Family-specific metadata (e.g. ``{"phi": array}`` for Beta).
+        backend_model: Fitted `bambi.Model`.
+        idata: Posterior samples (`arviz.InferenceData`).
+        formula: Original formula string.
+        family: User-facing family label.
+        data: Preprocessed DataFrame actually fit.
+        config: `ModelConfig` used for sampling.
+        priors: User prior dict, or `None` if Bambi auto-priors were used.
+        is_fitted: True after `fit()` completes.
+        fitted_at: UTC datetime when `fit()` completed.
+        extra: Family-specific metadata (response col, group col, etc.).
     """
 
     backend_model: Any = field(default=None, repr=False)
@@ -101,7 +68,7 @@ class ModelResult:
         )
 
     def summary(self) -> str:
-        """Human-readable summary. Delegates to ArviZ in v1."""
+        """One-screen text summary of the fitted result."""
         if not self.is_fitted:
             return f"ModelResult [{self.family}] — not fitted yet."
         return (
@@ -113,68 +80,27 @@ class ModelResult:
         )
 
 
-# ---------------------------------------------------------------------------
-# BaseModel — abstract base class  (was HBModel)
-# ---------------------------------------------------------------------------
+# BaseModel
 
 class BaseModel(abc.ABC):
     """Abstract base for all HBSAE distribution models.
 
-    Subclasses (:class:`GaussianModel`, :class:`BetaModel`, etc.) inherit
-    the concrete :meth:`fit` and :meth:`predict` implementations and
-    customise only the family-specific hooks:
-
-    Abstract hooks (subclass **must** implement)
-        * :meth:`_build_formula_and_link` — Bambi formula and link spec
-          (returns ``(formula, link)``).
-
-    Concrete hooks with defaults (set :attr:`_EXTRA_FIELD_NAMES` or override)
-        * :meth:`_extra_pipeline_kwargs` — kwargs forwarded to
-          :class:`~hbsaemp.data._validator.DataValidator` and
-          :class:`~hbsaemp.data._preprocessor.DataPreprocessor`.
-          Default reads :attr:`_EXTRA_FIELD_NAMES`.
-        * :meth:`_extra_result_dict` — family-specific keys merged into
-          ``ModelResult.extra``.  Default delegates to
-          :meth:`_extra_pipeline_kwargs`.
-        * :meth:`_pre_fit_checks` — early guards before ``bambi`` is
-          imported.  Default is a no-op.
-        * :meth:`_bambi_family` — Bambi family string.  Default returns
-          :attr:`_family`; :class:`LognormalModel` overrides this to
-          return ``"gaussian"`` since lognormal is fit as Gaussian on
-          log-scale data.
-        * :attr:`_preproc_family` — family string for validator and
-          preprocessor.  Default returns :attr:`_family`; overridden by
-          :class:`LognormalModel` for the same reason.
-
-    Subclasses **must** set :attr:`_MEAN_PARAM_KEY` (``"mu"`` or ``"p"``)
-    and declare :attr:`_EXTRA_FIELD_NAMES` as a class-level tuple of the
-    family-specific attribute names that the pipeline and result dict need.
-
-    Family-specific kwargs (``n_col``, ``deff_col``, ``trials_col``,
-    ``sampling_var_col``, ``squeeze``, ``link``) are consumed by the
-    subclass constructors; unknown kwargs are not silently accepted here.
-    See :data:`~hbsaemp.models._factory._FAMILY_PARAMS` for the dispatch.
+    Subclasses inherit the concrete `fit()` / `predict()` and override only
+    family-specific *behavior* hooks, each documented on its own method. The
+    single required override is `_build_formula_and_link`. All family metadata
+    (mean parameter, links, pipeline fields, backend family) is read from
+    `FAMILY_SPECS[self._family]` via `self._spec` — subclasses never re-declare
+    it.
 
     Args:
-        formula: R/lme4-style formula, e.g. ``"y ~ x1 + (1|group)"``.
-        family: Distribution family name (user-facing label).
+        formula: R/lme4-style formula, e.g. `"y ~ x1 + (1|group)"`.
+        family: User-facing family label.
         data: Input DataFrame.
-        config: MCMC configuration (:class:`~hbsaemp.models._config.ModelConfig`).
-        priors: Optional prior dict; ``None`` = Bambi auto priors.
+        config: MCMC configuration.
+        priors: Optional prior dict; `None` means Bambi auto-priors.
         group: Grouping column for random effects.
-        handle_missing: Missing data strategy (``"deleted"`` in v1).
+        handle_missing: Missing data strategy (`"deleted"` only in v1).
     """
-
-    #: Subclass must set this — key in ``idata.posterior`` used by
-    #: :meth:`predict` when ``kind="response_params"``.
-    #:
-    #:   - ``"mu"`` for Gaussian / Beta / Lognormal (mean parameter)
-    #:   - ``"p"`` for Binomial (success-probability parameter)
-    _MEAN_PARAM_KEY: ClassVar[str]
-    #: Family-specific attribute names forwarded to the data pipeline and
-    #: ``ModelResult.extra``.  Each entry ``name`` maps to ``self._<name>``.
-    #: Subclasses set this tuple; the default empty tuple means no extra kwargs.
-    _EXTRA_FIELD_NAMES: ClassVar[tuple[str, ...]] = ()
 
     def __init__(
         self,
@@ -200,7 +126,7 @@ class BaseModel(abc.ABC):
             "Created %s(family=%r, n=%d)", type(self).__name__, family, len(data)
         )
 
-    # ── Read-only properties ─────────────────────────────────────────────────
+    # Read-only properties
 
     @property
     def formula(self) -> FormulaStr:
@@ -241,25 +167,69 @@ class BaseModel(abc.ABC):
             )
         return self._result
 
-    # ── Abstract hooks (subclass must implement) ─────────────────────────────
+    # Family metadata (single source: FAMILY_SPECS[self._family])
+
+    @property
+    def _spec(self) -> FamilySpec:
+        """Immutable metadata for `self._family` (from `FAMILY_SPECS`)."""
+        try:
+            return FAMILY_SPECS[self._family]
+        except KeyError as exc:
+            raise ValueError(
+                f"No FamilySpec registered for family={self._family!r}. "
+                f"Known families: {sorted(FAMILY_SPECS)}."
+            ) from exc
+
+    @property
+    def _mean_param_key(self) -> str:
+        """Posterior key for the mean/probability parameter (`"mu"` / `"p"`).
+
+        Read by `predict(kind="response_params")`.
+        """
+        return self._spec.mean_param_key
+
+    @property
+    def _default_link(self) -> str:
+        """Default link for the family mean parameter when no `link=` given."""
+        return self._spec.default_link
+
+    def _validate_link(self) -> None:
+        """Reject `self._link` if not in the family's supported links.
+
+        Single source of truth: `FAMILY_SPECS[self._family].supported_links`.
+        Called from `_pre_fit_checks()`, so the check runs before the bambi
+        import on every `fit()`.
+        """
+        link = getattr(self, "_link", None)
+        if link not in self._spec.supported_links:
+            raise ValueError(
+                f"link={link!r} not supported for family={self._family!r}. "
+                f"Valid links: {sorted(self._spec.supported_links)}"
+            )
+
+    # Abstract hooks (subclass must implement)
 
     def _extra_pipeline_kwargs(self) -> dict[str, Any]:
-        """Family-specific keyword arguments for the data pipeline.
+        """Family-specific kwargs unpacked into validator and preprocessor.
 
-        The returned dict is unpacked into both
-        :meth:`~hbsaemp.data._validator.DataValidator.validate` and
-        :meth:`~hbsaemp.data._preprocessor.DataPreprocessor.process`
-        by :meth:`_run_pipeline` and :meth:`_preprocess_new_data`.
-
-        Default reads :attr:`_EXTRA_FIELD_NAMES` and returns
-        ``{name: self._<name>}`` for each declared field.  Subclasses
-        set :attr:`_EXTRA_FIELD_NAMES`; override this method only when
+        Reads `FAMILY_SPECS[self._family].pipeline_fields` and returns
+        `{name: self._<name>}` for each declared field. A field declared in
+        the spec but missing on the instance raises immediately — the
+        single-source contract must not drift silently. Override only when
         the lookup logic itself must differ.
-
-        Returns:
-            Dict of keyword arguments (may be empty).
         """
-        return {name: getattr(self, f"_{name}") for name in self._EXTRA_FIELD_NAMES}
+        missing = [
+            name for name in self._spec.pipeline_fields
+            if not hasattr(self, f"_{name}")
+        ]
+        if missing:
+            raise AttributeError(
+                f"{type(self).__name__} is missing attribute(s) "
+                f"{['_' + m for m in missing]} declared in "
+                f"FAMILY_SPECS[{self._family!r}].pipeline_fields — the "
+                f"subclass constructor must set them."
+            )
+        return {name: getattr(self, f"_{name}") for name in self._spec.pipeline_fields}
 
     @abc.abstractmethod
     def _build_formula_and_link(
@@ -267,119 +237,144 @@ class BaseModel(abc.ABC):
         bmb_module: Any,
         response: str,
     ) -> tuple[Any, Any]:
-        """Build the Bambi formula and link specification for ``bmb.Model``.
-
-        Called by :meth:`fit` after the data pipeline has run.
+        """Build the Bambi formula and link spec for `bmb.Model`.
 
         Args:
-            bmb_module: The imported ``bambi`` module — passed in so the
-                subclass need not import ``bambi`` itself.  Use it to
-                build distributional formulas via ``bmb_module.Formula``.
-            response: Response column name as parsed from ``self._formula``
-                (e.g. ``"y"``).  Useful for families that rewrite the
-                formula LHS (e.g. Binomial's ``"y | trials(n) ~ rhs"``).
+            bmb_module: Imported `bambi` module (subclass doesn't import it
+                directly). Use `bmb_module.Formula` for distributional models.
+            response: Response column name parsed from `self._formula`.
 
         Returns:
-            ``(formula, link)`` pair.  ``formula`` may be a plain string
-            or a :class:`bambi.Formula` object.  ``link`` may be a string
-            (single link) or a dict (distributional models — must include
-            **all** parameter keys, e.g. ``{"mu": "logit", "kappa": "log"}``).
+            `(formula, link)`. `formula` is a string or `bambi.Formula`;
+            `link` is a string (single link) or a dict (distributional —
+            must include all parameter keys).
         """
 
     def _extra_result_dict(self) -> dict[str, Any]:
-        """Family-specific keys merged into ``ModelResult.extra``.
+        """Family-specific keys merged into `ModelResult.extra`.
 
-        :meth:`fit` always adds ``"response"`` and ``"group"`` to
-        ``extra`` automatically.  Subclasses declare :attr:`_EXTRA_FIELD_NAMES`
-        for the further keys their downstream consumers (predict,
-        estimate_areas, update) need to read back later.
-
-        Default delegates to :meth:`_extra_pipeline_kwargs` — the pipeline
-        and result dicts are identical for all built-in families.  Override
-        only when the result dict must differ from the pipeline dict.
-
-        Returns:
-            Dict of extra keys (may be empty).
+        `fit()` always adds `"response"` and `"group"`. Default delegates
+        to `_extra_pipeline_kwargs()`; override only when result keys must
+        differ from pipeline keys.
         """
         return self._extra_pipeline_kwargs()
 
-    # ── Concrete hooks (overridable) ─────────────────────────────────────────
+    # Concrete hooks (overridable)
 
     def _pre_fit_checks(self) -> None:
-        """Early guard hook — runs before the ``bambi`` import in :meth:`fit`.
+        """Early guards run before the `bambi` import.
 
-        Default is a no-op.  Subclasses override when they need to fail
-        fast on missing required attributes before the (potentially slow)
-        ``bambi`` import.  Example: :class:`BinomialModel` raises if
-        ``trials_col`` was not supplied.
+        Base implementation validates `self._link` against the family spec.
+        Subclasses that need extra fail-fast checks (e.g. `BinomialModel`
+        requires `trials_col`; `BetaModel` guards `squeeze`) override this and
+        call `super()._pre_fit_checks()` to keep link validation.
         """
-        return None
+        self._validate_link()
 
     def _bambi_family(self) -> str:
-        """The family string passed to ``bambi.Model(..., family=...)``.
+        """Family string for ``bambi.Model(family=...)``.
 
-        Default returns :attr:`_family` (the user-facing label).  Override
-        when the Bambi backend family differs — for example,
-        :class:`LognormalModel` returns ``"gaussian"`` because the model
-        is fit as Gaussian on a log-scale response.  ``ModelResult.family``
-        still keeps the user-facing label.
+        Read from `FAMILY_SPECS`.
         """
-        return self._family
+        return self._spec.bambi_family
 
     def _response_pp_key(self, response: str) -> str:
-        """Key under which ``idata.posterior_predictive`` stores the response.
+        """Key under which `posterior_predictive` stores the response.
 
-        Default returns *response* unchanged — correct for plain Gaussian /
-        Beta / Lognormal formulae.  :class:`BinomialModel` overrides because
-        Bambi 0.14+ stores PP under the wrapped LHS ``p(y, trials_col)``
-        rather than the bare response column.
+        Defaults to *response*; `BinomialModel` overrides (Bambi wraps it as
+        `p(y, trials_col)`).
         """
         return response
 
     def _workaround_priors(self, bmb_module: Any) -> dict[str, Any]:
-        """Auto-injected priors that work around backend (Bambi) bugs.
+        """Auto-injected priors that work around Bambi backend bugs.
 
-        Default returns an empty dict.  Subclasses override when the backend
-        needs help avoiding internal failures (e.g. distributional components
-        whose design matrix would otherwise be empty — see
-        :class:`BetaModel` and :class:`GaussianModel`).
-
-        User-supplied priors (``self._priors``) take precedence — the merge
-        happens in :meth:`fit` with the workaround dict as the lower-priority
-        base layer.
+        Default returns `{}`. User priors (`self._priors`) take precedence —
+        `fit()` merges with the workaround dict as the lower-priority base.
         """
         return {}
 
     @property
     def _preproc_family(self) -> str:
-        """Family string passed to :class:`~hbsaemp.data._validator.DataValidator`
-        and :class:`~hbsaemp.data._preprocessor.DataPreprocessor`.
+        """Family for validator and preprocessor.
 
-        Subclasses may override this when the validator/preprocessor family
-        differs from the user-facing :attr:`family`.
-        :class:`LognormalModel` returns ``"gaussian"`` because its log-scale
-        response can be negative (failing the lognormal positivity check).
+        Read from `FAMILY_SPECS`.
         """
-        return self._family
+        return self._spec.preproc_family
 
-    # ── Pipeline helpers (concrete) ──────────────────────────────────────────
+    # Hook helpers (concrete utilities for subclass hooks)
+
+    def _build_distributional_formula(
+        self,
+        bmb_module: Any,
+        main_formula: str,
+        *,
+        param: str,
+        offset_col: str | None,
+        mu_link: str,
+        mu_key: str = "mu",
+    ) -> tuple[Any, Any]:
+        """Build a Bambi distributional formula for Fay-Herriot offset models.
+
+        Shared between Gaussian and Beta. When `offset_col` is
+        None, returns the plain formula + single link.
+
+        The secondary sub-formula uses `"1 + offset(...)"` (not `"0 + ..."`)
+        as a Bambi 0.18+ workaround — the `0+` form leaves an empty common
+        design matrix and crashes `DistributionalComponent.predict()`. The
+        intercept is clamped near zero by `_pin_intercept_prior`.
+
+        Args:
+            bmb_module: Imported `bambi` module.
+            main_formula: Response-side formula, e.g. `"y ~ x1 + x2"`.
+            param: Distributional parameter name (`"sigma"`, `"kappa"`).
+            offset_col: Pre-computed offset column (e.g. `"log_sqrt_D"`),
+                or None for plain regression.
+            mu_link: Link function for the mean parameter.
+            mu_key: Mean-parameter key in the link dict (`"mu"` or `"p"`).
+
+        Returns:
+            `(formula, link)` ready for `bmb.Model`.
+        """
+        if offset_col is not None:
+            formula = bmb_module.Formula(
+                main_formula, f"{param} ~ 1 + offset({offset_col})"
+            )
+            # Both keys required — partial dict raises KeyError in Bambi backend.
+            link: Any = {mu_key: mu_link, param: "log"}
+        else:
+            formula = main_formula
+            link = mu_link
+        return formula, link
+
+    def _pin_intercept_prior(
+        self,
+        bmb_module: Any,
+        *,
+        param: str,
+        active: bool,
+    ) -> dict[str, Any]:
+        """Tight `Normal(0, 1e-3)` prior on `{param}_Intercept` when *active*.
+
+        Used by the distributional offset workaround to keep `param ≈ offset`
+        (see `_build_distributional_formula`). Returns `{}` when not active.
+        """
+        if active:
+            return {
+                f"{param}_Intercept": bmb_module.Prior("Normal", mu=0.0, sigma=1e-3),
+            }
+        return {}
+
+    # Pipeline helpers (concrete)
 
     def _run_pipeline(
         self,
         data: pd.DataFrame,
     ) -> tuple[str, list[str], list[str], str | None, pd.DataFrame]:
-        """Common parse → validate → preprocess pipeline used by :meth:`fit`.
+        """Parse formula, validate, preprocess; returns the cleaned frame.
 
-        Delegates family-specific kwargs to :meth:`_extra_pipeline_kwargs`
-        and the preprocessor family to :attr:`_preproc_family`.
-
-        Args:
-            data: Raw training DataFrame (usually ``self._data``).
-
-        Returns:
-            Tuple ``(response, predictors, random_groups, group_col, df_clean)``
-            where *df_clean* is a preprocessed copy ready for
-            ``bambi.Model``.
+        Returns `(response, predictors, random_groups, group_col, df_clean)`
+        where `df_clean` is the preprocessed copy ready for `bambi.Model`.
         """
         from hbsaemp.data._preprocessor import DataPreprocessor
         from hbsaemp.data._validator import DataValidator
@@ -413,22 +408,11 @@ class BaseModel(abc.ABC):
     def _preprocess_new_data(self, new_data: pd.DataFrame) -> pd.DataFrame:
         """Re-apply training-time preprocessing to out-of-sample data.
 
-        Called by :meth:`predict` when ``new_data`` is not ``None``.
-        Adds required offset columns (e.g. ``log_phi`` for Beta,
-        ``log_sqrt_D`` for Gaussian/Lognormal FH) so that Bambi's
-        distributional formula can evaluate them on the new rows.
-
-        Validation is **skipped** — only the transform step is run.
-
-        Args:
-            new_data: Out-of-sample DataFrame with the same column
-                structure as the training data.
-
-        Returns:
-            Preprocessed copy of ``new_data``.
+        Adds required offset columns (`log_phi`, `log_sqrt_D`) so Bambi's
+        distributional formula can evaluate them. Validation is skipped.
 
         Raises:
-            ModelNotFittedError: If :meth:`fit` has not been called.
+            ModelNotFittedError: If `fit()` has not been called.
         """
         from hbsaemp.data._preprocessor import DataPreprocessor
         from hbsaemp.utils._formula import parse_formula
@@ -445,44 +429,29 @@ class BaseModel(abc.ABC):
             **self._extra_pipeline_kwargs(),
         )
 
-    # ── predict() kind normalisation ─────────────────────────────────────────
+    # predict() kind normalisation
 
-    # Map of deprecated kind aliases → canonical Bambi 0.14+ kind.
+    # Map of deprecated kind aliases → canonical Bambi 0.18+ kind.
     _KIND_ALIASES: dict[str, str] = {"pps": "response", "mean": "response_params"}
-    # Kinds removed in Bambi 0.14+ — raise immediately before touching idata.
+    # Kinds removed in Bambi 0.18+ — raise immediately before touching idata.
     _KIND_REMOVED: frozenset[str] = frozenset({"linear"})
     # Only these two canonical values are forwarded to ``bambi.Model.predict()``.
     _KIND_VALID: frozenset[str] = frozenset({"response", "response_params"})
 
     def _normalize_predict_kind(self, kind: str) -> str:
-        """Validate and normalise the ``kind`` argument for :meth:`predict`.
+        """Validate and normalise the `kind` arg before forwarding to Bambi.
 
-        Maps deprecated Bambi aliases to their Bambi 0.14+ equivalents,
-        rejects removed values, and raises for anything else — **before**
-        the kind string is forwarded to ``bambi.Model.predict()``.
+        Mapping:
 
-        Canonical mapping
-        -----------------
-        * ``"response"`` → unchanged (posterior predictive :math:`Y_{rep}`)
-        * ``"response_params"`` → unchanged (posterior mean µ / p / κ)
-        * ``"pps"`` → ``"response"`` + :class:`FutureWarning`
-        * ``"mean"`` → ``"response_params"`` + :class:`FutureWarning`
-        * ``"linear"`` → :class:`ValueError` (removed in Bambi 0.14+)
-        * anything else → :class:`ValueError`
-
-        Args:
-            kind: Raw kind string supplied by the caller.
-
-        Returns:
-            Canonical kind string (``"response"`` or ``"response_params"``)
-            accepted by Bambi 0.14+.
-
-        Raises:
-            ValueError: For unsupported or removed kind values.
+        * `"response"` / `"response_params"` — passthrough.
+        * `"pps"` -> `"response"` (FutureWarning).
+        * `"mean"` -> `"response_params"` (FutureWarning).
+        * `"linear"` — removed in Bambi 0.18+ -> ValueError.
+        * other — ValueError.
         """
         if kind in self._KIND_REMOVED:
             raise ValueError(
-                f"kind={kind!r} was removed in Bambi 0.14+. "
+                f"kind={kind!r} was removed in Bambi 0.18+. "
                 f"Use 'response' (posterior predictive Y_rep) or "
                 f"'response_params' (posterior mean parameter µ/p/κ)."
             )
@@ -508,19 +477,15 @@ class BaseModel(abc.ABC):
         return kind
 
     def _build_bambi_priors(self, priors: PriorDict | None) -> dict | None:
-        """Convert user prior dict to Bambi ``Prior`` objects.
+        """Convert user prior dict / `Prior` objects to `bambi.Prior`.
 
-        Args:
-            priors: Dict of the form
-                ``{"x1": {"dist": "Normal", "mu": 0, "sigma": 1}}``,
-                or ``None`` for Bambi auto-priors.
-
-        Returns:
-            Dict of ``{param: bmb.Prior(...)}`` ready for
-            ``bmb.Model(..., priors=...)``, or ``None``.
+        Accepts either `Prior` instances (validated at construction) or plain
+        dicts like `{"dist": "Normal", "mu": 0, "sigma": 1}` (validated here
+        via `Prior.from_dict`). Returns `None` for Bambi's auto-priors.
 
         Raises:
-            ImportError: If ``bambi`` is not installed.
+            ImportError: If `bambi` is not installed.
+            PriorSpecError: If any dict entry lacks a `"dist"` key.
         """
         if priors is None:
             return None
@@ -528,42 +493,36 @@ class BaseModel(abc.ABC):
             import bambi as bmb
         except ImportError as exc:
             raise ImportError(
-                "Prior conversion requires bambi>=0.14. "
+                "Prior conversion requires bambi>=0.18. "
                 "Install with: pip install 'hbsaemp[bambi]'"
             ) from exc
-        return {
-            k: bmb.Prior(v["dist"], **{kk: vv for kk, vv in v.items() if kk != "dist"})
-            for k, v in priors.items()
-        }
 
-    # ── Concrete fit() and predict() ─────────────────────────────────────────
+        from hbsaemp.models._prior import Prior
+
+        result: dict[str, Any] = {}
+        for k, v in priors.items():
+            if isinstance(v, Prior):
+                result[k] = v.to_bambi(bmb)
+            else:
+                # Legacy dict format — coerce via Prior.from_dict (validates here).
+                result[k] = Prior.from_dict(v, param=k).to_bambi(bmb)
+        return result
+
+    # Concrete fit() and predict()
 
     def fit(self) -> ModelResult:
-        """Fit the HBSAE model via Bambi MCMC.
+        """Fit the model via Bambi MCMC and return a `ModelResult`.
 
-        Shared pipeline used by every family subclass:
+        Pipeline (shared across all families):
+        pre_fit_checks -> import bambi -> run_pipeline (parse + validate +
+        preprocess) -> build formula+link -> merge priors -> bmb.Model.fit().
 
-        1. :meth:`_pre_fit_checks` — early guard hook (default no-op).
-        2. Lazy import of ``bambi`` (centralised :class:`ImportError` handling).
-        3. :meth:`_run_pipeline` — parse formula → validate data →
-           preprocess (adds family-specific offset columns).
-        4. :meth:`_build_formula_and_link` — subclass hook returns the
-           Bambi formula (plain string or :class:`bambi.Formula`) and
-           link spec (string or dict).
-        5. :meth:`_build_bambi_priors` — convert user priors to Bambi
-           :class:`bambi.Prior` objects.
-        6. Build ``bambi.Model`` with family from :meth:`_bambi_family`.
-        7. ``bambi.Model.fit()`` with
-           ``idata_kwargs={"log_likelihood": True}`` (mandatory for LOO/WAIC).
-        8. Build and store :class:`ModelResult` — ``family`` keeps the
-           user-facing label (e.g. ``"lognormal"``) even when the Bambi
-           backend family differs.
-
-        Returns:
-            The fitted :class:`ModelResult` (also stored on ``self._result``).
+        Log-likelihood is computed post-sampling via
+        `bmodel.compute_log_likelihood(idata)` (PyMC 6.0 / Bambi 0.18 pattern) —
+        required for LOO downstream.
 
         Raises:
-            ImportError: If ``bambi`` is not installed.
+            ImportError: If `bambi` is not installed.
             DataValidationError: If the data fails validator checks.
         """
         # 1. Family-specific pre-flight checks (raise BEFORE bambi import).
@@ -574,7 +533,7 @@ class BaseModel(abc.ABC):
             import bambi as bmb
         except ImportError as exc:
             raise ImportError(
-                f"{type(self).__name__}.fit() requires bambi>=0.14. "
+                f"{type(self).__name__}.fit() requires bambi>=0.18. "
                 "Install with: pip install 'hbsaemp[bambi]'"
             ) from exc
 
@@ -597,7 +556,7 @@ class BaseModel(abc.ABC):
             else None
         )
 
-        # 6. Build Bambi model (use _bambi_family() so lognormal maps to gaussian).
+        # 6. Build Bambi model using the family metadata from FAMILY_SPECS.
         bmb_family = self._bambi_family()
         logger.debug(
             "Building bambi.Model (family=%r, link=%r)", bmb_family, link
@@ -617,10 +576,14 @@ class BaseModel(abc.ABC):
             sampler_kwargs["draws"], sampler_kwargs["tune"],
             sampler_kwargs["chains"], sampler_kwargs["cores"],
         )
-        idata = bmodel.fit(
-            **sampler_kwargs,
-            idata_kwargs={"log_likelihood": True},
-        )
+        idata = bmodel.fit(**sampler_kwargs)
+
+        # 7b. Compute log-likelihood post-sampling. PyMC 6.0 / Bambi 0.18
+        # deprecated requesting it inline via fit(idata_kwargs={"log_likelihood": True}).
+        # data=None reuses Bambi's internal training frame (df_clean, which already
+        # carries any offset columns). LOO downstream requires this group; let a
+        # failure here propagate rather than yield an idata that breaks silently later.
+        bmodel.compute_log_likelihood(idata)
 
         # 8. Store result — keep user-facing family label.
         self._result = ModelResult(
@@ -643,6 +606,36 @@ class BaseModel(abc.ABC):
         logger.info("%s.fit() complete.", type(self).__name__)
         return self._result
 
+    def _predict_idata(
+        self, new_data: pd.DataFrame | None = None, *, kind: str
+    ) -> Any:
+        """Return a fresh `InferenceData` with the predicted group populated.
+
+        `inplace=False` → Bambi returns a NEW `InferenceData` (the original
+        posterior merged with the requested prediction group). `result.idata`
+        — long-lived state holding the in-sample `mu`/`p` written at `fit()`
+        time — is never overwritten. Callers read draws from the returned
+        object, never from `result.idata`.
+
+        `kind` must already be canonical (`"response"` / `"response_params"`);
+        `predict()` normalises before calling. The public `predictive_idata()`
+        wraps this for the `"response"` case so `compare_models()` and advanced
+        users get mutation-free PPC without reaching into a private method.
+        """
+        result = self.result  # raises ModelNotFittedError if not fitted
+        bmodel = result.backend_model
+
+        # In-sample falls back to the stored training data instead of None:
+        # Bambi 0.18+ raises a TypeError ("'str' cannot be interpreted as an
+        # integer") on distributional models with offset() when data=None,
+        # because the offset column lookup expects an explicit DataFrame.
+        processed = (
+            self._preprocess_new_data(new_data)
+            if new_data is not None
+            else result.data
+        )
+        return bmodel.predict(result.idata, data=processed, kind=kind, inplace=False)
+
     def predict(
         self,
         new_data: pd.DataFrame | None = None,
@@ -650,47 +643,26 @@ class BaseModel(abc.ABC):
         kind: str = "response",
         n_samples: int | None = None,
     ) -> np.ndarray:
-        """Draw posterior samples.
-
-        Supported ``kind`` values (Bambi 0.14+):
-
-        * ``"response"`` *(default)* — posterior predictive samples
-          :math:`Y_{rep}`; extracted from
-          ``idata.posterior_predictive[response]``.
-        * ``"response_params"`` — posterior of the mean/latent parameter
-          (``"mu"`` for Gaussian / Beta / Lognormal, ``"p"`` for Binomial);
-          extracted from ``idata.posterior[_MEAN_PARAM_KEY]``.
-
-        Deprecated aliases (handled internally, **not** forwarded to Bambi):
-
-        * ``"pps"`` → normalised to ``"response"``; triggers :class:`FutureWarning`.
-        * ``"mean"`` → normalised to ``"response_params"``; triggers
-          :class:`FutureWarning`.
-
-        Removed in Bambi 0.14+ (raises :class:`ValueError` immediately):
-
-        * ``"linear"``
+        """Draw posterior samples; returns `(total_draws, n_obs)`.
 
         Args:
-            new_data: Out-of-sample data. ``None`` uses training data.
-                For Binomial, *new_data* must include ``trials_col``.
-            kind: Prediction kind (see above). Default ``"response"``.
-            n_samples: Number of posterior draws to return. ``None`` = all.
-
-        Returns:
-            Array of shape ``(total_draws, n_obs)`` where
-            ``total_draws = chains × draws``.  For :class:`LognormalModel`
-            the values are on the **log scale** — apply :func:`numpy.exp`
-            to recover the original-scale response.
+            new_data: Out-of-sample data. `None` uses training data.
+                For Binomial, must include `trials_col`.
+            kind:
+                - `"response"` (default): posterior predictive Y_rep, from
+                  `idata.posterior_predictive[response]`.
+                - `"response_params"`: posterior of the mean parameter
+                  (`mu` or `p`), from `idata.posterior[self._mean_param_key]`.
+                - `"pps"` / `"mean"`: deprecated aliases (FutureWarning).
+                - `"linear"`: removed in Bambi 0.18+ -> ValueError.
+            n_samples: Number of posterior draws to return; `None` = all.
 
         Raises:
-            ModelNotFittedError: If :meth:`fit` has not been called.
+            ModelNotFittedError: If `fit()` has not been called.
             ValueError: For unsupported or removed *kind* values.
         """
         result = self.result  # raises ModelNotFittedError if not fitted
         response: str = result.extra["response"]
-        bmodel = result.backend_model
-        idata = result.idata
 
         # Normalise before calling Bambi: maps deprecated aliases, rejects
         # removed / unknown kinds. Only "response" or "response_params" reach Bambi.
@@ -703,26 +675,19 @@ class BaseModel(abc.ABC):
             "None (in-sample)" if new_data is None else f"shape={new_data.shape}",
         )
 
-        # Preprocess new_data so any required offset columns are present.
-        # In-sample falls back to the stored training data instead of None:
-        # Bambi 0.14+ raises a TypeError ("'str' cannot be interpreted as an
-        # integer") on distributional models with offset() when data=None,
-        # because the offset column lookup expects an explicit DataFrame.
-        processed = (
-            self._preprocess_new_data(new_data)
-            if new_data is not None
-            else result.data
-        )
-        bmodel.predict(idata, data=processed, kind=kind, inplace=True)
+        # inplace=False → Bambi mengembalikan idata BARU; result.idata tetap
+        # utuh (state hidup-lama, menyimpan mu/p in-sample dari fit()). Lihat
+        # _predict_idata() dan CLAUDE.md "What NOT to do".
+        pred_idata = self._predict_idata(new_data, kind=kind)
 
         # ── Extract draws ────────────────────────────────────────────────────
         # kind is always canonical after _normalize_predict_kind():
-        #   "response"        → idata.posterior_predictive[_response_pp_key(response)]
-        #   "response_params" → idata.posterior[_MEAN_PARAM_KEY]
+        #   "response"        → pred_idata.posterior_predictive[_response_pp_key(response)]
+        #   "response_params" → pred_idata.posterior[_mean_param_key]
         if kind == "response":
-            draws_da = idata.posterior_predictive[self._response_pp_key(response)]
+            draws_da = pred_idata.posterior_predictive[self._response_pp_key(response)]
         else:  # "response_params"
-            draws_da = idata.posterior[self._MEAN_PARAM_KEY]
+            draws_da = pred_idata.posterior[self._mean_param_key]
 
         # stack() combines named dims — safe against axis-order changes in ArviZ.
         # Result dims: (obs_dim, "sample"), shape (n_obs, n_samples).
@@ -737,7 +702,26 @@ class BaseModel(abc.ABC):
         )
         return flat
 
-    # ── Misc ─────────────────────────────────────────────────────────────────
+    def predictive_idata(self, new_data: pd.DataFrame | None = None) -> Any:
+        """Return a fresh idata with ``posterior_predictive`` populated, WITHOUT
+        mutating ``result.idata``.
+
+        Public entry point for posterior-predictive work: used internally by
+        ``compare_models()`` for its pp-check plot, and available to advanced
+        users who want a custom PPC without corrupting the stored idata. Wraps
+        the private ``_predict_idata`` (``inplace=False``). On ArviZ 1.1 the
+        returned object is a DataTree — access groups as attributes
+        (``idata.posterior_predictive``).
+
+        Args:
+            new_data: Out-of-sample data. ``None`` uses the training data.
+
+        Raises:
+            ModelNotFittedError: If ``fit()`` has not been called.
+        """
+        return self._predict_idata(new_data, kind="response")
+
+    # Misc
 
     def summary(self) -> str:
         """Human-readable model summary.

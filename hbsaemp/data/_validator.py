@@ -4,7 +4,6 @@ v0: DataValidator stub.
 v1: Concrete implementation using pandas/numpy checks.
 """
 from __future__ import annotations
-from typing import Any
 import numpy as np
 import pandas as pd
 from hbsaemp._exceptions import DataValidationError
@@ -18,7 +17,7 @@ class DataValidator:
     """Validate a DataFrame before model fitting.
 
     v0: All methods raise NotImplementedError.
-    v1: Concrete checks — types, NaN, domain (y in (0,1) for beta, y>0 for lognormal, etc.).
+    v1: Concrete checks — types, NaN, and family-specific domains.
 
     Args:
         handle_missing: Strategy for NaN values. ``"deleted"`` = dropna (v1).
@@ -152,7 +151,7 @@ class DataValidator:
                 context={"inf_columns": inf_cols},
             )
     
-    # Family-spefic checks
+    # Family-specific checks
     def _check_beta(
         self,
         data: pd.DataFrame,
@@ -220,6 +219,7 @@ class DataValidator:
                 )
 
     def _check_lognormal(self, data: pd.DataFrame, response: str, **_) -> None:
+        """Validate positive original-scale responses for the planned V2 family."""
         y = data[response].dropna()
         n_bad = int((y <= 0).sum())
         if n_bad:

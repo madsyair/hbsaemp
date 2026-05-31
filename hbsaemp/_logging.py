@@ -21,17 +21,11 @@ logging.getLogger(PACKAGE_LOGGER_NAME).addHandler(logging.NullHandler())
 
 
 def get_logger(name: str | None = None) -> logging.Logger:
-    """Return a namespaced logger. Call with ``__name__`` in every module.
+    """Return a namespaced logger; call with ``__name__`` in every module.
 
-    Args:
-        name: Module name. ``None`` → root ``hbsaemp`` logger.
-            Names not starting with ``"hbsaemp."`` are auto-prefixed.
-
-    Returns:
-        A ready :class:`logging.Logger`.
-
-    Raises:
-        TypeError: If *name* is not ``str`` or ``None``.
+    ``None`` or the bare package name → root ``hbsaemp`` logger; any other name
+    is auto-prefixed with ``hbsaemp.``. Raises ``TypeError`` if *name* is not
+    ``str``/``None``.
     """
     if name is not None and not isinstance(name, str):
         raise TypeError(f"`name` must be str or None, got {type(name).__name__!r}")

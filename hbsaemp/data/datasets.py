@@ -7,7 +7,7 @@ Available datasets (same names as R hbsaems):
     data_fhnorm         — Gaussian/Fay-Herriot normal
     data_betalogitnorm  — Beta logit-normal
     data_binlogitnorm   — Binomial logit-normal
-    data_lnln           — Lognormal-lognormal
+    data_lnln           — Lognormal-lognormal example reserved for V2
 
 All datasets: m=30 areas, seed=42, area-level (one row per area).
 Column names match the R hbsaems package.
@@ -74,9 +74,7 @@ def load_dataset(name: DatasetName) -> pd.DataFrame:
     return _generators[name]()  # type: ignore[operator]
 
 
-# ---------------------------------------------------------------------------
 # Private generators — one per dataset
-# ---------------------------------------------------------------------------
 
 def _rng() -> np.random.Generator:
     return np.random.default_rng(_SEED)
@@ -202,7 +200,7 @@ def _make_binlogitnorm() -> pd.DataFrame:
 
 
 def _make_lnln() -> pd.DataFrame:
-    """Lognormal-lognormal.
+    """Lognormal-lognormal example reserved for the planned V2 model.
 
     Model: log(y_i) | eta_i ~ N(eta_i, psi_i)   [psi_i = known sampling var]
            eta_i = x_i^T beta + u_i,  u_i ~ N(0, sigma_u^2)

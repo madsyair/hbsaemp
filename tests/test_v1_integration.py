@@ -56,15 +56,8 @@ def _check_convergence_result(result: hb.ConvergenceResult) -> None:
 
 def _check_comparison_result(result: hb.ComparisonResult) -> None:
     """Common assertions for single-model ComparisonResult."""
-    import arviz as az
     assert isinstance(result, hb.ComparisonResult)
     assert result.loo is not None
-    # WAIC is opt-in: ArviZ ≥0.20 removed ``az.waic`` and compare_models()
-    # degrades to None in that case.
-    if hasattr(az, "waic"):
-        assert result.waic is not None
-    else:
-        assert result.waic is None
     assert result.comparison_table is None  # single model → no table
 
 
@@ -247,64 +240,6 @@ class TestIntegrationBinomial:
 
 
 # ===========================================================================
-# Lognormal integration
-# ===========================================================================
-
-class TestIntegrationLognormal:
-    """Full workflow with data_lnln (Lognormal-lognormal)."""
-
-    @pytest.fixture(scope="class")
-    def model(self) -> hb.BaseModel:
-        df = hb.load_dataset("data_lnln")
-        m = hb.create_model(
-            "y_log_obs ~ x1 + x2 + (1|group)",
-            family="lognormal",
-            data=df,
-            sampling_var="psi_i",
-            config=_CFG,
-        )
-        m.fit()
-        return m
-
-    @pytest.fixture(scope="class")
-    def df(self) -> pd.DataFrame:
-        return hb.load_dataset("data_lnln")
-
-    def test_fit_success(self, model):
-        assert model.is_fitted
-        assert model.result.family == "lognormal"
-
-    def test_idata_groups(self, model):
-        assert hasattr(model.result.idata, "posterior")
-        assert hasattr(model.result.idata, "log_likelihood")
-
-    def test_log_sqrt_D_added(self, model):
-        assert "log_sqrt_D" in model.result.data.columns
-
-    def test_log_sqrt_D_values(self, model):
-        df = model.result.data
-        np.testing.assert_allclose(
-            df["log_sqrt_D"].values,
-            0.5 * np.log(df["psi_i"].values),
-            rtol=1e-6,
-        )
-
-    def test_estimate_areas_log_scale(self, model):
-        result = hb.estimate_areas(model)
-        _check_area_result(result, len(model.result.data))
-        # Lognormal: predictions on log scale → any real value is valid
-        assert np.isfinite(result.result_table["mean"]).all()
-
-    def test_check_convergence(self, model):
-        result = hb.check_convergence(model, plot_types=[])
-        _check_convergence_result(result)
-
-    def test_compare_models_single(self, model):
-        result = hb.compare_models(model)
-        _check_comparison_result(result)
-
-
-# ===========================================================================
 # Multi-model comparison
 # ===========================================================================
 
@@ -346,11 +281,6 @@ class TestMultiModelComparison:
         assert isinstance(result.loo, dict)
         assert "model_0" in result.loo
         assert "model_1" in result.loo
-
-    def test_waic_dict_keys(self, two_beta_models):
-        m1, m2 = two_beta_models
-        result = hb.compare_models([m1, m2])
-        assert isinstance(result.waic, dict)
 
 
 # ===========================================================================

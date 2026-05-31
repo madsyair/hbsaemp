@@ -1,15 +1,12 @@
-"""Small Area Estimation prediction and uncertainty quantification.
+"""Small Area Estimation: per-area mean/SD/HDI/RSE/MSE from posterior draws.
 
-Python equivalent of R hbsaems::hbsae().
-
-v0: estimate_areas() stub + AreaEstimatesResult dataclass.
-v1: Concrete — model.predict() via bambi; RSE/MSE/RMSE/CI from posterior draws.
+`estimate_areas()` always reads the posterior of the latent mean parameter
+(via `predict(kind="response_params")`) — never the posterior predictive,
+which would re-add sampling variance and destroy the shrinkage estimate.
 """
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from functools import lru_cache
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -21,38 +18,16 @@ logger = get_logger(__name__)
 __all__: list[str] = ["AreaEstimatesResult", "estimate_areas", "hbsae"]
 
 
-@lru_cache(maxsize=1)
-def _get_hdi_kwarg() -> str:
-    """Return the active kwarg name for ``arviz.hdi`` probability.
-
-    ArviZ ≥0.20 renamed ``hdi_prob`` → ``prob``.  Detect once per process
-    via :func:`inspect.signature` and cache; preserves the lazy arviz
-    import (signature inspection happens at first call, not module load).
-    """
-    from inspect import signature
-
-    import arviz as az
-
-    return "prob" if "prob" in signature(az.hdi).parameters else "hdi_prob"
-
-
 @dataclass
 class AreaEstimatesResult:
-    """Container for small area estimation results.
+    """Per-area SAE results.
 
     Attributes:
-        result_table: DataFrame with per-area statistics.
-            Columns: ``mean``, ``sd``, ``ci_lower``, ``ci_upper``,
-            ``rse_pct``, ``mse``, ``rmse``.
-            Optional ``group`` column when grouping info is available.
-        mean_rse: Overall mean RSE (%) across all areas.
-        mean_mse: Overall mean MSE across all areas.
-
-    Example (v1 output)::
-
-             mean        sd  ci_lower  ci_upper  rse_pct       mse      rmse
-        0  5.1418  0.424869  4.308978  5.974702   8.2666  0.180594  0.424963
-        1  4.2751  0.369247  3.551182  4.998952   8.6380  0.136343  0.369246
+        result_table: DataFrame with columns `mean`, `sd`, `ci_lower`,
+            `ci_upper`, `rse_pct`, `mse`, `rmse`. An optional `group` column
+            is prepended when the source model has grouping info.
+        mean_rse: Mean RSE (%) across all areas.
+        mean_mse: Mean MSE across all areas.
     """
 
     result_table: pd.DataFrame = field(default_factory=pd.DataFrame)
@@ -60,7 +35,7 @@ class AreaEstimatesResult:
     mean_mse: float | None = None
 
     def summary(self) -> str:
-        """Human-readable summary of SAE results."""
+        """One-screen text summary."""
         if self.result_table.empty:
             return "AreaEstimatesResult [stub — call estimate_areas() with a fitted model]"
         return (
@@ -82,73 +57,37 @@ def estimate_areas(
     new_data: pd.DataFrame | None = None,
     ci_prob: float = 0.95,
 ) -> AreaEstimatesResult:
-    """Generate hierarchical Bayesian small area estimates.
+    """Compute per-area HB estimates from the posterior of the latent parameter.
 
-    Python equivalent of ``hbsae()`` in R hbsaems.
+    For each area, draws are taken via `predict(kind="response_params")` —
+    posterior of mu (Gaussian/Beta) or p (Binomial) — never the
+    posterior predictive (which would re-add sampling variance and destroy
+    shrinkage; for Binomial it would also return counts not probabilities).
 
-    Computes per-area statistics from the **posterior distribution of the
-    latent mean/probability parameter** (not the posterior predictive):
+    Metrics per area (from `(total_draws, n_obs)` array):
+    `mean`, `sd`, `ci_lower`/`ci_upper` (HDI at `ci_prob`), `rse_pct =
+    sd / |mean| * 100`, `mse` (posterior variance), `rmse`.
 
-    * Gaussian / Beta / Lognormal (log-scale): posterior of ``μ_i`` —
-      the shrinkage estimate ``E[θ_i | y]``.
-    * Binomial: posterior of ``p_i`` — the area-level success probability
-      in ``(0, 1)``.
-
-    Using the posterior of the latent parameter (rather than the posterior
-    predictive ``y*``) is the correct choice for SAE because:
-
-    1. The posterior predictive ``Var[y*|y] = Var[θ_i|y] + D_i`` re-adds
-       the local sampling variance ``D_i``, destroying the shrinkage effect
-       that is the core benefit of hierarchical Bayes models.
-    2. For Binomial, the posterior predictive returns *counts* (``y* ∈
-       {0, …, n_i}``), whereas the SAE target is the *proportion* ``p_i``.
-
-    The posterior predictive is used only in
-    :func:`~hbsaemp.diagnostics.comparison.compare_models` for posterior
-    predictive checks (PPC), where distributing over new observations is
-    the correct intent.
-
-    Metrics computed per area from the posterior draws array of shape
-    ``(total_draws, n_obs)``:
-
-    * ``mean`` — posterior mean of the latent parameter
-    * ``sd`` — posterior standard deviation
-    * ``ci_lower``, ``ci_upper`` — ArviZ HDI at *ci_prob*
-    * ``rse_pct`` — relative standard error: ``(sd / |mean|) × 100``
-    * ``mse`` — posterior variance (= MSE of the HB estimator)
-    * ``rmse`` — ``sqrt(mse)``
-
-    A ``group`` column is appended when the model was fitted with group
-    information (``model.result.extra["group"]`` is not ``None``).
+    A `group` column is prepended when the model was fitted with grouping.
 
     Args:
-        model: A fitted :class:`~hbsaemp.models._base.BaseModel`.
-        new_data: Optional out-of-sample DataFrame for prediction.
-            When ``None``, uses the training data (in-sample estimates).
-        ci_prob: Credible interval probability. Default 0.95 (95 % HDI).
-
-    Returns:
-        :class:`AreaEstimatesResult` with per-area table and overall metrics.
+        model: Fitted `BaseModel`.
+        new_data: Optional out-of-sample DataFrame. `None` uses training data.
+        ci_prob: HDI probability (default 0.95).
 
     Raises:
-        ModelNotFittedError: If *model* has not been fitted.
-        ImportError: If ``arviz`` is not installed.
-
-    Example (v1)::
-
-        result = estimate_areas(model)
-        result.summary()
-        result.result_table.to_csv("sae_estimates.csv")
+        ModelNotFittedError: If `model` has not been fitted.
+        ImportError: If `arviz` is not installed.
     """
     try:
         import arviz as az
     except ImportError as exc:
         raise ImportError(
-            "estimate_areas() requires arviz>=0.18. "
+            "estimate_areas() requires arviz>=1.1. "
             "Install with: pip install 'hbsaemp[bambi]'"
         ) from exc
 
-    # ── guard: model must be fitted ──────────────────────────────────────────
+    # guard: model must be fitted
     result = model.result  # raises ModelNotFittedError if not fitted
 
     group_col: str | None = result.extra.get("group")
@@ -160,17 +99,17 @@ def estimate_areas(
         ci_prob,
     )
 
-    # ── posterior draws of the latent mean/probability parameter ─────────────
-    # kind="response_params" extracts idata.posterior[_MEAN_PARAM_KEY]:
-    #   Gaussian/Beta/Lognormal → "mu"  (shrinkage estimate of θ_i)
-    #   Binomial                → "p"   (area-level success probability)
+    # posterior draws of the latent mean/probability parameter
+    # kind="response_params" extracts idata.posterior[model._mean_param_key]:
+    #   Gaussian/Beta -> "mu"  (shrinkage estimate of theta_i)
+    #   Binomial      -> "p"   (area-level success probability)
     # Using the posterior predictive (kind="response") would re-add the local
     # sampling variance D_i, inflating SD/MSE/RMSE and destroying shrinkage.
     # draws shape: (total_draws, n_obs)
     draws: np.ndarray = model.predict(new_data=new_data, kind="response_params")
     n_obs: int = draws.shape[1]
 
-    # ── group labels ──────────────────────────────────────────────────────────
+    # group labels
     # Group labels must be positionally aligned with the draws array columns.
     # result.data is already NaN-dropped (preprocessed during fit()).
     # new_data is raw — it must be preprocessed to drop the same NaN rows that
@@ -185,7 +124,7 @@ def estimate_areas(
         if group_col in source_for_labels.columns:
             group_labels = source_for_labels[group_col].reset_index(drop=True)
 
-    # ── per-area statistics (vectorised over axis=0 = sample dim) ────────────
+    # per-area statistics (vectorised over axis=0 = sample dim)
     means = draws.mean(axis=0)
     sds   = draws.std(axis=0)
     mses  = draws.var(axis=0)
@@ -197,16 +136,13 @@ def estimate_areas(
             np.nan,
         )
 
-    # HDI per area. Loop here is the safe path across arviz versions —
-    # numpy/xarray axis semantics for az.hdi shifted between releases. The
-    # main perf win comes from vectorising mean/sd/var above and skipping
-    # the list-of-dicts → DataFrame construction below.
-    # The kwarg was renamed from ``hdi_prob`` to ``prob`` in ArviZ ≥0.20;
-    # cached via ``_get_hdi_kwarg`` so signature inspection runs once per process.
-    hdi_kwarg = _get_hdi_kwarg()
+    # HDI per area. Loop is the safe path: az.hdi has no vectorised 2-D
+    # variant in ArviZ 1.1 (calling with axis= aggregates incorrectly).
+    # `prob` is the canonical kwarg since ArviZ ≥0.20 (was `hdi_prob` before);
+    # lower-bound ≥1.1 makes runtime detection unnecessary.
     hdi_arr = np.empty((n_obs, 2), dtype=float)
     for i in range(n_obs):
-        hdi_arr[i] = az.hdi(draws[:, i], **{hdi_kwarg: ci_prob})
+        hdi_arr[i] = az.hdi(draws[:, i], prob=ci_prob)
 
     df_result = pd.DataFrame({
         "mean":     means,

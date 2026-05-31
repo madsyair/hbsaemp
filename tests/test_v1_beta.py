@@ -13,6 +13,7 @@ import pandas as pd
 import pytest
 
 import hbsaemp as hb
+from hbsaemp.diagnostics._plot_utils import _idata_groups
 
 pytestmark = pytest.mark.slow
 
@@ -77,10 +78,23 @@ class TestBetaFit:
         assert idata.posterior is not None
 
     def test_idata_has_log_likelihood(self, beta_model_fitted):
-        """log_likelihood group must exist — required for LOO/WAIC (M4)."""
+        """log_likelihood group must exist — required for LOO (M4)."""
         idata = beta_model_fitted.result.idata
         assert hasattr(idata, "log_likelihood"), \
-            "idata must have log_likelihood group (idata_kwargs={'log_likelihood': True})"
+            "idata must have log_likelihood group (bmodel.compute_log_likelihood)"
+
+    def test_log_likelihood_has_response_var(self, beta_model_fitted):
+        """log_likelihood group must contain the response variable."""
+        ll = beta_model_fitted.result.idata.log_likelihood
+        response = beta_model_fitted.result.extra["response"]
+        assert response in ll
+
+    def test_log_likelihood_finite(self, beta_model_fitted):
+        """All log-likelihood values must be finite."""
+        import numpy as np
+        ll = beta_model_fitted.result.idata.log_likelihood
+        response = beta_model_fitted.result.extra["response"]
+        assert np.isfinite(ll[response].values).all()
 
     def test_result_data_is_clean(self, beta_model_fitted):
         """result.data is the preprocessed DataFrame — y in (0, 1).
@@ -106,10 +120,17 @@ class TestBetaFit:
         assert isinstance(beta_model_fitted.result.backend_model, bmb.Model)
 
     def test_posterior_mu_exists(self, beta_model_fitted):
-        """mu (mean parameter) must appear in posterior."""
-        posterior = beta_model_fitted.result.idata.posterior
-        # Bambi stores intercept-related terms; check at least one variable
-        assert len(list(posterior.data_vars)) > 0
+        """mu is present in idata.posterior immediately after fit() (include_response_params=True)."""
+        idata = beta_model_fitted.result.idata
+        assert "mu" in idata.posterior.data_vars, (
+            f"Expected 'mu' in posterior; got {list(idata.posterior.data_vars)}"
+        )
+
+    def test_posterior_mu_shape(self, beta_model_fitted):
+        """mu has per-observation draws: shape (chain, draw, n_obs)."""
+        mu = beta_model_fitted.result.idata.posterior["mu"]
+        assert mu.dims[-1] not in ("chain", "draw")
+        assert mu.shape[-1] == len(beta_model_fitted.result.data)
 
     def test_fit_without_phi_pinning(self, beta_model_no_phi):
         """Model without n/deff also fits — Bambi estimates kappa."""
@@ -156,7 +177,7 @@ class TestBetaPredict:
             m.predict()
 
     def test_predict_kind_linear_removed(self, beta_model_fitted):
-        """kind='linear' was removed in Bambi 0.14+ — must raise ValueError."""
+        """kind='linear' was removed in Bambi 0.18+ — must raise ValueError."""
         with pytest.raises(ValueError, match="linear"):
             beta_model_fitted.predict(kind="linear")
 
@@ -165,6 +186,38 @@ class TestBetaPredict:
         draws = beta_model_fitted.predict(kind="response_params")
         assert (draws >= 0).all() and (draws <= 1).all()
         assert np.isfinite(draws).all()
+
+    def test_predict_in_sample_value_unchanged(self, beta_model_fitted):
+        """predict() in-sample is deterministic — inplace=False must not change
+        the returned values, only whether idata is mutated."""
+        out1 = beta_model_fitted.predict(kind="response_params")
+        out2 = beta_model_fitted.predict(kind="response_params")
+        np.testing.assert_allclose(out1, out2)
+
+    def test_predict_new_data_does_not_mutate_result_idata(
+        self, beta_model_fitted, data_beta
+    ):
+        """predict(new_data) must NOT overwrite the in-sample mu stored in
+        result.idata — inplace=False keeps result.idata pristine."""
+        idata = beta_model_fitted.result.idata
+        shape_before = idata.posterior["mu"].shape
+        val_before = float(idata.posterior["mu"].values.flatten()[0])
+
+        new_data = data_beta.head(10).reset_index(drop=True)
+        beta_model_fitted.predict(new_data=new_data, kind="response_params")
+
+        assert idata.posterior["mu"].shape == shape_before
+        assert float(idata.posterior["mu"].values.flatten()[0]) == val_before
+
+    def test_predictive_idata_no_mutation(self, beta_model_fitted):
+        """Public predictive_idata() populates posterior_predictive on a fresh
+        idata without mutating result.idata. Also exercises _idata_groups on a
+        real ArviZ 1.1 DataTree (T2 validation)."""
+        m = beta_model_fitted
+        before = _idata_groups(m.result.idata)
+        ppc = m.predictive_idata()
+        assert "posterior_predictive" in _idata_groups(ppc)   # fresh idata filled
+        assert _idata_groups(m.result.idata) == before        # stored idata untouched
 
 
 # ---------------------------------------------------------------------------
@@ -189,7 +242,27 @@ class TestBetaCustomPriors:
         )
         result = model.fit()
         assert result.is_fitted
-        assert result.priors is priors
+
+        # Layer 1: hbsaemp stores the user's prior dict in ModelResult.priors.
+        # Restored from git HEAD (dropped when migrating off bmb.Model.priors).
+        # Use == not `is` — robust against future defensive-copy semantics.
+        assert result.priors == priors
+
+        # Layer 2: Bambi 0.18 removed `bmb.Model.priors` — priors now live on
+        # the parent distributional component's terms. Walk the public path
+        # (stable since Bambi 0.13).
+        bmodel = result.backend_model
+        parent_name = bmodel.family.likelihood.parent        # "mu" for Beta
+        parent_terms = bmodel.distributional_components[parent_name].terms
+        for name, spec in priors.items():
+            assert name in parent_terms, (
+                f"Custom prior for {name!r} not in parent_terms. "
+                f"Available terms: {list(parent_terms.keys())}"
+            )
+            assert parent_terms[name].prior.name == spec["dist"], (
+                f"Expected prior dist {spec['dist']!r} for {name!r}, "
+                f"got {parent_terms[name].prior.name!r}"
+            )
 
 
 # ---------------------------------------------------------------------------

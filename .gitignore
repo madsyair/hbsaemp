@@ -9,6 +9,7 @@ __pycache__/
 
 # Test / tooling
 .pytest_cache/
+_pytest*.log
 .ruff_cache/
 .mypy_cache/
 .nox/
@@ -39,15 +40,11 @@ compiledir_*/
 *.ipynb
 .ipynb_checkpoints/
 
-# Docs build
+# Docs
+docs/
 site/
-docs/_build/
 
-# Internal documentation (lokal saja, jangan push)
-CLAUDE.md
-flow.md
-update-context.md
-ONBOARDING.md
+# Internal documentation
 *.local.md
 
 # Claude Code / AI harness

@@ -12,14 +12,14 @@ __all__: list[str] = ["parse_formula"]
 def parse_formula(formula: str) -> dict:
     """Parse an R/lme4-style formula string into its components.
 
-    Handles standard fixed-effect formulas, random-intercept terms
-    ``(1|group)``, and binomial response syntax ``y | trials(n) ~ ...``
-    (only the response name before ``|`` is captured).
+    Handles standard fixed-effect formulas and random-intercept terms
+    ``(1|group)``. The response is the first identifier on the left-hand
+    side; a leading ``lhs | ...`` is tolerated, with the part after ``|``
+    ignored.
 
     Args:
         formula: R/lme4-style formula string, e.g.
-            ``"y ~ x1 + x2 + (1|group)"`` or
-            ``"y | trials(n) ~ x1 + x2"``.
+            ``"y ~ x1 + x2 + (1|group)"``.
 
     Returns:
         Dict with keys:
@@ -38,9 +38,6 @@ def parse_formula(formula: str) -> dict:
 
         >>> parse_formula("y ~ x1")
         {'response': 'y', 'fixed': ['x1'], 'random_groups': []}
-
-        >>> parse_formula("y | trials(n) ~ x1 + (1|g)")
-        {'response': 'y', 'fixed': ['x1'], 'random_groups': ['g']}
     """
     if "~" not in formula:
         raise FormulaError(

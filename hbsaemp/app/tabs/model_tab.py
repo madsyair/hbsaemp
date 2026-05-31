@@ -11,7 +11,7 @@ Features (v1)
   - Response variable selector.
   - Predictor variable multi-select.
   - Group variable selector (random effects).
-  - Family / distribution selector (gaussian / beta / binomial / lognormal).
+  - Family / distribution selector (gaussian / beta / binomial).
   - Link function selector (auto-populated based on family).
 * **Sampler configuration**: draws, tune, chains, cores, target_accept,
   random_seed — all backed by :class:`~hbsaemp.models._config.ModelConfig`.

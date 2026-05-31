@@ -66,7 +66,7 @@ def data_binomial(rng: np.random.Generator) -> pd.DataFrame:
 
 @pytest.fixture(scope="session")
 def data_lognormal(rng: np.random.Generator) -> pd.DataFrame:
-    """100-row DataFrame for Lognormal / LNLN — y > 0."""
+    """Positive-response fixture reserved for the planned V2 Lognormal model."""
     n, g = 100, 10
     group = np.repeat(np.arange(1, g + 1), n // g)
     x1 = rng.normal(0, 1, n)

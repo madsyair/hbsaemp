@@ -1,10 +1,8 @@
 """Convergence diagnostics for fitted HBSAE models.
 
-Python equivalent of R hbsaems::hbcc().
-
-v0: check_convergence() stub + ConvergenceResult dataclass.
-v1: Concrete — Rhat/ESS via arviz; trace/dens/acf/rhat/neff plots.
-v2+: Geweke, Heidelberger-Welch, Raftery-Lewis via pymc-extras.
+`check_convergence()` (alias `hbcc`) computes r-hat / ESS via ArviZ, emits
+`ConvergenceWarning` when thresholds are breached, and renders trace / dens /
+acf / rhat / neff / energy plots.
 """
 from __future__ import annotations
 
@@ -18,6 +16,8 @@ from hbsaemp._exceptions import ConvergenceWarning
 from hbsaemp._logging import get_logger
 from hbsaemp.diagnostics._plot_utils import (
     _CONVERGENCE_PLOT_CANDIDATES,
+    _NO_VAR_NAMES_PLOTS,
+    _diagnostic_var_names,
     _ensure_headless_matplotlib,
     _fig_from_axes,
 )
@@ -28,7 +28,7 @@ __all__: list[str] = ["ConvergenceResult", "check_convergence", "hbcc"]
 
 # Default diagnostic settings
 _DEFAULT_DIAG_TESTS: list[str] = ["rhat", "ess"]
-_DEFAULT_PLOT_TYPES: list[str] = ["trace", "dens", "acf", "rhat", "neff"]
+_DEFAULT_PLOT_TYPES: list[str] = ["trace", "dens", "acf", "rhat", "neff", "energy"]
 
 # Convergence thresholds
 _RHAT_THRESHOLD: float = 1.01
@@ -83,7 +83,9 @@ class ConvergenceResult:
         rhat_ess: DataFrame with ``mean``, ``sd``, ``r_hat``, ``ess_bulk``,
             ``ess_tail`` per parameter (ArviZ summary).
         plots: Dict of ``matplotlib.Figure`` keyed by plot-type name.
-            Keys from ``["trace", "dens", "acf", "rhat", "neff"]``.
+            Keys from ``["trace", "dens", "acf", "rhat", "neff", "energy"]``.
+        plot_errors: Dict keyed by plot-type name → error message, for plots
+            that failed to render (surfaced rather than silently swallowed).
         geweke: Geweke Z-scores (v2+, ``None`` in v1).
         heidel: Heidelberger-Welch results (v2+, ``None`` in v1).
         raftery: Raftery-Lewis results (v2+, ``None`` in v1).
@@ -91,6 +93,7 @@ class ConvergenceResult:
 
     rhat_ess: Any = None
     plots: dict[str, Any] = field(default_factory=dict)
+    plot_errors: dict[str, str] = field(default_factory=dict)
     geweke: Any = None
     heidel: Any = None
     raftery: Any = None
@@ -131,7 +134,8 @@ class ConvergenceResult:
             f"  Min ESS bulk : {min_ess_str}\n"
             f"  Min ESS tail : {min_ess_tail_str}\n"
             f"  Plots        : {list(self.plots.keys())}\n"
-            f"  Status       : {status}"
+            + (f"  Plot errors  : {len(self.plot_errors)}\n" if self.plot_errors else "")
+            + f"  Status       : {status}"
         )
 
     def __repr__(self) -> str:
@@ -158,11 +162,12 @@ def check_convergence(
 
     Generates diagnostic plots (each stored as a ``matplotlib.Figure``):
 
-    * ``"trace"`` — trace plots
-    * ``"dens"``  — marginal posterior densities
-    * ``"acf"``   — autocorrelation plots
-    * ``"rhat"``  — R-hat forest plot
-    * ``"neff"``  — effective sample size plot
+    * ``"trace"``  — trace plots
+    * ``"dens"``   — marginal posterior densities (``plot_dist``)
+    * ``"acf"``    — autocorrelation plots
+    * ``"rhat"``   — R-hat forest plot
+    * ``"neff"``   — effective sample size plot
+    * ``"energy"`` — NUTS energy / BFMI diagnostic
 
     Args:
         model: A fitted :class:`~hbsaemp.models._base.BaseModel`.
@@ -182,13 +187,13 @@ def check_convergence(
         import arviz as az
     except ImportError as exc:
         raise ImportError(
-            "check_convergence() requires arviz>=0.18. "
+            "check_convergence() requires arviz>=1.1. "
             "Install with: pip install 'hbsaemp[bambi]'"
         ) from exc
 
     _ensure_headless_matplotlib()
 
-    # ── guard ─────────────────────────────────────────────────────────────────
+    # guard
     result = model.result  # raises ModelNotFittedError if not fitted
     idata = result.idata
 
@@ -200,8 +205,18 @@ def check_convergence(
         result.family, resolved_tests, resolved_plots,
     )
 
-    # ── 1. Rhat / ESS via ArviZ summary ──────────────────────────────────────
-    summary_df = az.summary(idata)
+    # 1. Rhat / ESS via ArviZ summary
+    # Drop per-observation response params (mu/p/kappa) written by
+    # include_response_params=True — their n_obs rows inflate the parameter
+    # count and can skew the min-ESS / max-Rhat aggregates. Keep group-level
+    # random effects (1|group): they ARE sampled and can fail to converge
+    # independently. Explicit guard, NOT ``or None``: var_names=[] raises
+    # TypeError, var_names=None processes ALL rows — both reintroduce the bug.
+    summary_vars = _diagnostic_var_names(idata.posterior, policy="scalar_and_group")
+    if summary_vars:
+        summary_df = az.summary(idata, var_names=summary_vars)
+    else:
+        summary_df = pd.DataFrame()  # no scalar params (defensive; never in practice)
     keep_cols = ["mean", "sd", "r_hat", "ess_bulk", "ess_tail"]
     available = [c for c in keep_cols if c in summary_df.columns]
     rhat_ess = summary_df[available].copy()
@@ -213,7 +228,7 @@ def check_convergence(
         if col in rhat_ess.columns:
             rhat_ess[col] = pd.to_numeric(rhat_ess[col], errors="coerce")
 
-    # ── 2. Issue warnings ─────────────────────────────────────────────────────
+    # 2. Issue warnings
     # Spec-driven loop over ``_WARN_SPECS`` keeps the three Rhat/Bulk/Tail
     # branches in sync — same message shape, same logger call, single
     # ``stacklevel=3`` attribution to the caller of ``check_convergence``.
@@ -227,12 +242,17 @@ def check_convergence(
         if not bad.empty:
             _emit_convergence_warning(label, thr, bad, op=op, suffix=suffix)
 
-    # ── 3. Generate plots ─────────────────────────────────────────────────────
+    # 3. Generate plots
     # ``_CONVERGENCE_PLOT_CANDIDATES`` (in ``_plot_utils``) lists fallback
     # ArviZ function names per plot type; the first callable on the installed
     # ArviZ wins.  ``_fig_from_axes`` then turns whatever the plot fn returns
     # (Axes / ndarray / Figure / tuple / PlotCollection) into a Figure or None.
+    # Plots use ``scalar_only`` — one subplot per variable, so group effects
+    # (and per-obs params) would blow past max_subplots=40 at large n_area.
+    # Failures land in ``plot_errors`` instead of being swallowed to the log.
+    plot_vars = _diagnostic_var_names(idata.posterior, policy="scalar_only")
     plots: dict[str, Any] = {}
+    plot_errors: dict[str, str] = {}
     for ptype in resolved_plots:
         if ptype not in _CONVERGENCE_PLOT_CANDIDATES:
             logger.debug("check_convergence: unknown plot_type %r — skipped.", ptype)
@@ -251,20 +271,38 @@ def check_convergence(
             )
             continue
         plot_fn, kwargs = fn
+        # plot_energy reads sample_stats, not posterior vars, so it rejects
+        # var_names; inject var_names only for the posterior-based plots.
+        call_kwargs = dict(kwargs)
+        if ptype not in _NO_VAR_NAMES_PLOTS:
+            call_kwargs["var_names"] = plot_vars
         try:
-            plots[ptype] = _fig_from_axes(plot_fn(idata, **kwargs))
-            logger.debug("check_convergence: generated %r plot.", ptype)
+            fig = _fig_from_axes(plot_fn(idata, **call_kwargs))
         except Exception as exc:  # noqa: BLE001
+            plot_errors[ptype] = str(exc)
             logger.warning(
                 "check_convergence: could not generate %r plot: %s", ptype, exc
             )
+            continue
+        # A None here means the plot ran but the Figure could not be extracted
+        # from the ArviZ return value — record it instead of storing None silently.
+        if fig is None:
+            plot_errors[ptype] = (
+                f"could not extract a Figure from {plot_fn.__name__}() return value."
+            )
+            logger.warning(
+                "check_convergence: %r plot produced no extractable Figure.", ptype
+            )
+            continue
+        plots[ptype] = fig
+        logger.debug("check_convergence: generated %r plot.", ptype)
 
     logger.info(
         "check_convergence(): complete — %d params, %d plots generated.",
         len(rhat_ess), len(plots),
     )
 
-    return ConvergenceResult(rhat_ess=rhat_ess, plots=plots)
+    return ConvergenceResult(rhat_ess=rhat_ess, plots=plots, plot_errors=plot_errors)
 
 
 #: R-style alias — ``hbcc(model)`` is equivalent to ``check_convergence(model)``.

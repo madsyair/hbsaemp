@@ -1,23 +1,18 @@
-"""Custom exception and warning hierarchy for ``hbsaemp``.
+"""Exception and warning hierarchy for hbsaemp.
 
-All exceptions inherit from :exc:`HBSAEError`.
+All exceptions inherit from `HBSAEError`. Hierarchy:
 
-Hierarchy
----------
-.. code-block:: text
+    HBSAEError
+      ValidationError
+        DataValidationError    DataFrame issues
+        FormulaError           bad formula string
+        PriorSpecError         invalid prior specification
+        SpatialMatrixError     v2+ adjacency/weight matrix
+      ModelRegistryError       unknown family in create_model()
+      ModelNotFittedError      predict/summary before fit()
+      EstimationError          failure during SAE prediction
 
-    Exception
-    └── HBSAEError
-        ├── ValidationError
-        │   ├── DataValidationError   — DataFrame issues
-        │   ├── FormulaError          — bad formula string
-        │   └── SpatialMatrixError    — v2+ adjacency/weight matrix
-        ├── ModelRegistryError        — unknown family name in hbm()
-        ├── ModelNotFittedError       — predict/summary before fit()
-        └── EstimationError           — failure during SAE prediction
-
-    UserWarning
-    └── ConvergenceWarning            — Rhat > threshold, low ESS
+    ConvergenceWarning (UserWarning)
 """
 
 from __future__ import annotations
@@ -29,6 +24,7 @@ __all__: list[str] = [
     "ValidationError",
     "DataValidationError",
     "FormulaError",
+    "PriorSpecError",
     "SpatialMatrixError",
     "ModelRegistryError",
     "ModelNotFittedError",
@@ -38,11 +34,10 @@ __all__: list[str] = [
 
 
 class HBSAEError(Exception):
-    """Base for all ``hbsaemp`` errors.
+    """Base for all hbsaemp errors.
 
-    Args:
-        message: Human-readable description.
-        context: Machine-readable dict (e.g. ``{"column": "y", "n_nan": 3}``).
+    `context` is a machine-readable dict for diagnostics (e.g.
+    `{"column": "y", "n_nan": 3}`).
     """
 
     def __init__(self, message: str, context: dict[str, Any] | None = None) -> None:
@@ -54,20 +49,12 @@ class HBSAEError(Exception):
         return f"{type(self).__name__}({self.message!r}, context={self.context!r})"
 
 
-# ── Validation ─────────────────────────────────────────────────────────────
-
 class ValidationError(HBSAEError):
     """Parent for all input-validation failures."""
 
 
 class DataValidationError(ValidationError):
-    """Raised when a DataFrame fails validation.
-
-    Args:
-        message: Human-readable description.
-        column: Offending column name, if applicable.
-        context: Additional details.
-    """
+    """A DataFrame failed validation. `column` is the offending column, if known."""
 
     def __init__(
         self,
@@ -83,13 +70,7 @@ class DataValidationError(ValidationError):
 
 
 class FormulaError(ValidationError):
-    """Raised when a formula string cannot be parsed.
-
-    Args:
-        message: Human-readable description.
-        formula: The formula string that failed.
-        context: Additional details.
-    """
+    """A formula string failed parsing. `formula` is the offending string."""
 
     def __init__(
         self,
@@ -104,16 +85,28 @@ class FormulaError(ValidationError):
         self.formula = formula
 
 
-class SpatialMatrixError(ValidationError):
-    """Raised when a spatial weight or adjacency matrix is invalid.
+class PriorSpecError(ValidationError):
+    """A prior specification dict was malformed.
 
-    .. note:: Defined in v0 for namespace stability; raised only in v2+ code.
-
-    Args:
-        message: Human-readable description.
-        matrix_type: ``"car"`` or ``"sar"``.
-        context: Additional details.
+    Raised by `Prior` at construction so spec errors surface before `fit()`.
+    `param` is the model parameter the prior was attached to, if known.
     """
+
+    def __init__(
+        self,
+        message: str,
+        param: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        ctx = context or {}
+        if param is not None:
+            ctx["param"] = param
+        super().__init__(message, ctx)
+        self.param = param
+
+
+class SpatialMatrixError(ValidationError):
+    """Invalid spatial weight or adjacency matrix (v2+ only)."""
 
     def __init__(
         self,
@@ -128,25 +121,8 @@ class SpatialMatrixError(ValidationError):
         self.matrix_type = matrix_type
 
 
-# ── Registry ────────────────────────────────────────────────────────────────
-
 class ModelRegistryError(HBSAEError):
-    """Raised when ``hbm()`` is called with an unknown ``family`` name.
-
-    This is the ``hbsaemp`` equivalent of caret raising an error when an
-    unknown ``method=`` string is passed to ``train()``.
-
-    Args:
-        family: The unrecognised family string.
-        registered: List of currently registered family names.
-
-    Example:
-        >>> raise ModelRegistryError(
-        ...     "Unknown family 'tweedie'",
-        ...     family="tweedie",
-        ...     registered=["gaussian", "beta", "binomial", "lognormal"],
-        ... )
-    """
+    """`create_model()` was called with an unknown `family` name."""
 
     def __init__(
         self,
@@ -165,32 +141,16 @@ class ModelRegistryError(HBSAEError):
         self.registered = registered or []
 
 
-# ── Model state ─────────────────────────────────────────────────────────────
-
 class ModelNotFittedError(HBSAEError):
-    """Raised when ``predict()``, ``summary()``, or a diagnostic method is
-    called before ``fit()`` has been executed.
-
-    Example:
-        >>> raise ModelNotFittedError(
-        ...     "Call model.fit() before hbsae()",
-        ...     context={"method": "hbsae"},
-        ... )
-    """
+    """`predict()`, `summary()`, or a diagnostic was called before `fit()`."""
 
 
 class EstimationError(HBSAEError):
-    """Raised when posterior prediction or SAE computation fails."""
+    """Posterior prediction or SAE computation failed."""
 
-
-# ── Warnings ────────────────────────────────────────────────────────────────
 
 class ConvergenceWarning(UserWarning):
-    """Issued when MCMC convergence diagnostics indicate potential problems.
+    """MCMC convergence diagnostics indicate potential problems.
 
-    Typical triggers: :math:`\\hat{R} > 1.01`, bulk ESS < 400.
-
-    Example:
-        >>> import warnings
-        >>> warnings.warn("Rhat=1.05 for 'b_x1'", ConvergenceWarning, stacklevel=2)
+    Typical triggers: r-hat > 1.01, bulk ESS < 400.
     """

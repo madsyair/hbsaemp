@@ -17,7 +17,6 @@ cfg = ModelConfig(draws=2000, tune=1000, chains=4, cores=2)
 m1 = create_model("y ~ x1 + x2", family="gaussian",  data=df, group="area",  config=cfg)
 m2 = create_model("y ~ x1 + x2", family="beta",       data=df, n="n", deff="deff", config=cfg)
 m3 = create_model("y ~ x1 + x2", family="binomial",   data=df, trials="n",   config=cfg)
-m4 = create_model("y ~ x1 + x2", family="lognormal",  data=df, group="area",  config=cfg)
 
 # 3. Fit (v1+: Bambi MCMC backend)
 m1.fit()
@@ -25,7 +24,7 @@ m1.fit()
 # 4. Bayesian workflow — same API for every family
 check_prior(m1)              # prior predictive check  (alias: hbpc)
 check_convergence(m1)        # Rhat, ESS, trace plots  (alias: hbcc)
-compare_models([m1, m2])     # LOO, WAIC, pp_check     (alias: hbmc)
+compare_models([m1, m2])     # LOO, pp_check           (alias: hbmc)
 estimate_areas(m1)           # RSE, MSE, RMSE, CI      (alias: hbsae)
 
 # R-style alias also works (for users migrating from hbsaems)
@@ -39,11 +38,11 @@ launch_app()                 # ≡ run_sae_app() in R hbsaems
 
 ## Version roadmap
 
-| Version | Description | Extra deps |
-|---------|-------------|------------|
-| `0.0.0` | Architecture template — all stubs | `numpy`, `pandas` only |
-| `1.0.0` | Bambi implementation | `pip install "hbsaemp[bambi,gui]"` |
-| `2.0.0` | Spatial extension (CAR/ICAR/SAR) | `pip install "hbsaemp[spatial]"` |
+| Version | Description                       | Extra deps                         |
+| ------- | --------------------------------- | ---------------------------------- |
+| `0.0.0` | Architecture template — all stubs | `numpy`, `pandas` only             |
+| `1.0.0` | Bambi implementation              | `pip install "hbsaemp[bambi,gui]"` |
+| `2.0.0` | Spatial extension (CAR/ICAR/SAR)  | `pip install "hbsaemp[spatial]"`   |
 
 ## Package structure
 
@@ -56,7 +55,7 @@ hbsaemp/
 │   ├── _config.py           ModelConfig  (= trainControl)
 │   ├── _base.py             BaseModel ABC · ModelResult dataclass
 │   ├── _factory.py          hbm()  (= train())  · MODEL_REGISTRY
-│   └── _gaussian/beta/binomial/lognormal.py  — stubs → v1 impls
+│   └── _gaussian/beta/binomial.py  — model implementations
 ├── data/
 │   ├── _validator.py        DataValidator stub → v1
 │   ├── _preprocessor.py     DataPreprocessor stub → v1
@@ -83,6 +82,6 @@ GPL-3.0-or-later. Based on [hbsaems](https://github.com/madsyair/hbsaems) by Cho
 
 ## References
 
-- Choir, A.S. et al. (2025). *hbsaems: Hierarchical Bayesian SAE Models*. R package.
-- Capretto, T. et al. (2022). [Bambi](https://doi.org/10.18637/jss.v103.i15). *JSS* 103(15).
-- Rao, J.N.K. & Molina, I. (2015). *Small Area Estimation* (2nd ed.). Wiley.
+- Choir, A.S. et al. (2025). _hbsaems: Hierarchical Bayesian SAE Models_. R package.
+- Capretto, T. et al. (2022). [Bambi](https://doi.org/10.18637/jss.v103.i15). _JSS_ 103(15).
+- Rao, J.N.K. & Molina, I. (2015). _Small Area Estimation_ (2nd ed.). Wiley.

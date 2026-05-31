@@ -1,18 +1,5 @@
-"""MCMC sampler configuration for hbsaemp.
-
-:class:`ModelConfig` bundles all sampler settings into one reusable object,
-analogous to ``trainControl()`` in R's caret package.
-
-.. code-block:: python
-
-    # caret (R)                         # hbsaemp (Python)
-    ctrl <- trainControl(               cfg = ModelConfig(
-        verboseIter = TRUE,                 draws  = 2000,
-    )                                       chains = 4,
-                                            cores  = 2,
-                                        )
-    m1 <- train(..., trControl=ctrl)    m1 = hbm(..., config=cfg)
-    m2 <- train(..., trControl=ctrl)    m2 = hbm(..., config=cfg)
+"""`ModelConfig` — bundles sampler settings (draws, chains, tune, etc.) into
+one reusable object passed via `create_model(config=...)`.
 """
 
 from __future__ import annotations
@@ -26,50 +13,24 @@ __all__: list[str] = ["ModelConfig", "DEFAULT_CONFIG"]
 
 @dataclass
 class ModelConfig:
-    """MCMC sampler configuration — shared across all model families.
+    """NUTS sampler configuration shared across all model families.
 
-    Pass a single ``ModelConfig`` to multiple :func:`hbm` calls to ensure
-    consistent sampling settings across a model comparison study.
-
-    Mapping to Bambi parameters (v1):
-    ----------------------------------
-    .. code-block:: text
-
-        ModelConfig              →  model.fit(inference_method="mcmc")  # always NUTS/HMC
-        ModelConfig.draws        →  model.fit(draws=...)
-        ModelConfig.tune         →  model.fit(tune=...)      # warmup
-        ModelConfig.chains       →  model.fit(chains=...)
-        ModelConfig.cores        →  model.fit(cores=...)
-        ModelConfig.target_accept  →  model.fit(target_accept=...)
-        ModelConfig.random_seed    →  model.fit(random_seed=...)
-
-    Mapping to R hbsaems parameters:
-    ----------------------------------
-    .. code-block:: text
-
-        ModelConfig.draws   ←→  iter - warmup
-        ModelConfig.tune    ←→  warmup
-        ModelConfig.chains  ←→  chains
-        ModelConfig.cores   ←→  cores
+    Pass the same `ModelConfig` to multiple `create_model()` calls to keep
+    sampling settings consistent across a comparison study.
 
     Args:
-        draws: Post-warmup draws per chain. Default 1000.
-            Total posterior samples = ``draws × chains``.
-        tune: Warmup / adaptation steps per chain. Default 1000.
-        chains: Independent Markov chains. Default 4.
-            Use ≥ 4 for reliable :math:`\\hat{R}`.
-        cores: CPU cores for parallel sampling. Default 1.
-        target_accept: NUTS acceptance rate target. Default 0.8.
-            Increase to 0.9–0.95 for complex posterior geometry.
-        random_seed: Optional integer for reproducibility. Default ``None``.
-        sample_prior: ``"no"`` (posterior) or ``"only"`` (prior predictive,
-            used by :func:`check_prior`). Default ``"no"``.
-        progressbar: Show sampling progress bar. Default ``True``.
-
-    Example:
-        >>> cfg = ModelConfig(draws=2000, tune=1000, chains=4, cores=2)
-        >>> m1 = hbm("y ~ x1", family="gaussian", data=df, config=cfg)
-        >>> m2 = hbm("y ~ x1", family="beta",     data=df, config=cfg)
+        draws: Post-warmup draws per chain (default 1000). Total posterior
+            samples = `draws * chains`.
+        tune: Warmup steps per chain (default 1000).
+        chains: Independent Markov chains (default 4). Use >= 4 for reliable
+            r-hat.
+        cores: CPU cores for parallel sampling (default 1).
+        target_accept: NUTS acceptance rate target (default 0.8). Raise to
+            0.9-0.95 for complex posterior geometry.
+        random_seed: Integer seed for reproducibility (default None).
+        sample_prior: `"no"` (posterior) or `"only"` (prior predictive, used
+            by `check_prior`). Default `"no"`.
+        progressbar: Show sampling progress bar (default True).
     """
 
     draws: int = 1000
@@ -82,7 +43,6 @@ class ModelConfig:
     progressbar: bool = True
 
     def __post_init__(self) -> None:
-        """Validate all fields on construction."""
         if self.draws < 1:
             raise ValueError(f"`draws` must be ≥ 1, got {self.draws}")
         if self.tune < 0:
@@ -102,17 +62,13 @@ class ModelConfig:
 
     @property
     def total_draws(self) -> int:
-        """Total posterior draws across all chains: ``draws × chains``."""
+        """Total posterior draws across all chains: `draws * chains`."""
         return self.draws * self.chains
 
     def to_sampler_kwargs(self) -> dict:
-        """Keyword arguments for ``bambi.Model.fit()`` (v1).
-
-        Returns:
-            Dict suitable for ``**`` unpacking into ``model.fit()``.
-        """
+        """Dict for `**` unpacking into `bambi.Model.fit()`."""
         return {
-            "inference_method": "mcmc",
+            "inference_method": "pymc",  # canonical name in Bambi 0.18+ ("mcmc" was deprecated)
             "draws": self.draws,
             "tune": self.tune,
             "chains": self.chains,
@@ -120,6 +76,7 @@ class ModelConfig:
             "target_accept": self.target_accept,
             "random_seed": self.random_seed,
             "progressbar": self.progressbar,
+            "include_response_params": True,  # Bambi 0.18+: materialise mu/p at fit time
         }
 
     def __repr__(self) -> str:
@@ -131,5 +88,5 @@ class ModelConfig:
         )
 
 
-#: Default config — used when ``config=None`` is passed to :func:`hbm`.
+# Default used when `config=None` is passed to `create_model()`.
 DEFAULT_CONFIG: ModelConfig = ModelConfig()

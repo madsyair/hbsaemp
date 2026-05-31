@@ -22,15 +22,16 @@ class DataPreprocessor:
 
     * **Beta** — adds ``log_phi = log(n/deff - 1)`` column (when ``n_col``
       and ``deff_col`` are provided), used by Bambi's distributional formula
-      ``"kappa ~ 0 + offset(log_phi)"``.  Smithson-Verkuilen squeeze
+      ``"kappa ~ 1 + offset(log_phi)"``.  Smithson-Verkuilen squeeze
       ``(y*(n-1)+0.5)/n`` is applied **only** when ``squeeze=True`` (default
       ``False``); use it only for datasets with boundary values ``y=0``/``y=1``.
 
     * **Gaussian FH** — adds ``log_sqrt_D = 0.5 * log(D)`` column used by
-      ``"sigma ~ 0 + offset(log_sqrt_D)"`` when ``sampling_var_col`` is
+      ``"sigma ~ 1 + offset(log_sqrt_D)"`` when ``sampling_var_col`` is
       provided.
 
-    * **Lognormal / Binomial** — no additional transforms.
+    * **Binomial** — no additional transforms.
+    * **Lognormal** — reserved no-op for the planned V2 family.
 
     Args:
         handle_missing: ``"deleted"`` (only supported value in v1) drops rows
@@ -138,7 +139,7 @@ class DataPreprocessor:
 
         ``log_phi = log(n/deff - 1)`` is always computed when the precision
         is pinned from data — it is required by the Bambi distributional
-        formula ``"kappa ~ 0 + offset(log_phi)"``.
+        formula ``"kappa ~ 1 + offset(log_phi)"``.
 
         Smithson-Verkuilen squeeze ``(y*(n-1)+0.5)/n`` is applied **only**
         when *squeeze* is ``True``.  Use this only when the dataset contains
@@ -182,14 +183,7 @@ class DataPreprocessor:
         return df
 
     def _transform_lognormal(self, df: pd.DataFrame, response: str, **_) -> pd.DataFrame:
-        """No-op when DataPreprocessor is called directly with ``family="lognormal"``.
-
-        :class:`~hbsaemp.models._lognormal.LognormalModel` overrides
-        ``_preproc_family`` to ``"gaussian"`` so the FH offset preprocessing
-        (``log_sqrt_D``) runs via :meth:`_transform_gaussian`.  This method
-        exists so the low-level public API ``DataPreprocessor().process(...,
-        family="lognormal")`` does not fall through to ``getattr`` errors.
-        """
+        """Reserved no-op for the planned V2 Lognormal family."""
         return df
 
     def _transform_binomial(self, df: pd.DataFrame, response: str, **_) -> pd.DataFrame:

@@ -19,7 +19,7 @@ FormulaStr: TypeAlias = str
 ColumnName: TypeAlias = str
 GroupName: TypeAlias = str
 
-FamilyLiteral: TypeAlias = Literal["gaussian", "beta", "binomial", "lognormal"]
+FamilyLiteral: TypeAlias = Literal["gaussian", "beta", "binomial"]
 LinkLiteral: TypeAlias = Literal["identity", "log", "logit", "probit", "cloglog"]
 MissingStrategyLiteral: TypeAlias = Literal["deleted"]
 SamplePriorLiteral: TypeAlias = Literal["no", "only"]
@@ -27,8 +27,8 @@ SpatialTypeLiteral: TypeAlias = Literal["car", "sar"]
 CARTypeLiteral: TypeAlias = Literal["icar", "escar", "esicar", "bym2"]
 SARTypeLiteral: TypeAlias = Literal["lag", "error"]
 DiagTestLiteral: TypeAlias = Literal["rhat", "ess", "geweke", "heidel", "raftery"]
-PlotTypeLiteral: TypeAlias = Literal["trace", "dens", "acf", "pair", "rhat", "neff"]
-ComparisonMetricLiteral: TypeAlias = Literal["loo", "waic", "bf"]
+PlotTypeLiteral: TypeAlias = Literal["trace", "dens", "acf", "pair", "rhat", "neff", "energy"]
+ComparisonMetricLiteral: TypeAlias = Literal["loo", "bf"]
 
 DrawsArray: TypeAlias = np.ndarray
 AdjacencyMatrix: TypeAlias = np.ndarray
