@@ -20,7 +20,7 @@ from hbsaemp.diagnostics._plot_utils import (
 
 
 def _fake_posterior() -> types.SimpleNamespace:
-    """Mimic a Beta posterior after include_response_params=True."""
+    """Mimic a Beta posterior with response params (mu/kappa) materialised."""
     def da(dims: tuple[str, ...]) -> types.SimpleNamespace:
         return types.SimpleNamespace(dims=dims)
 

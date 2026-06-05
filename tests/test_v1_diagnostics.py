@@ -234,8 +234,8 @@ class TestCompareModelsSingle:
         (never the private _predict_idata) and checks groups via _idata_groups
         (never .groups(), which crashes on ArviZ 1.1 DataTree)."""
         hb.compare_models([beta_model])
-        # stored posterior untouched — mu still present after comparison
-        assert "mu" in beta_model.result.idata.posterior
+        # stored posterior untouched — parameter vars still present after comparison
+        assert "Intercept" in beta_model.result.idata.posterior
 
     def test_compare_models_generates_ppc_plot(self, beta_model):
         """pp_check_plot must be a Figure now that arviz_plots.plot_ppc_dist is
@@ -247,10 +247,10 @@ class TestCompareModelsSingle:
 
     def test_compare_models_ppc_does_not_mutate_idata(self, beta_model):
         """PPC plotting sources Y_rep via predictive_idata() (inplace=False),
-        so result.idata's in-sample mu must be untouched (regression guard)."""
-        shape0 = beta_model.result.idata.posterior["mu"].shape
+        so result.idata's posterior must be untouched (no vars appended)."""
+        vars0 = set(beta_model.result.idata.posterior.data_vars)
         hb.compare_models([beta_model])
-        assert beta_model.result.idata.posterior["mu"].shape == shape0
+        assert set(beta_model.result.idata.posterior.data_vars) == vars0
 
     def test_not_fitted_raises(self, data_beta):
         cfg = hb.ModelConfig(draws=100, tune=100, chains=2)

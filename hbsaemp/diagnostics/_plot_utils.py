@@ -42,9 +42,10 @@ def _idata_groups(idata: Any) -> tuple[str, ...]:
     names = g() if callable(g) else g
     return tuple(str(n).strip("/") for n in names)
 
-# Bambi's per-observation dim, written by include_response_params=True. Stable
-# across families (Beta/Gaussian/Binomial). Variables carrying it (mu/p/kappa)
-# are deterministic functions of the sampled coefficients and scale with n_obs.
+# Bambi's per-observation dim, attached to the response params (mu/p/kappa)
+# when they are materialised via predict(kind="response_params"). Stable across
+# families (Beta/Gaussian/Binomial). Variables carrying it are deterministic
+# functions of the sampled coefficients and scale with n_obs.
 _OBS_DIM = "__obs__"
 
 DiagnosticVarPolicy = Literal["scalar_only", "scalar_and_group"]
@@ -113,8 +114,7 @@ _NO_VAR_NAMES_PLOTS: frozenset[str] = frozenset({"energy"})
 
 
 def _ensure_headless_matplotlib() -> None:
-    """Force matplotlib to the non-interactive ``Agg`` backend when none has
-    been chosen yet.
+    """Force matplotlib to the non-interactive ``Agg`` backend if unset.
 
     Calling ArviZ/arviz-plots will lazy-import a GUI backend (Qt5/Tk) on
     Windows, which can crash with ``WinError 0xc0000139`` if the Qt

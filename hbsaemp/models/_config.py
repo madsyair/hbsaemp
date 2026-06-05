@@ -1,5 +1,6 @@
-"""`ModelConfig` — bundles sampler settings (draws, chains, tune, etc.) into
-one reusable object passed via `create_model(config=...)`.
+"""`ModelConfig` — one reusable bundle of sampler settings.
+
+Holds draws, chains, tune, etc.; passed via `create_model(config=...)`.
 """
 
 from __future__ import annotations
@@ -76,7 +77,6 @@ class ModelConfig:
             "target_accept": self.target_accept,
             "random_seed": self.random_seed,
             "progressbar": self.progressbar,
-            "include_response_params": True,  # Bambi 0.18+: materialise mu/p at fit time
         }
 
     def __repr__(self) -> str:

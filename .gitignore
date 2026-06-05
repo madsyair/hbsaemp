@@ -1,84 +1,21 @@
-# VSCode Code Runner junk
-tempCodeRunnerFile.py
-**/tempCodeRunnerFile.py
-
 # Python cache
 __pycache__/
 *.py[cod]
-*$py.class
 
-# Test / tooling
+# Caches present
 .pytest_cache/
-_pytest*.log
 .ruff_cache/
-.mypy_cache/
-.nox/
-.tox/
 
 # Editor
 .vscode/
 
-# Build / packaging
+# Packaging
 *.egg-info/
-build/
-dist/
-__editable__*.pth
 
-# Project artefacts
+# Project artefacts / docs / logs
 outputs/
-
-# Profiling
-*.prof
-*.lprof
-prof/
-
-# PyMC / PyTensor MCMC backend cache
-.pytensor/
-compiledir_*/
-
-# Jupyter
-*.ipynb
-.ipynb_checkpoints/
-
-# Docs
 docs/
-site/
-
-# Internal documentation
-*.local.md
-
-# Claude Code / AI harness
-.claude/
-.aider*
-.cursor/
-
-# IDE selain VSCode
-.idea/
-*.iml
-
-# Editor backup / swap
-*.swp
-*.swo
-*~
-*.bak
-*.orig
-
-# OS-generated
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# Secrets / environment
-.env
-.env.*
-!.env.example
-
-# Test coverage
-.coverage
-.coverage.*
-htmlcov/
-coverage.xml
-
-# Logs
 *.log
-logs/
+
+# Claude Code
+.claude/

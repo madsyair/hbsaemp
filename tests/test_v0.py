@@ -67,13 +67,12 @@ def test_model_config_custom():
     assert kw["draws"] == 2000 and kw["chains"] == 2
 
 
-def test_sampler_kwargs_include_response_params():
-    """to_sampler_kwargs() must always emit include_response_params=True (Bambi 0.18+)."""
-    assert hb.ModelConfig().to_sampler_kwargs().get("include_response_params") is True
-
-
-def test_sampler_kwargs_custom_config_preserves_response_params():
-    assert hb.ModelConfig(draws=500, chains=2).to_sampler_kwargs().get("include_response_params") is True
+def test_sampler_kwargs_omits_include_response_params():
+    """fit() must NOT request per-observation response params: mu/p are computed
+    on demand via predict(kind='response_params'). Keeping them out of fit keeps
+    idata small and avoids the offset-model materialisation Bambi 0.18 ignores."""
+    assert "include_response_params" not in hb.ModelConfig().to_sampler_kwargs()
+    assert "include_response_params" not in hb.ModelConfig(draws=500, chains=2).to_sampler_kwargs()
 
 
 def test_sampler_kwargs_uses_pymc_inference_method():
@@ -385,12 +384,16 @@ class TestDataLayer:
                 bad, "y", ["x1"], family="beta", n_col="n", deff_col="deff"
             )
 
-    def test_validator_lognormal_nonpositive(self, data_lognormal):
-        """Retain the positive-response contract for the planned V2 family."""
-        bad = data_lognormal.copy()
-        bad.loc[0, "y"] = -1.0
-        with pytest.raises(hb.DataValidationError):
-            hb.DataValidator().validate(bad, "y", ["x1"], family="lognormal")
+    def test_validator_lognormal_rejected_as_unsupported(self, data_lognormal):
+        """lognormal is reserved for V2 (factory `_PLANNED_FAMILIES`).
+
+        The validator now recognises only `FAMILY_SPECS` families, so a direct
+        `validate(family="lognormal")` is rejected as an unsupported family —
+        `create_model()` already intercepts it earlier with a roadmap message.
+        The positive-response domain rule for V2 lives in `docs/lognormal-v2.md`.
+        """
+        with pytest.raises(hb.DataValidationError, match="lognormal"):
+            hb.DataValidator().validate(data_lognormal, "y", ["x1"], family="lognormal")
 
     def test_validator_binomial_y_exceeds_n(self, data_binomial):
         bad = data_binomial.copy()

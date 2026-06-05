@@ -1,11 +1,10 @@
-"""Formula parsing utilities — v0 stub.
-
-v1: Parse R/lme4-style formula strings into fixed-effect terms,
-    random-effect groups, and response variable.
-"""
+"""Parse R/lme4-style formula strings into response, fixed effects, and random-effect groups."""
 from __future__ import annotations
+
 import re
+
 from hbsaemp._exceptions import FormulaError
+
 __all__: list[str] = ["parse_formula"]
 
 

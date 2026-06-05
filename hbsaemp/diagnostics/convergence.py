@@ -149,13 +149,13 @@ def check_convergence(
     diag_tests: list[str] | None = None,
     plot_types: list[str] | None = None,
 ) -> ConvergenceResult:
-    """Assess MCMC convergence of a fitted model.
+    r"""Assess MCMC convergence of a fitted model.
 
     Python equivalent of ``hbcc()`` in R hbsaems.
 
     Computes:
 
-    * **Rhat** (:math:`\\hat{R}`) — potential scale reduction factor per
+    * **Rhat** (:math:`\hat{R}`) — potential scale reduction factor per
       parameter.  Values > 1.01 trigger a :class:`~hbsaemp._exceptions.ConvergenceWarning`.
     * **ESS** (bulk / tail) — effective sample size.
       Values < 400 trigger a warning.
@@ -206,8 +206,8 @@ def check_convergence(
     )
 
     # 1. Rhat / ESS via ArviZ summary
-    # Drop per-observation response params (mu/p/kappa) written by
-    # include_response_params=True — their n_obs rows inflate the parameter
+    # Drop per-observation response params (mu/p/kappa, materialised by
+    # predict(kind="response_params")) — their n_obs rows inflate the parameter
     # count and can skew the min-ESS / max-Rhat aggregates. Keep group-level
     # random effects (1|group): they ARE sampled and can fail to converge
     # independently. Explicit guard, NOT ``or None``: var_names=[] raises

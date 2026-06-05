@@ -51,7 +51,7 @@ class Prior:
         self.__post_init__()
 
     @classmethod
-    def from_dict(cls, d: dict[str, Any], *, param: str | None = None) -> "Prior":
+    def from_dict(cls, d: dict[str, Any], *, param: str | None = None) -> Prior:
         """Build a `Prior` from the legacy `{"dist": ..., ...}` dict format.
 
         Validates immediately. `param` is the model parameter name the prior

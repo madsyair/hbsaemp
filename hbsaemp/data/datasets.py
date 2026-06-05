@@ -1,19 +1,15 @@
-"""Built-in datasets matching R hbsaems package.
+"""Built-in datasets mirroring R hbsaems (30 areas, seed=42, area-level).
 
-v0: load_dataset() stub — raises NotImplementedError.
-v1: Returns real DataFrames generated from reproducible seeds.
-
-Available datasets (same names as R hbsaems):
-    data_fhnorm         — Gaussian/Fay-Herriot normal
+Available datasets (names match R hbsaems):
+    data_fhnorm         — Gaussian / Fay-Herriot normal
     data_betalogitnorm  — Beta logit-normal
     data_binlogitnorm   — Binomial logit-normal
-    data_lnln           — Lognormal-lognormal example reserved for V2
-
-All datasets: m=30 areas, seed=42, area-level (one row per area).
-Column names match the R hbsaems package.
+    data_lnln           — Lognormal-lognormal (reserved for V2)
 """
 from __future__ import annotations
+
 from typing import Literal
+
 import numpy as np
 import pandas as pd
 

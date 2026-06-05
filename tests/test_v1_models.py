@@ -146,10 +146,6 @@ class TestGaussianFit:
         import bambi as bmb
         assert isinstance(gaussian_plain_fitted.result.backend_model, bmb.Model)
 
-    def test_posterior_mu_exists(self, gaussian_plain_fitted):
-        """mu is present in idata.posterior immediately after fit() (include_response_params=True)."""
-        assert "mu" in gaussian_plain_fitted.result.idata.posterior.data_vars
-
 
 class TestGaussianFayHerriott:
 
@@ -259,10 +255,6 @@ class TestBinomialFit:
     def test_fitted_at_set(self, binomial_fitted):
         assert binomial_fitted.result.fitted_at is not None
 
-    def test_posterior_p_exists(self, binomial_fitted):
-        """p is present in idata.posterior immediately after fit() (include_response_params=True)."""
-        assert "p" in binomial_fitted.result.idata.posterior.data_vars
-
 
 class TestBinomialPredict:
 
@@ -297,12 +289,11 @@ class TestBinomialPredict:
             binomial_fitted.predict(kind="linear")
 
     def test_predict_kind_response_params_in_unit_interval(self, binomial_fitted):
-        """kind='response_params' extracts posterior['p'] (continuous), not counts.
+        """kind='response_params' returns posterior of p (continuous), not counts.
 
         The (0, 1) range alone is not sufficient — posterior predictive counts
-        normalised by trials would also pass. Verify draws are continuous
-        floats and match posterior['p'].mean() so a swapped extraction key
-        would fail.
+        normalised by trials would also pass. Verify draws are continuous floats
+        so a swapped extraction key (counts vs probabilities) would fail.
         """
         draws = binomial_fitted.predict(kind="response_params")
         assert (draws >= 0).all() and (draws <= 1).all()
@@ -312,10 +303,6 @@ class TestBinomialPredict:
         assert not np.allclose(draws, np.round(draws)), (
             "response_params should return continuous probabilities, not rounded counts"
         )
-        # Cross-check: per-area mean of draws ≈ posterior['p'] mean across draws.
-        p_post = binomial_fitted.result.idata.posterior["p"]
-        expected_mean = p_post.stack(sample=("chain", "draw")).mean(dim="sample").values
-        np.testing.assert_allclose(draws.mean(axis=0), expected_mean, rtol=1e-6)
 
 
 class TestBinomialMissingTrials:

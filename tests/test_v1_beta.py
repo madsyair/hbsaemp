@@ -119,19 +119,6 @@ class TestBetaFit:
         import bambi as bmb
         assert isinstance(beta_model_fitted.result.backend_model, bmb.Model)
 
-    def test_posterior_mu_exists(self, beta_model_fitted):
-        """mu is present in idata.posterior immediately after fit() (include_response_params=True)."""
-        idata = beta_model_fitted.result.idata
-        assert "mu" in idata.posterior.data_vars, (
-            f"Expected 'mu' in posterior; got {list(idata.posterior.data_vars)}"
-        )
-
-    def test_posterior_mu_shape(self, beta_model_fitted):
-        """mu has per-observation draws: shape (chain, draw, n_obs)."""
-        mu = beta_model_fitted.result.idata.posterior["mu"]
-        assert mu.dims[-1] not in ("chain", "draw")
-        assert mu.shape[-1] == len(beta_model_fitted.result.data)
-
     def test_fit_without_phi_pinning(self, beta_model_no_phi):
         """Model without n/deff also fits — Bambi estimates kappa."""
         assert beta_model_no_phi.is_fitted
@@ -197,17 +184,17 @@ class TestBetaPredict:
     def test_predict_new_data_does_not_mutate_result_idata(
         self, beta_model_fitted, data_beta
     ):
-        """predict(new_data) must NOT overwrite the in-sample mu stored in
-        result.idata — inplace=False keeps result.idata pristine."""
+        """predict(new_data) must NOT mutate result.idata — inplace=False keeps
+        the stored parameter posterior pristine (no extra vars appended)."""
         idata = beta_model_fitted.result.idata
-        shape_before = idata.posterior["mu"].shape
-        val_before = float(idata.posterior["mu"].values.flatten()[0])
+        vars_before = set(idata.posterior.data_vars)
+        val_before = float(idata.posterior["Intercept"].values.flatten()[0])
 
         new_data = data_beta.head(10).reset_index(drop=True)
         beta_model_fitted.predict(new_data=new_data, kind="response_params")
 
-        assert idata.posterior["mu"].shape == shape_before
-        assert float(idata.posterior["mu"].values.flatten()[0]) == val_before
+        assert set(idata.posterior.data_vars) == vars_before
+        assert float(idata.posterior["Intercept"].values.flatten()[0]) == val_before
 
     def test_predictive_idata_no_mutation(self, beta_model_fitted):
         """Public predictive_idata() populates posterior_predictive on a fresh

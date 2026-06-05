@@ -3,7 +3,9 @@
 All types are stable across v0 -> v1 -> v2+.
 """
 from __future__ import annotations
-from typing import Any, Literal, TypeAlias
+
+from typing import Any, Literal
+
 import numpy as np
 
 __all__: list[str] = [
@@ -15,22 +17,22 @@ __all__: list[str] = [
     "DrawsArray", "AdjacencyMatrix", "WeightMatrix", "PriorDict",
 ]
 
-FormulaStr: TypeAlias = str
-ColumnName: TypeAlias = str
-GroupName: TypeAlias = str
+type FormulaStr = str
+type ColumnName = str
+type GroupName = str
 
-FamilyLiteral: TypeAlias = Literal["gaussian", "beta", "binomial"]
-LinkLiteral: TypeAlias = Literal["identity", "log", "logit", "probit", "cloglog"]
-MissingStrategyLiteral: TypeAlias = Literal["deleted"]
-SamplePriorLiteral: TypeAlias = Literal["no", "only"]
-SpatialTypeLiteral: TypeAlias = Literal["car", "sar"]
-CARTypeLiteral: TypeAlias = Literal["icar", "escar", "esicar", "bym2"]
-SARTypeLiteral: TypeAlias = Literal["lag", "error"]
-DiagTestLiteral: TypeAlias = Literal["rhat", "ess", "geweke", "heidel", "raftery"]
-PlotTypeLiteral: TypeAlias = Literal["trace", "dens", "acf", "pair", "rhat", "neff", "energy"]
-ComparisonMetricLiteral: TypeAlias = Literal["loo", "bf"]
+type FamilyLiteral = Literal["gaussian", "beta", "binomial"]
+type LinkLiteral = Literal["identity", "log", "logit", "probit", "cloglog"]
+type MissingStrategyLiteral = Literal["deleted"]
+type SamplePriorLiteral = Literal["no", "only"]
+type SpatialTypeLiteral = Literal["car", "sar"]
+type CARTypeLiteral = Literal["icar", "escar", "esicar", "bym2"]
+type SARTypeLiteral = Literal["lag", "error"]
+type DiagTestLiteral = Literal["rhat", "ess", "geweke", "heidel", "raftery"]
+type PlotTypeLiteral = Literal["trace", "dens", "acf", "pair", "rhat", "neff", "energy"]
+type ComparisonMetricLiteral = Literal["loo", "bf"]
 
-DrawsArray: TypeAlias = np.ndarray
-AdjacencyMatrix: TypeAlias = np.ndarray
-WeightMatrix: TypeAlias = np.ndarray
-PriorDict: TypeAlias = dict[str, Any]
+type DrawsArray = np.ndarray
+type AdjacencyMatrix = np.ndarray
+type WeightMatrix = np.ndarray
+type PriorDict = dict[str, Any]

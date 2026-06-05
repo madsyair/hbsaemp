@@ -4,7 +4,7 @@ from __future__ import annotations
 from hbsaemp.models._base import BaseModel, ModelResult
 from hbsaemp.models._config import DEFAULT_CONFIG, ModelConfig
 from hbsaemp.models._factory import MODEL_REGISTRY, create_model, hbm
-from hbsaemp.models._family_spec import FAMILY_SPECS, FamilySpec
+from hbsaemp.models._family_spec import FAMILY_SPECS, FamilySpec, get_family_spec, list_families
 from hbsaemp.models._flex import hbm_flex
 from hbsaemp.models._prior import Prior
 from hbsaemp.models._shortcuts import (
@@ -28,4 +28,6 @@ __all__: list[str] = [
     "FamilySpec",
     "FAMILY_SPECS",
     "Prior",
+    "list_families",
+    "get_family_spec",
 ]

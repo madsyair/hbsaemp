@@ -1,13 +1,16 @@
-"""Data validation for hbsaemp.
+"""Read-only data validation: structural checks + per-family domain checks.
 
-v0: DataValidator stub.
-v1: Concrete implementation using pandas/numpy checks.
+`DataValidator.validate()` raises `DataValidationError` on failure and returns
+None; it never mutates the frame.
 """
 from __future__ import annotations
+
 import numpy as np
 import pandas as pd
+
 from hbsaemp._exceptions import DataValidationError
 from hbsaemp._logging import get_logger
+from hbsaemp.models._family_spec import FAMILY_SPECS
 
 logger = get_logger(__name__)
 __all__: list[str] = ["DataValidator"]
@@ -16,17 +19,12 @@ __all__: list[str] = ["DataValidator"]
 class DataValidator:
     """Validate a DataFrame before model fitting.
 
-    v0: All methods raise NotImplementedError.
-    v1: Concrete checks — types, NaN, and family-specific domains.
+    Concrete checks — types, NaN, and family-specific domains.
 
     Args:
         handle_missing: Strategy for NaN values. ``"deleted"`` = dropna (v1).
     """
 
-    _SUPPORTED_FAMILIES: frozenset[str] = frozenset(
-        {"beta", "gaussian", "lognormal", "binomial"}
-    )
-    
     def __init__(self, handle_missing: str = "deleted") -> None:
         if handle_missing != "deleted":
             raise NotImplementedError(
@@ -90,10 +88,9 @@ class DataValidator:
             )
         if data.empty:
             raise DataValidationError("`data` is empty.")
-        if family not in self._SUPPORTED_FAMILIES:
+        if family not in FAMILY_SPECS:
             raise DataValidationError(
-                f"Unknown family {family!r}. "
-                f"Supported: {sorted(self._SUPPORTED_FAMILIES)}."
+                f"Unknown family {family!r}. Supported: {sorted(FAMILY_SPECS)}."
             )
 
         aux_cols = [
@@ -105,14 +102,17 @@ class DataValidator:
         self._check_columns_exist(data, all_cols)
         self._check_numeric(data, [response, *predictors, *aux_cols])
 
-        getattr(self, f"_check_{family}")(
-            data, response,
-            n_col=n_col,
-            deff_col=deff_col,
-            sampling_var_col=sampling_var_col,
-            trials_col=trials_col,
-            squeeze=squeeze,
-        )
+        # Family-specific domain check reads straight from the single source
+        # (FAMILY_SPECS). None means the family declares no extra check.
+        spec = FAMILY_SPECS[family]
+        if spec.response_check is not None:
+            spec.response_check(data, response, {
+                "n_col": n_col,
+                "deff_col": deff_col,
+                "sampling_var_col": sampling_var_col,
+                "trials_col": trials_col,
+                "squeeze": squeeze,
+            })
 
         logger.debug("DataValidator: passed (family=%r, n=%d)", family, len(data))
 
@@ -150,119 +150,6 @@ class DataValidator:
                 "All numeric columns must contain finite values only.",
                 context={"inf_columns": inf_cols},
             )
-    
-    # Family-specific checks
-    def _check_beta(
-        self,
-        data: pd.DataFrame,
-        response: str,
-        *,
-        n_col: str | None,
-        deff_col: str | None,
-        squeeze: bool = False,
-        **_,
-    ) -> None:
-        y = data[response].dropna()
-        if squeeze:
-            # Smithson-Verkuilen will map [0,1] → (0,1); allow closed interval.
-            n_bad = int(((y < 0) | (y > 1)).sum())
-            domain_msg = "[0, 1]"
-        else:
-            # No squeeze: Bambi Beta requires strictly open (0, 1).
-            n_bad = int(((y <= 0) | (y >= 1)).sum())
-            domain_msg = "(0, 1)"
-        if n_bad:
-            raise DataValidationError(
-                f"Beta family requires response in {domain_msg}. "
-                f"Found {n_bad} value(s) outside this range in {response!r}. "
-                + ("" if squeeze else "Pass squeeze=True to handle boundary values 0 and 1."),
-                column=response,
-                context={"n_boundary_values": n_bad},
-            )
-
-        if n_col is not None and deff_col is not None:
-            phi_df = data[[n_col, deff_col]].dropna()
-            if (phi_df[n_col] <= 0).any():
-                raise DataValidationError(
-                    f"{n_col!r}: sample sizes must be positive.", column=n_col
-                )
-            if (phi_df[deff_col] <= 0).any():
-                raise DataValidationError(
-                    f"{deff_col!r}: design effects must be positive.", column=deff_col
-                )
-            phi = phi_df[n_col].values / phi_df[deff_col].values - 1
-            n_bad_phi = int((phi <= 0).sum())
-            if n_bad_phi:
-                raise DataValidationError(
-                    f"Beta precision phi = n/deff - 1 must be > 0. "
-                    f"Found {n_bad_phi} row(s) where n/deff ≤ 1.",
-                    context={"n_invalid_phi": n_bad_phi},
-                )
-
-    def _check_gaussian(
-        self,
-        data: pd.DataFrame,
-        response: str,
-        *,
-        sampling_var_col: str | None,
-        **_,
-    ) -> None:
-        if sampling_var_col is not None:
-            D = data[sampling_var_col].dropna()
-            n_bad = int((D <= 0).sum())
-            if n_bad:
-                raise DataValidationError(
-                    f"Gaussian FH: {sampling_var_col!r} must be positive. "
-                    f"Found {n_bad} non-positive value(s).",
-                    column=sampling_var_col,
-                    context={"n_nonpositive": n_bad},
-                )
-
-    def _check_lognormal(self, data: pd.DataFrame, response: str, **_) -> None:
-        """Validate positive original-scale responses for the planned V2 family."""
-        y = data[response].dropna()
-        n_bad = int((y <= 0).sum())
-        if n_bad:
-            raise DataValidationError(
-                f"Lognormal family requires response > 0. "
-                f"Found {n_bad} non-positive value(s) in {response!r}.",
-                column=response,
-                context={"n_nonpositive": n_bad},
-            )
-
-    def _check_binomial(
-        self,
-        data: pd.DataFrame,
-        response: str,
-        *,
-        trials_col: str | None,
-        **_,
-    ) -> None:
-        y = data[response].dropna()
-        if (y < 0).any():
-            raise DataValidationError(
-                f"Binomial family: {response!r} must be non-negative.", column=response
-            )
-        if not (y % 1 == 0).all():
-            raise DataValidationError(
-                f"Binomial family: {response!r} must contain integers.", column=response
-            )
-        if trials_col is not None:
-            check = data[[response, trials_col]].dropna()
-            n = check[trials_col]
-            if (n < 1).any() or not (n % 1 == 0).all():
-                raise DataValidationError(
-                    f"Binomial family: {trials_col!r} must contain positive integers.",
-                    column=trials_col,
-                )
-            n_bad = int((check[response].values > check[trials_col].values).sum())
-            if n_bad:
-                raise DataValidationError(
-                    f"Binomial family: {response!r} must not exceed {trials_col!r}. "
-                    f"Found {n_bad} row(s) where y > n.",
-                    column=response,
-                    context={"n_exceeding_trials": n_bad},
-                )
 
     def __repr__(self) -> str:
         return f"DataValidator(handle_missing={self._handle_missing!r})"

@@ -7,9 +7,11 @@ metadata constant or drifts from the spec.
 """
 from __future__ import annotations
 
+import pandas as pd
 import pytest
 
 import hbsaemp as hb
+from hbsaemp._exceptions import DataValidationError
 from hbsaemp.models._factory import MODEL_REGISTRY
 from hbsaemp.models._family_spec import FAMILY_SPECS
 
@@ -141,3 +143,49 @@ def test_beta_squeeze_with_n_deff_ok(data_beta, default_config):
     m = hb.create_model("y ~ x1", "beta", data_beta,
                         n="n", deff="deff", squeeze=True, config=default_config)
     m._pre_fit_checks()  # squeeze with the precision offset active is allowed
+
+
+# Behavior callables live in the spec too (P0-1) — no Bambi, direct on the spec
+
+def test_addition_template_only_for_binomial():
+    # Only families that wrap the response carry a template; others are None.
+    assert FAMILY_SPECS["binomial"].addition_template == "p({response}, {trials_col})"
+    assert FAMILY_SPECS["gaussian"].addition_template is None
+    assert FAMILY_SPECS["beta"].addition_template is None
+
+
+def test_addition_template_formats_lhs():
+    lhs = FAMILY_SPECS["binomial"].addition_template.format(response="y", trials_col="n")
+    assert lhs == "p(y, n)"
+
+
+def test_response_check_rejects_out_of_domain_beta():
+    bad = pd.DataFrame({"y": [0.2, 1.5]})  # 1.5 is outside (0, 1)
+    with pytest.raises(DataValidationError):
+        FAMILY_SPECS["beta"].response_check(bad, "y", {"squeeze": False})
+
+
+def test_response_check_rejects_non_integer_binomial():
+    bad = pd.DataFrame({"y": [1.5, 2.0]})  # non-integer successes
+    with pytest.raises(DataValidationError):
+        FAMILY_SPECS["binomial"].response_check(bad, "y", {"trials_col": None})
+
+
+def test_preprocess_beta_adds_log_phi():
+    df = pd.DataFrame({"y": [0.2], "n": [100.0], "deff": [2.0]})
+    out = FAMILY_SPECS["beta"].preprocess(
+        df.copy(), "y", {"n_col": "n", "deff_col": "deff", "squeeze": False}
+    )
+    assert "log_phi" in out.columns
+
+
+def test_preprocess_gaussian_adds_log_sqrt_d():
+    df = pd.DataFrame({"y": [5.0], "D": [0.25]})
+    out = FAMILY_SPECS["gaussian"].preprocess(df.copy(), "y", {"sampling_var_col": "D"})
+    assert "log_sqrt_D" in out.columns
+
+
+def test_binomial_has_no_preprocess():
+    # Binomial needs no offset transform — the spec stores None and the
+    # preprocessor skips it (mirrors the response_check=None branch).
+    assert FAMILY_SPECS["binomial"].preprocess is None

@@ -31,6 +31,16 @@ estimate_areas(m1)           # RSE, MSE, RMSE, CI      (alias: hbsae)
 from hbsaemp import hbm
 m1 = hbm("y ~ x1 + x2", family="gaussian", data=df, config=cfg)  # identical
 
+# Custom priors — validated at construction (fails fast, before fit)
+from hbsaemp import Prior
+m4 = create_model("y ~ x1 + x2", family="gaussian", data=df, group="area",
+                  priors={"Intercept": Prior("Normal", mu=0, sigma=1)}, config=cfg)
+
+# Inspect available families without touching internals
+from hbsaemp import list_families, get_family_spec
+list_families()                            # ['beta', 'binomial', 'gaussian']
+get_family_spec("beta").supported_links    # frozenset({'logit', 'probit'})
+
 # 5. Web GUI (v1+: Panel dashboard)
 from hbsaemp import launch_app
 launch_app()                 # ≡ run_sae_app() in R hbsaems
@@ -50,15 +60,19 @@ launch_app()                 # ≡ run_sae_app() in R hbsaems
 hbsaemp/
 ├── _logging.py              configure_logging
 ├── _exceptions.py           HBSAEError hierarchy
-├── _types.py                TypeAlias, Literal, Protocols
+├── _types.py                TypeAlias, Literal
 ├── models/
 │   ├── _config.py           ModelConfig  (= trainControl)
 │   ├── _base.py             BaseModel ABC · ModelResult dataclass
-│   ├── _factory.py          hbm()  (= train())  · MODEL_REGISTRY
-│   └── _gaussian/beta/binomial.py  — model implementations
+│   ├── _factory.py          create_model() / hbm()  · MODEL_REGISTRY
+│   ├── _family_spec.py      FamilySpec · FAMILY_SPECS (single source of truth)
+│   ├── _flex.py             hbm_flex (tier 2)
+│   ├── _shortcuts.py        hbm_{gaussian,beta,binomial} (tier 3)
+│   ├── _prior.py            Prior value object
+│   └── _gaussian.py · _beta.py · _binomial.py   family hooks
 ├── data/
-│   ├── _validator.py        DataValidator stub → v1
-│   ├── _preprocessor.py     DataPreprocessor stub → v1
+│   ├── _validator.py        DataValidator  (domain checks, read-only)
+│   ├── _preprocessor.py     DataPreprocessor  (offset transforms)
 │   └── datasets.py          load_dataset() · AVAILABLE_DATASETS
 ├── diagnostics/
 │   ├── convergence.py       check_convergence() / hbcc
@@ -68,7 +82,7 @@ hbsaemp/
 │   ├── areas.py             estimate_areas()    / hbsae
 │   └── update.py            update_model()      / update_hbm
 ├── utils/
-│   └── _formula.py          parse_formula() stub → v1
+│   └── _formula.py          parse_formula()
 └── app/
     ├── _config.py           AppConfig
     ├── _app.py              App stub → v1 (Panel dashboard)

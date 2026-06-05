@@ -42,7 +42,10 @@ def update_model(
         new_data: Optional new DataFrame; `None` reuses the original training
             data.
         config: Full replacement `ModelConfig`.
-        draws, tune, chains, cores: Individual sampler overrides.
+        draws: Override the number of posterior draws per chain.
+        tune: Override the number of tuning (warmup) iterations.
+        chains: Override the number of MCMC chains.
+        cores: Override the number of parallel sampling cores.
 
     Raises:
         ModelNotFittedError: If `model` has not been fitted.

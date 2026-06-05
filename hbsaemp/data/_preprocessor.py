@@ -1,13 +1,16 @@
-"""Data preprocessing for hbsaemp.
+"""Data preprocessing for hbsaemp: returns a transformed copy of the frame.
 
-v0: DataPreprocessor stub.
-v1: Concrete — missing value handling, type coercion, formula extraction.
+`DataPreprocessor.process()` adds family-specific offset columns (e.g.
+`log_phi`, `log_sqrt_D`) and applies the missing-data strategy; it never
+mutates the input.
 """
 from __future__ import annotations
-import numpy as np
+
 import pandas as pd
+
 from hbsaemp._exceptions import DataValidationError
 from hbsaemp._logging import get_logger
+from hbsaemp.models._family_spec import FAMILY_SPECS
 
 logger = get_logger(__name__)
 __all__: list[str] = ["DataPreprocessor"]
@@ -31,7 +34,6 @@ class DataPreprocessor:
       provided.
 
     * **Binomial** — no additional transforms.
-    * **Lognormal** — reserved no-op for the planned V2 family.
 
     Args:
         handle_missing: ``"deleted"`` (only supported value in v1) drops rows
@@ -107,86 +109,21 @@ class DataPreprocessor:
                 context={"relevant_cols": relevant_cols, "n_original": n_before},
             )
 
-        df = getattr(self, f"_transform_{family}")(
-            df, response,
-            n_col=n_col,
-            deff_col=deff_col,
-            sampling_var_col=sampling_var_col,
-            trials_col=trials_col,
-            squeeze=squeeze,
-        )
+        # Family-specific transform reads straight from the single source
+        # (FAMILY_SPECS). None means the family needs no offset transform.
+        spec = FAMILY_SPECS[family]
+        if spec.preprocess is not None:
+            df = spec.preprocess(df, response, {
+                "n_col": n_col,
+                "deff_col": deff_col,
+                "sampling_var_col": sampling_var_col,
+                "trials_col": trials_col,
+                "squeeze": squeeze,
+            })
 
         logger.debug(
             "DataPreprocessor: %d rows ready (family=%r).", len(df), family
         )
-        return df
-    
-    # ── Family-specific transforms ────────────────────────────────────────────
-
-    def _transform_beta(
-        self,
-        df: pd.DataFrame,
-        response: str,
-        *,
-        n_col: str | None,
-        deff_col: str | None,
-        squeeze: bool = False,
-        **_,
-    ) -> pd.DataFrame:
-        """Add ``log_phi`` column; optionally apply Smithson-Verkuilen squeeze.
-
-        Only active when both *n_col* and *deff_col* are provided.
-
-        ``log_phi = log(n/deff - 1)`` is always computed when the precision
-        is pinned from data — it is required by the Bambi distributional
-        formula ``"kappa ~ 1 + offset(log_phi)"``.
-
-        Smithson-Verkuilen squeeze ``(y*(n-1)+0.5)/n`` is applied **only**
-        when *squeeze* is ``True``.  Use this only when the dataset contains
-        boundary values ``y=0`` or ``y=1``; the default (``False``) fits on
-        the original direct-estimate proportions without distortion.
-        """
-        if n_col is not None and deff_col is not None:
-            n_vals = df[n_col].to_numpy(dtype=float)
-            deff_vals = df[deff_col].to_numpy(dtype=float)
-
-            if squeeze:
-                y = df[response].to_numpy(dtype=float)
-                df[response] = (y * (n_vals - 1) + 0.5) / n_vals
-                logger.debug(
-                    "Beta: Smithson-Verkuilen squeeze applied (squeeze=True)."
-                )
-
-            df["log_phi"] = np.log(n_vals / deff_vals - 1)
-            logger.debug(
-                "Beta: log_phi in [%.3f, %.3f].",
-                df["log_phi"].min(), df["log_phi"].max(),
-            )
-        return df
-
-    def _transform_gaussian(
-        self,
-        df: pd.DataFrame,
-        response: str,
-        *,
-        sampling_var_col: str | None,
-        **_,
-    ) -> pd.DataFrame:
-        """Add ``log_sqrt_D`` column for Gaussian Fay-Herriot."""
-        if sampling_var_col is not None:
-            D = df[sampling_var_col].to_numpy(dtype=float)
-            df["log_sqrt_D"] = 0.5 * np.log(D)
-            logger.debug(
-                "Gaussian FH: log_sqrt_D in [%.3f, %.3f].",
-                df["log_sqrt_D"].min(), df["log_sqrt_D"].max(),
-            )
-        return df
-
-    def _transform_lognormal(self, df: pd.DataFrame, response: str, **_) -> pd.DataFrame:
-        """Reserved no-op for the planned V2 Lognormal family."""
-        return df
-
-    def _transform_binomial(self, df: pd.DataFrame, response: str, **_) -> pd.DataFrame:
         return df
 
     def __repr__(self) -> str:

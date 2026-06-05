@@ -69,8 +69,13 @@ class BinomialModel(BaseModel):
         # The legacy "y | trials(n) ~ rhs" form was removed when formulae>=0.5
         # repurposed "|" on the LHS, raising
         # "response term must be of class Term, not Model".
+        # The LHS wrapper comes from FAMILY_SPECS[...].addition_template (single
+        # source); only the RHS is taken from the user formula.
         _, rhs = self._formula.split("~", 1)
-        formula = f"p({response}, {self._trials_col}) ~ {rhs.strip()}"
+        lhs = self._spec.addition_template.format(
+            response=response, trials_col=self._trials_col
+        )
+        formula = f"{lhs} ~ {rhs.strip()}"
         logger.debug("BinomialModel: rewritten formula = %r", formula)
         return formula, self._link
 

@@ -13,11 +13,11 @@ from hbsaemp._exceptions import ModelRegistryError
 from hbsaemp._logging import get_logger
 from hbsaemp._types import FamilyLiteral, FormulaStr, MissingStrategyLiteral, PriorDict
 from hbsaemp.models._base import BaseModel
+from hbsaemp.models._beta import BetaModel
+from hbsaemp.models._binomial import BinomialModel
 from hbsaemp.models._config import DEFAULT_CONFIG, ModelConfig
 from hbsaemp.models._family_spec import FAMILY_SPECS
 from hbsaemp.models._gaussian import GaussianModel
-from hbsaemp.models._beta import BetaModel
-from hbsaemp.models._binomial import BinomialModel
 
 logger = get_logger(__name__)
 
@@ -88,7 +88,7 @@ def create_model(
     priors: PriorDict | None = None,
     group: str | None = None,
     handle_missing: MissingStrategyLiteral = "deleted",
-    # ── Family-specific optional parameters ──────────────────────────────
+    # Family-specific optional parameters
     trials: str | None = None,
     # ^ binomial: column name for number of trials
     n: str | None = None,
@@ -118,8 +118,10 @@ def create_model(
         group: Grouping column for random effects.
         handle_missing: Only `"deleted"` is supported in v1.
         trials: Binomial — column with trial counts (required).
-        n, deff: Beta — survey sample size + design effect (both or neither;
-            used to compute phi = n/deff - 1).
+        n: Beta — survey sample-size column; use with `deff` (together they
+            give phi = n/deff - 1).
+        deff: Beta — design-effect column; use with `n` (together they give
+            phi = n/deff - 1).
         sampling_var: Gaussian FH — column with known sampling variances D_i,
             enables the FH offset.
         link: Override default link.

@@ -1,5 +1,6 @@
-"""Model comparison (alias `hbmc`) — PSIS-LOO-CV via ArviZ, plus pp_check and
-marginal posterior plots for the first model.
+"""Model comparison (alias `hbmc`): PSIS-LOO-CV via ArviZ.
+
+Also builds a pp_check and marginal posterior plots for the first model.
 """
 from __future__ import annotations
 

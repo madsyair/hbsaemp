@@ -10,7 +10,7 @@ from __future__ import annotations
 import abc
 import warnings
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -595,7 +595,7 @@ class BaseModel(abc.ABC):
             config=self._config,
             priors=self._priors,
             is_fitted=True,
-            fitted_at=datetime.now(timezone.utc),
+            fitted_at=datetime.now(UTC),
             extra={
                 "response": response,
                 "group": group_col,
@@ -613,8 +613,9 @@ class BaseModel(abc.ABC):
 
         `inplace=False` → Bambi returns a NEW `InferenceData` (the original
         posterior merged with the requested prediction group). `result.idata`
-        — long-lived state holding the in-sample `mu`/`p` written at `fit()`
-        time — is never overwritten. Callers read draws from the returned
+        holds only the sampled parameter posteriors — the response params
+        (`mu`/`p`) are computed on demand here, never stored at `fit()` time —
+        so it is never overwritten. Callers read draws from the returned
         object, never from `result.idata`.
 
         `kind` must already be canonical (`"response"` / `"response_params"`);
@@ -675,13 +676,12 @@ class BaseModel(abc.ABC):
             "None (in-sample)" if new_data is None else f"shape={new_data.shape}",
         )
 
-        # inplace=False → Bambi mengembalikan idata BARU; result.idata tetap
-        # utuh (state hidup-lama, menyimpan mu/p in-sample dari fit()). Lihat
-        # _predict_idata() dan CLAUDE.md "What NOT to do".
+        # inplace=False → Bambi returns a NEW idata; result.idata stays intact
+        # (it holds only the sampled parameter posteriors; mu/p are computed on
+        # demand, never stored at fit() time).
         pred_idata = self._predict_idata(new_data, kind=kind)
 
-        # ── Extract draws ────────────────────────────────────────────────────
-        # kind is always canonical after _normalize_predict_kind():
+        # Extract draws. kind is always canonical after _normalize_predict_kind():
         #   "response"        → pred_idata.posterior_predictive[_response_pp_key(response)]
         #   "response_params" → pred_idata.posterior[_mean_param_key]
         if kind == "response":
@@ -703,15 +703,14 @@ class BaseModel(abc.ABC):
         return flat
 
     def predictive_idata(self, new_data: pd.DataFrame | None = None) -> Any:
-        """Return a fresh idata with ``posterior_predictive`` populated, WITHOUT
-        mutating ``result.idata``.
+        """Return a fresh idata with ``posterior_predictive`` populated.
 
-        Public entry point for posterior-predictive work: used internally by
-        ``compare_models()`` for its pp-check plot, and available to advanced
-        users who want a custom PPC without corrupting the stored idata. Wraps
-        the private ``_predict_idata`` (``inplace=False``). On ArviZ 1.1 the
-        returned object is a DataTree — access groups as attributes
-        (``idata.posterior_predictive``).
+        Does NOT mutate ``result.idata``. Public entry point for
+        posterior-predictive work: used internally by ``compare_models()`` for
+        its pp-check plot, and available to advanced users who want a custom PPC
+        without corrupting the stored idata. Wraps the private ``_predict_idata``
+        (``inplace=False``). On ArviZ 1.1 the returned object is a DataTree —
+        access groups as attributes (``idata.posterior_predictive``).
 
         Args:
             new_data: Out-of-sample data. ``None`` uses the training data.
@@ -726,7 +725,8 @@ class BaseModel(abc.ABC):
     def summary(self) -> str:
         """Human-readable model summary.
 
-        In v0 returns a placeholder.  In v1, delegates to ``arviz.summary``.
+        Before `fit()`, returns a ``[not fitted]`` placeholder; afterwards
+        delegates to `ModelResult.summary()`.
         """
         if not self.is_fitted:
             return (

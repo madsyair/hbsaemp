@@ -13,44 +13,47 @@ point:
     compare_models([m1, m2])      # alias: hbmc
 """
 from __future__ import annotations
+
 import sys
+
 __version__: str = "1.0.0"
 if sys.version_info < (3, 12):
     raise RuntimeError(f"hbsaemp requires Python >= 3.12 (got {sys.version}).")
 
 # Core
-from hbsaemp._logging import configure_logging as configure_logging
 from hbsaemp._exceptions import (
-    HBSAEError as HBSAEError,
-    ValidationError as ValidationError,
-    DataValidationError as DataValidationError,
-    FormulaError as FormulaError,
-    SpatialMatrixError as SpatialMatrixError,
-    ModelRegistryError as ModelRegistryError,
-    ModelNotFittedError as ModelNotFittedError,
-    EstimationError as EstimationError,
     ConvergenceWarning as ConvergenceWarning,
+    DataValidationError as DataValidationError,
+    EstimationError as EstimationError,
+    FormulaError as FormulaError,
+    HBSAEError as HBSAEError,
+    ModelNotFittedError as ModelNotFittedError,
+    ModelRegistryError as ModelRegistryError,
+    SpatialMatrixError as SpatialMatrixError,
+    ValidationError as ValidationError,
 )
+from hbsaemp._logging import configure_logging as configure_logging
 
-# Model layer
-from hbsaemp.models._config import ModelConfig as ModelConfig, DEFAULT_CONFIG as DEFAULT_CONFIG
-from hbsaemp.models._base import BaseModel as BaseModel, ModelResult as ModelResult
-from hbsaemp.models._factory import (
-    create_model as create_model,
-    hbm as hbm,
-    MODEL_REGISTRY as MODEL_REGISTRY,
+# GUI (frontend)
+from hbsaemp.app import (
+    DEFAULT_APP_CONFIG as DEFAULT_APP_CONFIG,
+    App as App,
+    AppConfig as AppConfig,
+    launch_app as launch_app,
 )
-from hbsaemp.models._flex import hbm_flex as hbm_flex
-from hbsaemp.models._shortcuts import (
-    hbm_beta as hbm_beta,
-    hbm_binomial as hbm_binomial,
-    hbm_gaussian as hbm_gaussian,
-)
+from hbsaemp.data._preprocessor import DataPreprocessor as DataPreprocessor
 
 # Data layer
 from hbsaemp.data._validator import DataValidator as DataValidator
-from hbsaemp.data._preprocessor import DataPreprocessor as DataPreprocessor
-from hbsaemp.data.datasets import load_dataset as load_dataset, AVAILABLE_DATASETS as AVAILABLE_DATASETS
+from hbsaemp.data.datasets import (
+    AVAILABLE_DATASETS as AVAILABLE_DATASETS,
+    load_dataset as load_dataset,
+)
+from hbsaemp.diagnostics.comparison import (
+    ComparisonResult as ComparisonResult,
+    compare_models as compare_models,
+    hbmc as hbmc,
+)
 
 # Diagnostics
 from hbsaemp.diagnostics.convergence import (
@@ -63,11 +66,6 @@ from hbsaemp.diagnostics.prior_check import (
     check_prior as check_prior,
     hbpc as hbpc,
 )
-from hbsaemp.diagnostics.comparison import (
-    ComparisonResult as ComparisonResult,
-    compare_models as compare_models,
-    hbmc as hbmc,
-)
 
 # Estimation
 from hbsaemp.estimation.areas import (
@@ -75,14 +73,27 @@ from hbsaemp.estimation.areas import (
     estimate_areas as estimate_areas,
     hbsae as hbsae,
 )
-from hbsaemp.estimation.update import update_model as update_model, update_hbm as update_hbm
+from hbsaemp.estimation.update import update_hbm as update_hbm, update_model as update_model
+from hbsaemp.models._base import BaseModel as BaseModel, ModelResult as ModelResult
 
-# GUI (frontend)
-from hbsaemp.app import (
-    launch_app as launch_app,
-    App as App,
-    AppConfig as AppConfig,
-    DEFAULT_APP_CONFIG as DEFAULT_APP_CONFIG,
+# Model layer
+from hbsaemp.models._config import DEFAULT_CONFIG as DEFAULT_CONFIG, ModelConfig as ModelConfig
+from hbsaemp.models._factory import (
+    MODEL_REGISTRY as MODEL_REGISTRY,
+    create_model as create_model,
+    hbm as hbm,
+)
+from hbsaemp.models._family_spec import (
+    FamilySpec as FamilySpec,
+    get_family_spec as get_family_spec,
+    list_families as list_families,
+)
+from hbsaemp.models._flex import hbm_flex as hbm_flex
+from hbsaemp.models._prior import Prior as Prior
+from hbsaemp.models._shortcuts import (
+    hbm_beta as hbm_beta,
+    hbm_binomial as hbm_binomial,
+    hbm_gaussian as hbm_gaussian,
 )
 
 __all__: list[str] = [
@@ -98,6 +109,9 @@ __all__: list[str] = [
     "hbm_flex",              # tier 2: response + auxiliary list
     "hbm_beta", "hbm_gaussian", "hbm_binomial",  # tier 3
     "MODEL_REGISTRY",
+    "Prior",                 # validated prior value object
+    "FamilySpec",            # frozen family-metadata type
+    "list_families", "get_family_spec",  # read-only family registry accessors
     # Data layer
     "DataValidator", "DataPreprocessor", "load_dataset", "AVAILABLE_DATASETS",
     # Diagnostics (Python names + R aliases)
