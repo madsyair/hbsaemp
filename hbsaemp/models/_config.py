@@ -5,9 +5,8 @@ Holds draws, chains, tune, etc.; passed via `create_model(config=...)`.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
-from hbsaemp._types import SamplePriorLiteral
+from dataclasses import dataclass, field
+from typing import Any
 
 __all__: list[str] = ["ModelConfig", "DEFAULT_CONFIG"]
 
@@ -29,9 +28,13 @@ class ModelConfig:
         target_accept: NUTS acceptance rate target (default 0.8). Raise to
             0.9-0.95 for complex posterior geometry.
         random_seed: Integer seed for reproducibility (default None).
-        sample_prior: `"no"` (posterior) or `"only"` (prior predictive, used
-            by `check_prior`). Default `"no"`.
         progressbar: Show sampling progress bar (default True).
+        max_treedepth: Maximum NUTS tree depth (default None → PyMC's own
+            default of 10). Raise it when PyMC warns "reached the maximum tree
+            depth".
+        sampler_kwargs: Extra keyword arguments forwarded verbatim to
+            `pm.sample` via Bambi (e.g. `init`, `nuts_sampler`). Must not
+            override any managed key produced by `to_sampler_kwargs()`.
     """
 
     draws: int = 1000
@@ -40,8 +43,9 @@ class ModelConfig:
     cores: int = 1
     target_accept: float = 0.8
     random_seed: int | None = None
-    sample_prior: SamplePriorLiteral = "no"
     progressbar: bool = True
+    max_treedepth: int | None = None
+    sampler_kwargs: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.draws < 1:
@@ -56,9 +60,13 @@ class ModelConfig:
             raise ValueError(
                 f"`target_accept` must be in (0, 1), got {self.target_accept}"
             )
-        if self.sample_prior not in ("no", "only"):
+        if self.max_treedepth is not None and self.max_treedepth < 1:
             raise ValueError(
-                f"`sample_prior` must be 'no' or 'only', got {self.sample_prior!r}"
+                f"`max_treedepth` must be ≥ 1, got {self.max_treedepth}"
+            )
+        if not isinstance(self.sampler_kwargs, dict):
+            raise TypeError(
+                f"`sampler_kwargs` must be a dict, got {type(self.sampler_kwargs).__name__}"
             )
 
     @property
@@ -67,8 +75,13 @@ class ModelConfig:
         return self.draws * self.chains
 
     def to_sampler_kwargs(self) -> dict:
-        """Dict for `**` unpacking into `bambi.Model.fit()`."""
-        return {
+        """Dict for `**` unpacking into `bambi.Model.fit()`.
+
+        `max_treedepth` is included only when set. `sampler_kwargs` is merged
+        last as a passthrough to `pm.sample`, but may not override any
+        hbsaemp-managed key (raises `ValueError`) so the fit contract stays intact.
+        """
+        base = {
             "inference_method": "pymc",  # canonical name in Bambi 0.18+ ("mcmc" was deprecated)
             "draws": self.draws,
             "tune": self.tune,
@@ -77,14 +90,24 @@ class ModelConfig:
             "target_accept": self.target_accept,
             "random_seed": self.random_seed,
             "progressbar": self.progressbar,
+            "include_response_params": False,  # pin lazy-μ contract (predict computes mu/p on demand)
         }
+        if self.max_treedepth is not None:
+            base["max_treedepth"] = self.max_treedepth
+        if overlap := (set(base) & set(self.sampler_kwargs)):
+            raise ValueError(
+                f"sampler_kwargs may not override managed keys: {sorted(overlap)}"
+            )
+        base.update(self.sampler_kwargs)
+        return base
 
     def __repr__(self) -> str:
         return (
             f"ModelConfig(draws={self.draws}, tune={self.tune}, "
             f"chains={self.chains}, cores={self.cores}, "
             f"target_accept={self.target_accept}, "
-            f"sample_prior={self.sample_prior!r})"
+            f"max_treedepth={self.max_treedepth}, "
+            f"sampler_kwargs={self.sampler_kwargs!r})"
         )
 
 

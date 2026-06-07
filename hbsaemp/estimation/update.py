@@ -28,6 +28,8 @@ def update_model(
     tune: int | None = None,
     chains: int | None = None,
     cores: int | None = None,
+    target_accept: float | None = None,
+    random_seed: int | None = None,
 ) -> ModelResult:
     """Full refit with optional new data and/or sampler overrides.
 
@@ -46,6 +48,10 @@ def update_model(
         tune: Override the number of tuning (warmup) iterations.
         chains: Override the number of MCMC chains.
         cores: Override the number of parallel sampling cores.
+        target_accept: Override the NUTS target acceptance rate (raise toward
+            0.95-0.99 to clear divergences). Validated to ``(0, 1)`` by
+            `ModelConfig.__post_init__` before refitting.
+        random_seed: Override the random seed for a reproducible refit.
 
     Raises:
         ModelNotFittedError: If `model` has not been fitted.
@@ -71,6 +77,10 @@ def update_model(
             overrides["chains"] = chains
         if cores is not None:
             overrides["cores"] = cores
+        if target_accept is not None:
+            overrides["target_accept"] = target_accept
+        if random_seed is not None:
+            overrides["random_seed"] = random_seed
         new_config = dataclasses.replace(model._config, **overrides)
 
     # resolve data

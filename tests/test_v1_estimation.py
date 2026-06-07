@@ -298,6 +298,22 @@ class TestUpdateModel:
         result = hb.update_hbm(beta_fitted, draws=150, tune=150)
         assert isinstance(result, hb.ModelResult)
 
+    def test_update_overrides_target_accept(self, beta_fitted):
+        """target_accept is the key non-convergence lever — must be overridable (TODO-11)."""
+        result = hb.update_model(beta_fitted, draws=120, tune=120, target_accept=0.95)
+        assert result.config.target_accept == 0.95
+        assert beta_fitted._config.target_accept == 0.95
+
+    def test_update_overrides_random_seed(self, beta_fitted):
+        result = hb.update_model(beta_fitted, draws=120, tune=120, random_seed=123)
+        assert result.config.random_seed == 123
+
+    def test_update_invalid_target_accept_raises(self, beta_fitted):
+        """Override flows through ModelConfig.__post_init__, which rejects target_accept ∉ (0,1)
+        before any refit happens."""
+        with pytest.raises(ValueError):
+            hb.update_model(beta_fitted, target_accept=1.5)
+
 
 # ---------------------------------------------------------------------------
 # update_model() — regression tests for the duplicate-kwarg TypeError

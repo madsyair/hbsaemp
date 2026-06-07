@@ -29,7 +29,10 @@ def parse_formula(formula: str) -> dict:
           from ``(.*|group)`` terms.
 
     Raises:
-        FormulaError: If ``"~"`` is absent or the response cannot be parsed.
+        FormulaError: If ``"~"`` is absent, the response cannot be parsed, or a
+            fixed-effect term is not a bare column identifier (e.g. an in-formula
+            transform such as ``log(x1)``/``C(x1)``/``I(x1**2)`` or an interaction
+            ``x1:x2``). Pre-compute such terms as DataFrame columns first.
 
     Examples:
         >>> parse_formula("y ~ x1 + x2 + (1|area)")
@@ -59,8 +62,9 @@ def parse_formula(formula: str) -> dict:
     # \s* around the group name supports R-style spacing: (1 | group)
     random_groups: list[str] = re.findall(r"\([^|)]*\|\s*([A-Za-z_]\w*)\s*\)", rhs)
 
-    # Remove all parenthesised groups (random effects) from RHS, then parse fixed
-    rhs_fixed = re.sub(r"\([^)]*\)", "", rhs)
+    # Strip only random-effect groups (those containing '|'); any remaining '(' marks a
+    # function term and will fail the bare-identifier check below — never silent-drop.
+    rhs_fixed = re.sub(r"\([^)]*\|[^)]*\)", "", rhs)
     fixed: list[str] = []
     for token in rhs_fixed.split("+"):
         term = token.strip()

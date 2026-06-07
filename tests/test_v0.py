@@ -67,12 +67,12 @@ def test_model_config_custom():
     assert kw["draws"] == 2000 and kw["chains"] == 2
 
 
-def test_sampler_kwargs_omits_include_response_params():
-    """fit() must NOT request per-observation response params: mu/p are computed
-    on demand via predict(kind='response_params'). Keeping them out of fit keeps
-    idata small and avoids the offset-model materialisation Bambi 0.18 ignores."""
-    assert "include_response_params" not in hb.ModelConfig().to_sampler_kwargs()
-    assert "include_response_params" not in hb.ModelConfig(draws=500, chains=2).to_sampler_kwargs()
+def test_sampler_kwargs_pins_include_response_params_false():
+    """fit() must EXPLICITLY pin include_response_params=False so the lazy-μ design
+    can't break silently if Bambi flips its default: mu/p are computed on demand via
+    predict(kind='response_params'), never materialised into idata at fit time."""
+    assert hb.ModelConfig().to_sampler_kwargs()["include_response_params"] is False
+    assert hb.ModelConfig(draws=500, chains=2).to_sampler_kwargs()["include_response_params"] is False
 
 
 def test_sampler_kwargs_uses_pymc_inference_method():
@@ -87,7 +87,8 @@ def test_sampler_kwargs_uses_pymc_inference_method():
     ({"tune": -1}, ValueError),
     ({"chains": 0}, ValueError),
     ({"target_accept": 1.5}, ValueError),
-    ({"sample_prior": "yes"}, ValueError),
+    ({"max_treedepth": 0}, ValueError),
+    ({"sampler_kwargs": None}, TypeError),
 ])
 def test_model_config_validation(bad, exc):
     with pytest.raises(exc):
@@ -99,12 +100,60 @@ def test_model_config_validation(bad, exc):
     {"tune": 0},
     {"chains": 1},
     {"target_accept": 0.5},
+    {"max_treedepth": 1},
 ])
 def test_model_config_valid_boundaries(kwargs):
     """Boundary values that must construct without raising."""
     cfg = hb.ModelConfig(**kwargs)
     for k, v in kwargs.items():
         assert getattr(cfg, k) == v
+
+
+def test_sampler_kwargs_max_treedepth_omitted_by_default():
+    """max_treedepth absent from kwargs unless set, so PyMC's own default applies."""
+    assert "max_treedepth" not in hb.ModelConfig().to_sampler_kwargs()
+
+
+def test_sampler_kwargs_max_treedepth_present_when_set():
+    kw = hb.ModelConfig(max_treedepth=12).to_sampler_kwargs()
+    assert kw["max_treedepth"] == 12
+
+
+def test_sampler_kwargs_passthrough():
+    """sampler_kwargs is forwarded verbatim into the fit kwargs (TODO-16)."""
+    kw = hb.ModelConfig(
+        sampler_kwargs={"init": "adapt_diag", "nuts_sampler": "numpyro"}
+    ).to_sampler_kwargs()
+    assert kw["init"] == "adapt_diag"
+    assert kw["nuts_sampler"] == "numpyro"
+
+
+@pytest.mark.parametrize("clashing", [
+    {"draws": 5},
+    {"target_accept": 0.9},
+    {"inference_method": "vi"},
+    {"include_response_params": True},
+])
+def test_sampler_kwargs_passthrough_collision_raises(clashing):
+    """sampler_kwargs may not silently override an hbsaemp-managed key."""
+    with pytest.raises(ValueError, match="managed keys"):
+        hb.ModelConfig(sampler_kwargs=clashing).to_sampler_kwargs()
+
+
+def test_sampler_kwargs_collision_with_max_treedepth_raises():
+    """max_treedepth becomes a managed key once set → duplicate in sampler_kwargs clashes."""
+    with pytest.raises(ValueError, match="managed keys"):
+        hb.ModelConfig(
+            max_treedepth=10, sampler_kwargs={"max_treedepth": 12}
+        ).to_sampler_kwargs()
+
+
+def test_sampler_kwargs_default_not_shared():
+    """default_factory gives each instance its own dict (no shared mutable default)."""
+    a = hb.ModelConfig()
+    b = hb.ModelConfig()
+    a.sampler_kwargs["init"] = "adapt_diag"
+    assert b.sampler_kwargs == {}
 
 
 # ---------------------------------------------------------------------------
@@ -754,3 +803,35 @@ def test_parse_formula_error_carries_formula():
     with pytest.raises(FormulaError) as exc_info:
         parse_formula("y ~ np.log(x1)")
     assert "np.log" in exc_info.value.context.get("formula", "")
+
+
+@pytest.mark.parametrize("formula", [
+    "y ~ C(x1)",
+    "y ~ I(x1**2)",
+    "y ~ log(x1)",
+    "y ~ scale(x1)",
+    "y ~ poly(x1, 2)",
+    "y ~ exp(x1)",
+    "y ~ np.log(x1)",
+    "y ~ x1:x2",
+    "y ~ C(region) + x1",  # exact bug from update-context: 'C' must not survive as a phantom
+])
+def test_parse_formula_function_terms_raise(formula):
+    """Single-name function terms must raise, not survive paren-strip as phantom
+    predictors (C/log/I/...) — TODO-1 regression guard."""
+    with pytest.raises(FormulaError, match="not a valid column identifier"):
+        parse_formula(formula)
+
+
+@pytest.mark.parametrize("formula, expected_fixed, expected_groups", [
+    ("y ~ x1 + x2 + (1|area)", ["x1", "x2"], ["area"]),
+    ("y ~ x1 + (1 | area)", ["x1"], ["area"]),
+    ("y ~ x1 + (x1|area)", ["x1"], ["area"]),
+    ("y ~ 0 + x1", ["x1"], []),
+])
+def test_parse_formula_re_and_intercept_preserved(formula, expected_fixed, expected_groups):
+    """Random-effect groups & intercept-control tokens still parse after the
+    paren-strip narrowing — no regression."""
+    r = parse_formula(formula)
+    assert r["fixed"] == expected_fixed
+    assert r["random_groups"] == expected_groups
