@@ -93,7 +93,7 @@ class ResultsTab:
             pagination="remote", page_size=20,
         )
         self._sae_download_btn = pn.widgets.FileDownload(
-            label="⬇ Download CSV Hasil SAE",
+            label="Download CSV of SAE Results",
             filename="sae_estimation.csv",
             callback=self._sae_csv_callback,
             button_type="success",
@@ -116,22 +116,16 @@ class ResultsTab:
         idata = self._get_idata()
         if idata is None:
             self._conv_status.object = error_box(
-                "Model belum di-fit",
-                "Klik <b>Fit Model</b> di tab <b>Modeling</b> terlebih dahulu."
+                "Model has not been fitted. Please click <b>Fit Model</b> in the <b>Modeling</b> tab first."
             )
             return
  
         self._conv_status.object = (
             '<div style="background:#0072B2;color:white;padding:10px 16px;'
-            'border-radius:8px;margin-top:8px">⏳ Menghitung diagnostik…</div>'
+            'border-radius:8px;margin-top:8px">Computing diagnostics</div>'
         )
  
         try:
-            # model.predict(kind="response") adds per-observation variables
-            # (e.g. 'mu' or 'p', dimensioned by __obs__) to the posterior
-            # group besides posterior_predictive. Those aren't model
-            # parameters — filter them out so the R-hat/ESS table & trace
-            # plots only show actual parameters.
             var_names = [
                 v for v in idata.posterior.data_vars
                 if "__obs__" not in idata.posterior[v].dims
@@ -165,26 +159,21 @@ class ResultsTab:
             plt.tight_layout()
             self._trace_pane.object = fig_trace
             plt.close(fig_trace)
- 
-            # Autocorrelation plot per parameter — high lags that never decay
-            # indicate poor MCMC mixing.
+
             pc_acf = azp.plot_autocorr(idata, var_names=var_names)
             fig_acf = pc_acf.viz["figure"].item()
-            fig_acf.suptitle("Autocorrelation per Parameter", fontsize=12, fontweight="bold")
+            fig_acf.suptitle("Autocorrelation for each Parameter", fontsize=12, fontweight="bold")
             fig_acf.subplots_adjust(top=0.8)
             self._autocorr_pane.object = fig_acf
             plt.close(fig_acf)
  
-            # Density plot (marginal posterior) per parameter.
             pc_dens = azp.plot_dist(idata, group="posterior", var_names=var_names, kind="kde")
             fig_dens = pc_dens.viz["figure"].item()
-            fig_dens.suptitle("Density Plot per Parameter", fontsize=12, fontweight="bold")
+            fig_dens.suptitle("Density Plot for each Parameter", fontsize=12, fontweight="bold")
             fig_dens.subplots_adjust(top=0.75)
             self._density_pane.object = fig_dens
             plt.close(fig_dens)
  
-            # Number of divergent transitions — an important NUTS sampling
-            # quality indicator beyond R-hat/ESS.
             n_divergences = (
                 int(idata.sample_stats["diverging"].sum())
                 if "diverging" in idata.sample_stats else None
@@ -198,32 +187,28 @@ class ResultsTab:
  
             max_rhat = float(df_conv["R-hat"].max()) if "R-hat" in df_conv.columns else float("nan")
             min_ess  = int(df_conv["ESS bulk"].min()) if "ESS bulk" in df_conv.columns else 0
- 
-            # Don't assume the Bambi/PyMC defaults auto-converge — evaluate
-            # each indicator and show an explicit warning if there's a problem.
+
             issues = []
             if not np.isnan(max_rhat) and max_rhat >= 1.01:
-                issues.append(f"Max R-hat {max_rhat:.4f} ≥ 1.01 (indikasi belum konvergen).")
+                issues.append(f"Max R-hat {max_rhat:.4f} ≥ 1.01 (indication of a lack of convergence).")
             if min_ess and min_ess < 400:
-                issues.append(f"Min ESS bulk {min_ess} < 400 (sampel efektif kurang).")
+                issues.append(f"Min ESS bulk {min_ess} < 400 (lack of effective samples).")
             if n_divergences:
                 issues.append(
-                    f"Ditemukan {n_divergences} divergent transition(s) — "
-                    "hasil posterior berpotensi bias."
+                    f"{n_divergences} divergent transition detected, the posterior results may be biased."
                 )
  
             if issues:
                 self._conv_status.object = error_box(
-                    "⚠ Indikasi masalah konvergensi",
+                    "Potential convergence issues detected",
                     "<br>".join(f"• {i}" for i in issues) +
-                    "<br><br>Pertimbangkan memeriksa ulang model/data "
-                    "(mis. reparameterisasi, prior lebih informatif, atau data lebih banyak)."
+                    "<br><br>Consider reviewing the model or data."
                 )
             else:
                 self._conv_status.object = success_box(
-                    f"✔ Diagnostik selesai — tidak ada indikasi masalah konvergensi. "
-                    f"Max R-hat: <b>{max_rhat:.4f}</b> (baik jika &lt; 1.01), "
-                    f"Min ESS bulk: <b>{min_ess}</b> (baik jika &gt; 400), "
+                    f"Diagnostics completed, no convergence issues detected. "
+                    f"Max R-hat: <b>{max_rhat:.4f}</b> (good if &lt; 1.01), "
+                    f"Min ESS bulk: <b>{min_ess}</b> (good if &gt; 400), "
                     f"Divergent transitions: <b>{n_divergences}</b>."
                 )
  
@@ -235,14 +220,13 @@ class ResultsTab:
         y     = self._get_y()
         if idata is None or y is None:
             self._sae_status.object = error_box(
-                "⚠ Model belum di-fit",
-                "Fit model terlebih dahulu di tab <b>Modeling</b>."
+                "Model has not been fitted. Please fit the model first in the <b>Modeling</b> tab."
             )
             return
  
         self._sae_status.object = (
             '<div style="background:#0072B2;color:white;padding:10px 16px;'
-            'border-radius:8px;margin-top:8px">⏳ Menghitung estimasi SAE…</div>'
+            'border-radius:8px;margin-top:8px">Computing SAE estimates</div>'
         )
  
         try:
@@ -255,15 +239,13 @@ class ResultsTab:
             y_pred = post_y.mean(axis=0)
             y_sd   = post_y.std(axis=0)
  
-            # RSE (Relative Standard Error, %) = SE / |estimate| * 100.
-            # Guarded against division by zero when the prediction is exactly 0.
             with np.errstate(divide="ignore", invalid="ignore"):
                 rse_obs = np.where(y_pred != 0, np.abs(y_sd / y_pred) * 100, np.nan)
  
             df_sae = pd.DataFrame({
                 "Obs":      np.arange(1, n + 1),
-                "Aktual":   np.round(y_arr,   4),
-                "Prediksi": np.round(y_pred,  4),
+                "Actual":   np.round(y_arr,   4),
+                "Prediction": np.round(y_pred,  4),
                 "SE":       np.round(y_sd,    4),
                 "RSE (%)":  np.round(rse_obs, 4),
             })
@@ -271,12 +253,11 @@ class ResultsTab:
             self._sae_download_btn.disabled = False
  
             self._sae_status.object = success_box(
-                f"✔ SAE Estimation selesai — {n} observasi."
+                f"✔ SAE Estimation completed — {n} observations."
             )
  
         except Exception as exc:
-            self._sae_status.object = error_box("✘ SAE Estimation gagal", str(exc))
- 
+            self._sae_status.object = _error_box("SAE Estimation failed", str(exc))
     def _sae_csv_callback(self) -> io.StringIO:
         """Data source for the FileDownload button — CSV of the current SAE table."""
         buf = io.StringIO()

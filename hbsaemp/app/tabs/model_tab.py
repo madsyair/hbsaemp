@@ -383,14 +383,10 @@ class ModelTab(param.Parameterized):
             try:
                 model, pred_names, _had_missing = self._build_bambi_model()
  
-                # Native Bambi API — not pm.sample_prior_predictive() directly.
-                # Model is build()'d first, then prior_predictive() is called
-                # WITHOUT a draws argument (uses Bambi's default, currently 500).
                 model.build()
                 prior_idata = model.prior_predictive()
                 y = self._response_array(model)
- 
-                # 1) Histogram of each parameter's prior — extra context.
+
                 param_names = list(prior_idata.prior.data_vars)
                 n_params = len(param_names)
                 fig1, axes1 = plt.subplots(1, n_params, figsize=(5 * n_params, 4))
@@ -406,11 +402,7 @@ class ModelTab(param.Parameterized):
                 plt.tight_layout()
                 self._prior_plot_pane.object = fig1
                 plt.close(fig1)
- 
-                # 2) Prior predictive vs actual data — native ArviZ plot
-                # (azp.plot_ppc_dist), works generically for any family since
-                # it only reads the prior_predictive/observed_data groups from
-                # the InferenceData rather than assuming a Gaussian shape.
+
                 pc = azp.plot_ppc_dist(
                     prior_idata, group="prior_predictive",
                     visuals={"observed_dist": True},
@@ -422,8 +414,6 @@ class ModelTab(param.Parameterized):
                 self._prior_ppc_pane.object = fig2
                 plt.close(fig2)
  
-                # 3) Spread interpretation — NOT a convergence claim, since
-                # prior predictive check involves no MCMC at all.
                 response_var = list(prior_idata.prior_predictive.data_vars)[0]
                 pred_samples = prior_idata.prior_predictive[response_var].values
                 evaluation = evaluate_predictive_spread(y, pred_samples)
@@ -466,8 +456,6 @@ class ModelTab(param.Parameterized):
             try:
                 model, pred_names, had_missing = self._build_bambi_model()
  
-                # No draws/tune/chains hardcoded — fully uses Bambi/PyMC's
-                # default sampler (NUTS).
                 idata = model.fit()
                 model.predict(idata, kind="response", inplace=True)
  
@@ -500,7 +488,6 @@ class ModelTab(param.Parameterized):
         model = self.state.model
         y     = self.state.y_vals
  
-        # Required: must not run before the model has been fitted.
         if idata is None or model is None or y is None:
             self._postpc_status.object = error_box(
                 "Model has not been fitted",
@@ -518,24 +505,17 @@ class ModelTab(param.Parameterized):
             try:
                 from hbsaemp.app._helpers import has_group
  
-                # Native Bambi API — not pm.sample_posterior_predictive()
-                # directly. If the posterior_predictive group isn't already
-                # in idata (e.g. from another flow), compute it here.
                 if not has_group(idata, "posterior_predictive"):
                     model.predict(idata, kind="response", inplace=True)
- 
-                # Native ArviZ plots (via the arviz_plots namespace), generic
-                # for any family since they only read the
-                # posterior_predictive/observed_data groups.
-                pc1 = azp.plot_ppc_dist(idata)  # default group="posterior_predictive"
+
+                pc1 = azp.plot_ppc_dist(idata)  
                 fig1 = pc1.viz["figure"].item()
                 fig1.suptitle("Posterior Predictive vs Actual Data",
                               fontsize=11, fontweight="bold")
                 fig1.subplots_adjust(top=0.82)
                 self._postpc_dist_pane.object = fig1
                 plt.close(fig1)
- 
-                # Credible interval / band per observation + actual data points.
+
                 pc2 = azp.plot_ppc_interval(idata)
                 fig2 = pc2.viz["figure"].item()
                 fig2.suptitle("Credible Interval Posterior Predictive for each Observasi",
