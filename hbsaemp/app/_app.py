@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING, Any
 
 from hbsaemp._logging import get_logger
 from hbsaemp.app._config import AppConfig, DEFAULT_APP_CONFIG
+from hbsaemp.app._state import AppState
 from hbsaemp.app.tabs.data_tab import DataTab
 from hbsaemp.app.tabs.explore_tab import ExploreTab
 from hbsaemp.app.tabs.model_tab import ModelTab
@@ -43,17 +44,21 @@ from hbsaemp.app.tabs.results_tab import ResultsTab
 
 logger = get_logger(__name__)
 
+pn.extension("tabulator", sizing_mode="stretch_width")
+
 __all__: list[str] = ["App"]
 
 
 class App:
     """hbsaemp web dashboard.
-
-    v0: constructor works (creates stub tabs), but :meth:`serve` raises
-    :exc:`NotImplementedError` because ``panel`` is not installed.
-
-    v1: :meth:`serve` launches a Panel dashboard in the browser.
-
+ 
+    Assembles :class:`~hbsaemp.app.tabs.data_tab.DataTab`,
+    :class:`~hbsaemp.app.tabs.explore_tab.ExploreTab`,
+    :class:`~hbsaemp.app.tabs.model_tab.ModelTab`, and
+    :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` into one
+    ``panel.template.FastListTemplate`` dashboard, all sharing a single
+    :class:`~hbsaemp.app._state.AppState`.
+ 
     Args:
         app_config: Appearance and server configuration.
             Defaults to :data:`~hbsaemp.app._config.DEFAULT_APP_CONFIG`.
@@ -64,10 +69,7 @@ class App:
 
         # Shared mutable state — tabs read/write to this dict.
         # Equivalent to Shiny reactive values (reactiveVal).
-        self._state: dict[str, Any] = {
-            "data":  None,   # pd.DataFrame after upload
-            "model": None,   # BaseModel after fitting
-        }
+        self._state: AppState = AppState()
 
         # Instantiate tab controllers (stub objects in v0).
         self._data_tab    = DataTab(self._state)
@@ -83,25 +85,31 @@ class App:
         return self._config
 
     @property
-    def state(self) -> dict[str, Any]:
-        """Shared state dict (read-only view)."""
+    def state(self) -> AppState:
+        """Shared :class:`~hbsaemp.app._state.AppState` (read-only view)"""
         return self._state
 
-    def build(self) -> Any:
+    def build(self) -> pn.template.FastListTemplate:
         """Assemble and return the Panel dashboard object (not yet served).
-
-        In v1, returns a ``panel.template.FastListTemplate`` instance.
-        Useful for embedding the app in a Jupyter notebook without launching
-        a server.
-
+        Useful for embedding the app in a Jupyter notebook, or for calling
+        ``.servable()`` on it inside a script launched with
+        ``panel serve script.py``, without starting a server via
+        :meth:`serve`.
+ 
         Returns:
-            A ``panel`` servable object.
-
-        Raises:
-            NotImplementedError: In v0.
+            A ``panel.template.FastListTemplate`` instance.
         """
-        raise NotImplementedError(
-            "App.build() requires panel>=1.3 (v1)."
+        tabs = pn.Tabs(
+            ("Data Upload",      self._data_tab.panel()),
+            ("Data Exploration", self._explore_tab.panel()),
+            ("Modeling",         self._model_tab.panel()),
+            ("Results",          self._results_tab.panel()),
+            sizing_mode="stretch_width",
+        )
+        return pn.template.FastListTemplate(
+            title=self._config.title,
+            main=[tabs],
+            accent="#A01346",
         )
 
     def serve(self) -> None:
@@ -112,8 +120,10 @@ class App:
         Raises:
             NotImplementedError: In v0.
         """
-        raise NotImplementedError(
-            "App.serve() requires panel>=1.3 (v1)."
+        pn.serve(
+            self.build(),
+            port=self._config.port,
+            show=self._config.open_browser,
         )
 
     def __repr__(self) -> str:
