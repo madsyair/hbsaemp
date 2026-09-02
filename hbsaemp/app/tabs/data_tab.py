@@ -21,35 +21,44 @@ Mapping from R hbsaems
     ─────────────────────────────── ──────────────────────────────
     fileInput("data_file", …)       pn.widgets.FileInput
     DT::DTOutput("data_preview")    pn.widgets.Tabulator
-    verbatimTextOutput("na_report") pn.pane.Str
-    selectInput("builtin", …)       pn.widgets.Select (builtin datasets)
+    verbatimTextOutput("na_report") pn.pane.Markdown
 """
 
 from __future__ import annotations
 
 import io
- 
+from typing import TYPE_CHECKING, Any
+
 import pandas as pd
 import panel as pn
 import param
- 
-from hbsaemp.app._helpers import success_box
-from hbsaemp.app._state import AppState
+
+if TYPE_CHECKING:
+    from hbsaemp.app._app import AppState
 
 __all__: list[str] = ["DataTab"]
 
+def _success_box(body: str) -> str:
+    """Render a green success/notification banner as raw HTML."""
+    return (
+        f'<div style="background:#2ca02c;color:white;padding:10px 16px;'
+        f'border-radius:8px;margin-top:8px">{body}</div>'
+    )
 
 class DataTab:
     """Data upload and preview tab.
  
     Args:
-        state: Shared :class:`~hbsaemp.app._state.AppState`.  Writes
-            ``state.data`` after a successful upload; read by downstream tabs.
+        state: Shared :class:`~hbsaemp.app._app.AppState` instance created
+            by :class:`~hbsaemp.app._app.App`. The ``data`` parameter is
+            written here after a successful upload, and watched by
+            downstream tabs (:class:`~hbsaemp.app.tabs.explore_tab.ExploreTab`,
+            :class:`~hbsaemp.app.tabs.model_tab.ModelTab`).
     """
  
     state: AppState = param.Parameter()
 
-    def __init__(self, state: AppState, **params) -> None:
+    def __init__(self, state: AppState, **params: Any) -> None:
         super().__init__(state=state, **params)
  
         self._file_input = pn.widgets.FileInput(
@@ -64,7 +73,7 @@ class DataTab:
         )
         self._upload_status = pn.pane.HTML("")
 
-    def _on_upload(self, event) -> None:
+    def _on_upload(self, event: param.parameterized.Event) -> None:
         if not self._file_input.value:
             return
         fname = self._file_input.filename
@@ -74,7 +83,7 @@ class DataTab:
         self._refresh_preview(df)
         self.state.data = df
         self._upload_status.object = success_box(
-            f"✔ Data <b>{fname}</b> successfully loaded. "
+            f"Data <b>{fname}</b> successfully loaded. "
             "Moving on to the tab <b>Data Exploration</b>."
         )
  
@@ -119,5 +128,10 @@ class DataTab:
             pn.Card(self._preview,                          title="Data Preview",                          margin=10),
         )
 
+    def get_dataframe(self) -> pd.DataFrame | None:
+        """Return the currently loaded :class:`pandas.DataFrame`, or ``None``."""
+        return self.state.data
+
     def __repr__(self) -> str:
-        return "DataTab(data_loaded={self.state.data is not None})"
+        loaded = self.state.data is not None if self.state is not None else False
+        return f"DataTab(data_loaded={loaded})"

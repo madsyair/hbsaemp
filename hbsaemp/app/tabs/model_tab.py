@@ -28,20 +28,20 @@ Mapping from R hbsaems
     R Shiny                             Panel v1 equivalent
     ─────────────────────────────────── ──────────────────────────────────
     selectInput("response_var", …)      pn.widgets.Select
-    pickerInput("auxiliary_vars", …)    pn.widgets.MultiChoice
+    pickerInput("auxiliary_vars", …)    PredictorCheckboxes (pn.FlexBox of Checkbox)
     selectInput("group_var", …)         pn.widgets.Select
     selectInput("distribution_type", …) pn.widgets.Select (family)
     selectInput("hb_link", …)           pn.widgets.Select (link)
-    numericInput("num_chains", …)       pn.widgets.IntInput
-    sliderInput("adapt_delta", …)       pn.widgets.FloatSlider
     actionButton("fit_model", …)        pn.widgets.Button
-    withProgress(…)                     pn.indicators.LoadingSpinner
+    withProgress(…)                     threading.Thread + status HTML
 """
 
 from __future__ import annotations
 
 import threading
- 
+from typing import TYPE_CHECKING, Any
+
+import arviz_plots as azp
 import bambi as bmb
 import matplotlib
 matplotlib.use("Agg")
@@ -50,17 +50,9 @@ import numpy as np
 import pandas as pd
 import panel as pn
 import param
- 
-import arviz_plots as azp
- 
-from hbsaemp.app._helpers import (
-    POSTERIOR_STATUS_LABEL,
-    PRIOR_STATUS_LABEL,
-    error_box,
-    evaluate_predictive_spread,
-    success_box,
-)
-from hbsaemp.app._state import AppState
+
+if TYPE_CHECKING:
+    from hbsaemp.app._app import AppState
 
 __all__: list[str] = ["ModelTab"]
 
@@ -105,154 +97,217 @@ _FAMILY_DESC: dict[str, str] = {
     ),
 }
  
- 
+def _error_box(title: str, body: str = "") -> str:
+    inner = f"<b>{title}</b><br>{body}" if body else title
+    return (
+        f'<div style="background:#d62728;color:white;padding:10px 16px;'
+        f'border-radius:8px;margin-top:8px">{inner}</div>'
+    )
+
+
+def _success_box(body: str) -> str:
+    return (
+        f'<div style="background:#2ca02c;color:white;padding:10px 16px;'
+        f'border-radius:8px;margin-top:8px">{body}</div>'
+    )
+
+
+def _has_group(idata: Any, name: str) -> bool:
+    """Check whether a group (e.g. ``'posterior_predictive'``) exists on an InferenceData."""
+    return any(g.strip("/") == name for g in idata.groups)
+
+
+class PredictorCheckboxes(param.Parameterized):
+    """A dynamic set of checkboxes used to multi-select predictor columns."""
+
+    value   = param.List(default=[])
+    options = param.List(default=[])
+
+    def __init__(self, **params: Any) -> None:
+        super().__init__(**params)
+        self._checkboxes: dict[str, pn.widgets.Checkbox] = {}
+        self._syncing = False
+        self._box = pn.FlexBox(sizing_mode="stretch_width", gap="4px 18px")
+        self._rebuild_checkboxes()
+
+    def _rebuild_checkboxes(self) -> None:
+        checkboxes = {}
+        for col in self.options:
+            cb = pn.widgets.Checkbox(name=str(col), value=col in self.value)
+            cb.param.watch(self._on_toggle, "value")
+            checkboxes[col] = cb
+        self._checkboxes = checkboxes
+        self._box.objects = list(self._checkboxes.values())
+
+    def _on_toggle(self, event: param.parameterized.Event) -> None:
+        if self._syncing:
+            return
+        self.value = [col for col, cb in self._checkboxes.items() if cb.value]
+
+    @param.depends("options", watch=True)
+    def _on_options_changed(self) -> None:
+        self._rebuild_checkboxes()
+
+    @param.depends("value", watch=True)
+    def _on_value_changed(self) -> None:
+        self._syncing = True
+        try:
+            for col, cb in self._checkboxes.items():
+                desired = col in self.value
+                if cb.value != desired:
+                    cb.value = desired
+        finally:
+            self._syncing = False
+
+    def panel(self) -> pn.FlexBox:
+        return self._box
+
+
 class ModelTab(param.Parameterized):
     """Model specification and fitting tab.
- 
+
     Args:
-        state: Shared :class:`~hbsaemp.app._state.AppState`.  Reads
-            ``state.data``; writes ``state.model``/``state.idata`` and
-            related fields after a successful fit.
+        state: Shared :class:`~hbsaemp.app._app.AppState` instance. Reads
+            ``state.data`` (set by
+            :class:`~hbsaemp.app.tabs.data_tab.DataTab`); writes
+            ``state.idata``, ``state.model``, ``state.y_vals``,
+            ``state.pred_names`` and ``state.response_col`` after fitting,
+            for :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` to consume.
     """
- 
-    state: AppState = param.Parameter()
- 
-    def __init__(self, state: AppState, **params) -> None:
+
+    state: "AppState" = param.Parameter()
+
+    def __init__(self, state: "AppState", **params: Any) -> None:
         super().__init__(state=state, **params)
- 
+
         self._response_sel = pn.widgets.Select(
             name="Response Variable  (y)",
-            options=[], width=240,
+            options=[], max_width=280,
         )
-        self._predictors_sel = pn.widgets.CheckBoxGroup(
+        self._predictors_sel = PredictorCheckboxes(
             name="Auxiliary / Predictor Variables  (x)",
-            options=[], value=[],
         )
         self._group_sel = pn.widgets.Select(
             name="Group / Area Variable  (optional)",
-            options=[], value=None, width=240,
+            options=[], value=None, max_width=280,
         )
- 
+
         self._family_sel = pn.widgets.Select(
             name="HB Family",
-            options=_FAMILY_OPTIONS, value="gaussian", width=210,
+            options=_FAMILY_OPTIONS, value="gaussian", max_width=250,
         )
         self._link_sel = pn.widgets.Select(
             name="Link Function",
             options=_FAMILY_LINK_OPTIONS["gaussian"],
             value=_FAMILY_LINK_DEFAULT["gaussian"],
-            width=210,
+            max_width=250,
         )
         self._family_desc = pn.pane.Markdown(
             _FAMILY_DESC["gaussian"], margin=(4, 0, 8, 0),
         )
         self._family_sel.param.watch(self._on_family_change, "value")
- 
+
         self._binomial_trials_sel = pn.widgets.Select(
             name="trials column  (number of trials)",
-            options=[], value=None, width=240,
+            options=[], value=None, max_width=280,
         )
         self._extra_params_pane = pn.Column()
- 
+
         self._formula_preview = pn.pane.HTML(self._render_formula_html())
         for w in [self._response_sel, self._predictors_sel, self._group_sel,
                   self._family_sel, self._binomial_trials_sel]:
             w.param.watch(self._update_formula_preview, "value")
- 
+
         self._build_btn = pn.widgets.Button(
             name="Build Model",
-            button_type="primary", width=200,
+            button_type="primary", max_width=220,
         )
-        self._build_status = pn.pane.HTML("")
+        self._build_status  = pn.pane.HTML("")
         self._build_btn.on_click(self._on_build)
- 
-        self._prior_run_btn        = pn.widgets.Button(
-            name="Run Prior Predictive Check", button_type="primary", width=240,
+
+        self._prior_run_btn   = pn.widgets.Button(
+            name="Run Prior Predictive Check", button_type="primary", max_width=260,
         )
-        self._prior_status         = pn.pane.HTML("")
-        self._prior_plot_pane      = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True)
-        self._prior_ppc_pane       = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True)
-        self._prior_interpretation = pn.pane.HTML("")
+        self._prior_status    = pn.pane.HTML("")
+        self._prior_plot_pane = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
+        self._prior_ppc_pane  = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
         self._prior_run_btn.on_click(self._on_prior_check)
- 
-        self._fit_btn     = pn.widgets.Button(
-            name="Fit Model", button_type="primary", width=200,
+
+        self._fit_btn         = pn.widgets.Button(
+            name="Fit Model", button_type="primary", max_width=220,
         )
-        self._fit_status  = pn.pane.HTML("")
-        self._fit_run_btn = self._fit_btn
+        self._fit_status      = pn.pane.HTML("")
         self._fit_btn.on_click(self._on_fit_model)
- 
-        self._postpc_run_btn        = pn.widgets.Button(
-            name="Run Posterior Predictive Check", button_type="primary", width=260,
+
+        self._postpc_run_btn = pn.widgets.Button(
+            name="Run Posterior Predictive Check", button_type="primary", max_width=280,
         )
         self._postpc_status         = pn.pane.HTML("")
-        self._postpc_dist_pane      = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True)
-        self._postpc_interval_pane  = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True)
-        self._postpc_interpretation = pn.pane.HTML("")
+        self._postpc_dist_pane      = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
+        self._postpc_interval_pane  = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
         self._postpc_run_btn.on_click(self._on_posterior_check)
- 
+
         self.state.param.watch(self._on_data_change, "data")
         if self.state.data is not None:
             self._populate_selectors(self.state.data)
- 
-    def _on_data_change(self, event) -> None:
+
+    def _on_data_change(self, event: param.parameterized.Event) -> None:
         if event.new is not None:
             self._populate_selectors(event.new)
- 
+
     def _populate_selectors(self, df: pd.DataFrame) -> None:
         all_cols = df.columns.tolist()
         num_cols = df.select_dtypes(include="number").columns.tolist()
- 
+
         self._response_sel.options   = num_cols
         self._response_sel.value     = num_cols[0] if num_cols else None
- 
+
         self._predictors_sel.options = num_cols
         self._predictors_sel.value   = num_cols[1:] if len(num_cols) > 1 else []
- 
+
         self._group_sel.options = [None] + all_cols
         self._group_sel.value   = None
- 
-        # Binomial trials column options include all numeric cols
+
         self._binomial_trials_sel.options = [None] + num_cols
         self._binomial_trials_sel.value   = None
- 
+
         self._update_formula_preview()
- 
-    def _on_family_change(self, event) -> None:
+
+    def _on_family_change(self, event: param.parameterized.Event) -> None:
         family = event.new
-        self._link_sel.options   = _FAMILY_LINK_OPTIONS[family]
-        self._link_sel.value     = _FAMILY_LINK_DEFAULT[family]
+        self._link_sel.options = _FAMILY_LINK_OPTIONS[family]
+        self._link_sel.value   = _FAMILY_LINK_DEFAULT[family]
         self._family_desc.object = _FAMILY_DESC[family]
         self._refresh_extra_params(family)
- 
+
     def _refresh_extra_params(self, family: str) -> None:
         if family == "binomial":
             self._extra_params_pane.objects = [
                 pn.pane.Markdown(
-                    "**Binomial-specific parameter** — kolom jumlah trial (nᵢ) per observasi. "
-                    "**Wajib diisi.**",
+                    "**Binomial: specific parameter**, column containing the number of trials (nᵢ) for each observation. "
+                    "**Required.**",
                     margin=(4, 0, 6, 0),
                 ),
                 self._binomial_trials_sel,
             ]
         else:
             self._extra_params_pane.objects = []
- 
+
     def _build_formula_str(self) -> str:
-        response   = self._response_sel.value or "y"
+        response   = self._response_sel.value   or "y"
         predictors = list(self._predictors_sel.value or [])
         group      = self._group_sel.value
         family     = self._family_sel.value
         trials     = self._binomial_trials_sel.value
- 
+
         lhs = f"p({response}, {trials})" if family == "binomial" and trials else response
- 
+
         rhs = predictors if predictors else ["1"]
         if group:
             rhs.append(f"(1|{group})")
- 
+
         return f"{lhs} ~ {' + '.join(rhs)}"
- 
+
     def _render_formula_html(self) -> str:
         formula = self._build_formula_str()
         return (
@@ -260,46 +315,40 @@ class ModelTab(param.Parameterized):
             f'padding:10px 16px;border-radius:6px;font-family:monospace;font-size:1.05em">'
             f'<b>Formula:</b>&nbsp; {formula}</div>'
         )
- 
-    def _update_formula_preview(self, *_) -> None:
+
+    def _update_formula_preview(self, *_: Any) -> None:
         self._formula_preview.object = self._render_formula_html()
- 
+
     def _validate_build(self) -> list[str]:
         errors: list[str] = []
- 
-        if self.state.data is None:
-            errors.append(
-                "Data belum diunggah. Buka tab <b>Data Upload</b> terlebih dahulu."
-            )
-            return errors
- 
+
         if not self._response_sel.value:
-            errors.append("Response variable belum dipilih.")
+            errors.append("Response variable not yet selected.")
         if not self._predictors_sel.value:
-            errors.append("Minimal satu predictor variable harus dipilih.")
- 
+            errors.append("At least one predictor variable and one response variable must be selected.")
+
         family = self._family_sel.value
         if family == "binomial" and not self._binomial_trials_sel.value:
             errors.append(
-                "Family <b>binomial</b> memerlukan kolom <code>trials</code>. "
-                "Pilih kolom yang sesuai."
+                "Family <b>binomial</b> requires a <code>trials</code> column. "
+                "Please select the appropriate column."
             )
         return errors
- 
-    def _on_build(self, event) -> None:
+
+    def _on_build(self, event: Any) -> None:
         errors = self._validate_build()
         if errors:
-            self._build_status.object = error_box(
-                "⚠ Cannot build model", "<br>".join(f"• {e}" for e in errors)
+            self._build_status.object = _error_box(
+                "Can not build model", "<br>".join(f"• {e}" for e in errors)
             )
             return
- 
+
         try:
             _model, _pred_names, had_missing = self._build_bambi_model()
         except Exception as exc:
-            self._build_status.object = error_box("⚠ Build model gagal", str(exc))
+            self._build_status.object = _error_box("Build model failed", str(exc))
             return
- 
+
         msg = (
             "Model built successfully. Moving on to the tab <b>Prior Predictive Checking</b>."
         )
@@ -308,25 +357,15 @@ class ModelTab(param.Parameterized):
                 "<br><br><i>Missing values were detected and the corresponding "
                 "rows were automatically removed before modeling.</i>"
             )
-        self._build_status.object = success_box(msg)
- 
+        self._build_status.object = _success_box(msg)
+
     def _build_bambi_model(self) -> tuple[bmb.Model, list[str], bool]:
-        """Build a ``bambi.Model`` from the current UI formula/config.
- 
-        Every family (gaussian/lognormal/beta/binomial) is a Bambi built-in
-        family, so no manual priors/likelihood are written per family here.
- 
-        Rows with a missing value in any column used by the model are always
-        dropped automatically (no user-facing option). The extra
-        ``had_missing`` return flags whether any rows were removed, so the
-        caller can surface a notice to the user.
-        """
         response   = self._response_sel.value
         predictors = list(self._predictors_sel.value or [])
         group      = self._group_sel.value
         family     = self._family_sel.value
         trials_col = self._binomial_trials_sel.value if family == "binomial" else None
- 
+
         cols = [response, *predictors]
         if group:
             cols.append(group)
@@ -334,17 +373,17 @@ class ModelTab(param.Parameterized):
             cols.append(trials_col)
         cols = list(dict.fromkeys(cols))
         df_model = self.state.data[cols].copy()
- 
+
         had_missing = bool(df_model.isna().any().any())
         if had_missing:
             df_model = df_model.dropna(subset=cols).reset_index(drop=True)
- 
+
         if family == "binomial":
             df_model[response]   = df_model[response].astype(int)
             df_model[trials_col] = df_model[trials_col].astype(int)
- 
+
         formula = self._build_formula_str()
- 
+
         model = bmb.Model(
             formula, df_model,
             family=family,
@@ -352,41 +391,39 @@ class ModelTab(param.Parameterized):
         )
         pred_names = predictors if predictors else ["Intercept"]
         return model, pred_names, had_missing
- 
+
     @staticmethod
     def _response_array(model: bmb.Model) -> np.ndarray:
-        """Return the response array actually used by the model (post-dropna)."""
         arr = np.asarray(model.response_component.term.data)
-        if arr.ndim > 1:  # binomial: columns [successes, trials]
+        if arr.ndim > 1:       # binomial: kolom [successes, trials]
             arr = arr[:, 0]
         return arr.astype(float).flatten()
- 
-    def _on_prior_check(self, event) -> None:
+
+    def _on_prior_check(self, event: Any) -> None:
         if self.state.data is None:
-            self._prior_status.object = error_box(
+            self._prior_status.object = _error_box(
                 "Data not available. Please upload the data first in the <b>Data Upload</b> tab."
             )
             return
         if not self._response_sel.value:
-            self._prior_status.object = error_box(
+            self._prior_status.object = _error_box(
                 "Please select a response variable in <b>Model Building</b> and click Build Model."
             )
             return
- 
+
         self._prior_status.object = (
             '<div style="background:#0072B2;color:white;padding:10px 16px;'
             'border-radius:8px;margin-top:8px">'
             'Running prior predictive check</div>'
         )
- 
+
         def _run():
             try:
                 model, pred_names, _had_missing = self._build_bambi_model()
- 
                 model.build()
                 prior_idata = model.prior_predictive()
-                y = self._response_array(model)
 
+                # Histogram prior for each parameter
                 param_names = list(prior_idata.prior.data_vars)
                 n_params = len(param_names)
                 fig1, axes1 = plt.subplots(1, n_params, figsize=(5 * n_params, 4))
@@ -403,68 +440,59 @@ class ModelTab(param.Parameterized):
                 self._prior_plot_pane.object = fig1
                 plt.close(fig1)
 
+                # Prior predictive vs actual data
                 pc = azp.plot_ppc_dist(
                     prior_idata, group="prior_predictive",
                     visuals={"observed_dist": True},
                 )
                 fig2 = pc.viz["figure"].item()
                 fig2.suptitle("Prior Predictive vs Actual Data",
-                              fontsize=11, fontweight="bold")
+                               fontsize=11, fontweight="bold")
                 fig2.subplots_adjust(top=0.82)
                 self._prior_ppc_pane.object = fig2
                 plt.close(fig2)
- 
-                response_var = list(prior_idata.prior_predictive.data_vars)[0]
-                pred_samples = prior_idata.prior_predictive[response_var].values
-                evaluation = evaluate_predictive_spread(y, pred_samples)
-                label = PRIOR_STATUS_LABEL[evaluation["status"]]
-                if evaluation["status"] == "ok":
-                    self._prior_interpretation.object = success_box(
-                        f"{label}<br>{evaluation['detail']}"
-                    )
-                else:
-                    self._prior_interpretation.object = error_box(label, evaluation["detail"])
- 
-                n_draws_used = prior_idata.prior_predictive.sizes.get("draw", "N/A")
-                self._prior_status.object = success_box(
-                    f"Prior predictive check complete. Moving on the tab <b>Fit Model</b>."
+
+                self._prior_status.object = _success_box(
+                    "Prior predictive check complete. Moving on the tab <b>Fit Model</b>."
                 )
- 
+
             except Exception as exc:
-                self._prior_status.object = error_box(
+                self._prior_status.object = _error_box(
                     "Prior check failed.", str(exc)
                 )
- 
+
         threading.Thread(target=_run, daemon=True).start()
- 
-    def _on_fit_model(self, event) -> None:
+
+    def _on_fit_model(self, event: Any) -> None:
         errors = self._validate_build()
         if errors:
-            self._fit_status.object = error_box(
+            self._fit_status.object = _error_box(
                 "Unable to fit the model",
                 "<br>".join(f"• {e}" for e in errors)
             )
             return
- 
+
         self._fit_status.object = (
             '<div style="background:#0072B2;color:white;padding:10px 16px;'
             'border-radius:8px;margin-top:8px">'
             'Running MCMC sampling</div>'
         )
- 
+
         def _run():
             try:
                 model, pred_names, had_missing = self._build_bambi_model()
- 
+
+                # Tidak ada draws/tune/chains yang di-hardcode — sepenuhnya
+                # memakai default sampling dari Bambi/PyMC (NUTS).
                 idata = model.fit()
                 model.predict(idata, kind="response", inplace=True)
- 
-                self.state.idata        = idata
-                self.state.model        = model
-                self.state.y_vals       = self._response_array(model)
-                self.state.pred_names   = pred_names
-                self.state.response_col = self._response_sel.value
- 
+
+                self.state.idata         = idata
+                self.state.model         = model
+                self.state.y_vals        = self._response_array(model)
+                self.state.pred_names    = pred_names
+                self.state.response_col  = self._response_sel.value
+
                 msg = (
                     "The MCMC process has been completed."
                 )
@@ -474,81 +502,66 @@ class ModelTab(param.Parameterized):
                         "corresponding rows were automatically removed before "
                         "modeling.</i>"
                     )
-                self._fit_status.object = success_box(msg)
- 
+                self._fit_status.object = _success_box(msg)
+
             except Exception as exc:
-                self._fit_status.object = error_box(
+                self._fit_status.object = _error_box(
                     "Fit model failed", str(exc)
                 )
- 
+
         threading.Thread(target=_run, daemon=True).start()
- 
-    def _on_posterior_check(self, event) -> None:
-        idata = self.state.idata
-        model = self.state.model
-        y     = self.state.y_vals
- 
+
+    def _on_posterior_check(self, event: Any) -> None:
+        idata = getattr(self.state, "idata", None)
+        model = getattr(self.state, "model", None)
+        y     = getattr(self.state, "y_vals", None)
+
         if idata is None or model is None or y is None:
-            self._postpc_status.object = error_box(
+            self._postpc_status.object = _error_box(
                 "Model has not been fitted",
                 "Please click <b>Fit Model</b> before running the Posterior Predictive Check."
             )
             return
- 
+
         self._postpc_status.object = (
             '<div style="background:#0072B2;color:white;padding:10px 16px;'
             'border-radius:8px;margin-top:8px">'
             'Running posterior predictive check</div>'
         )
- 
+
         def _run():
             try:
-                from hbsaemp.app._helpers import has_group
- 
-                if not has_group(idata, "posterior_predictive"):
+                if not _has_group(idata, "posterior_predictive"):
                     model.predict(idata, kind="response", inplace=True)
 
-                pc1 = azp.plot_ppc_dist(idata)  
+                pc1 = azp.plot_ppc_dist(idata)
                 fig1 = pc1.viz["figure"].item()
                 fig1.suptitle("Posterior Predictive vs Actual Data",
-                              fontsize=11, fontweight="bold")
+                               fontsize=11, fontweight="bold")
                 fig1.subplots_adjust(top=0.82)
                 self._postpc_dist_pane.object = fig1
                 plt.close(fig1)
 
                 pc2 = azp.plot_ppc_interval(idata)
                 fig2 = pc2.viz["figure"].item()
-                fig2.suptitle("Credible Interval Posterior Predictive for each Observasi",
-                              fontsize=11, fontweight="bold")
+                fig2.suptitle("Credible Interval of Posterior Predictive per Observation",
+                               fontsize=11, fontweight="bold")
                 fig2.subplots_adjust(top=0.82)
                 self._postpc_interval_pane.object = fig2
                 plt.close(fig2)
- 
-                response_var = list(idata.posterior_predictive.data_vars)[0]
-                pred_samples = idata.posterior_predictive[response_var].values
-                evaluation = evaluate_predictive_spread(
-                    np.asarray(y, dtype=float), pred_samples
-                )
-                label = POSTERIOR_STATUS_LABEL[evaluation["status"]]
-                if evaluation["status"] == "ok":
-                    self._postpc_interpretation.object = success_box(
-                        f"{label}<br>{evaluation['detail']}"
-                    )
-                else:
-                    self._postpc_interpretation.object = error_box(label, evaluation["detail"])
- 
-                self._postpc_status.object = success_box(
+
+                self._postpc_status.object = _success_box(
                     "Posterior predictive check complete."
                 )
- 
+
             except Exception as exc:
-                self._postpc_status.object = error_box(
+                self._postpc_status.object = _error_box(
                     "Posterior predictive check failed", str(exc)
                 )
- 
+
         threading.Thread(target=_run, daemon=True).start()
- 
-    def panel(self) -> pn.Tabs:
+
+    def panel(self) -> pn.Column:
         """Return the Panel layout for this tab."""
         overview = pn.pane.Markdown("""
                                     **This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.**
@@ -556,19 +569,19 @@ class ModelTab(param.Parameterized):
                                     - **Auxiliary Variables:** Explanatory (independent) variables — fixed effects.
                                     - **Group Variables:** Grouping variable (e.g., area, cluster) for random effects.
                                     - **HB Family and Link Function:** Bayesian hierarchical family and corresponding link function (e.g., log, logit).""")
- 
+
         createmodel_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown("**Select Variables**", margin=(4, 0, 4, 0)),
-                pn.Row(self._response_sel, self._group_sel),
+                pn.FlexBox(self._response_sel, self._group_sel),
                 pn.pane.Markdown("*Auxiliary / Predictor Variables (x):*", margin=(4, 0, 2, 0)),
-                self._predictors_sel,
+                self._predictors_sel.panel(),
                 pn.layout.Divider(),
                 pn.pane.Markdown(
                     "**Distribution Family and Link Function**",
                     margin=(4, 0, 4, 0),
                 ),
-                pn.Row(self._family_sel, self._link_sel),
+                pn.FlexBox(self._family_sel, self._link_sel),
                 self._family_desc,
                 self._extra_params_pane,
                 pn.layout.Divider(),
@@ -585,27 +598,26 @@ class ModelTab(param.Parameterized):
             title="Model Building",
             margin=10,
         )
- 
+
         prior_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "A prior predictive check assesses the plausibility of the prior *before* fitting the model.",
+                    "A prior predictive check assesses the plausibility of the prior *before* fitting the model. ",
                     margin=(4, 0, 8, 0),
                 ),
                 pn.Row(self._prior_run_btn),
                 self._prior_status,
                 pn.layout.Divider(),
-                pn.pane.Markdown("#### Distribusi Prior Setiap Parameter"),
+                pn.pane.Markdown("#### Prior Distribution of Each Parameter"),
                 self._prior_plot_pane,
                 pn.layout.Divider(),
-                pn.pane.Markdown("#### Prior Predictive vs Data Aktual"),
+                pn.pane.Markdown("#### Prior Predictive vs Actual Data"),
                 self._prior_ppc_pane,
-                self._prior_interpretation,
             ),
             title="Prior Predictive Check",
             margin=10,
         )
- 
+
         fitmodel_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
@@ -618,7 +630,7 @@ class ModelTab(param.Parameterized):
             title="Fit Model",
             margin=10,
         )
- 
+
         postpc_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
@@ -632,14 +644,13 @@ class ModelTab(param.Parameterized):
                 pn.pane.Markdown("#### Posterior Predictive vs Actual Data"),
                 self._postpc_dist_pane,
                 pn.layout.Divider(),
-                pn.pane.Markdown("#### Credible Interval for each Observasi"),
+                pn.pane.Markdown("#### Credible Interval for each Observation"),
                 self._postpc_interval_pane,
-                self._postpc_interpretation,
             ),
             title="Posterior Predictive Check",
             margin=10,
         )
- 
+
         return pn.Tabs(
             ("Overview", pn.Card(overview, title="Overview", margin=10)),
             ("Model Building", createmodel_card),
@@ -650,8 +661,10 @@ class ModelTab(param.Parameterized):
         )
 
     def get_fitted_model(self) -> bmb.Model | None:
-        """Return the fitted ``bambi.Model``, or ``None`` if not fitted yet."""
-        return self.state.model
+        """Return the fitted Bambi model, or ``None`` if not yet fitted."""
+        return getattr(self.state, "model", None)
 
     def __repr__(self) -> str:
-        return "ModelTab(model_fitted={self.state.model is not None})"
+        fitted = getattr(self.state, "model", None) is not None
+        return f"ModelTab(fitted={fitted})"
+
