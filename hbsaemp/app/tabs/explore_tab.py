@@ -20,13 +20,13 @@ Mapping from R hbsaems
     R Shiny                         Panel v1 equivalent
     ─────────────────────────────── ──────────────────────────────
     selectInput("explore_var_…")    pn.widgets.Select
-    verbatimTextOutput("numeric_…") pn.pane.DataFrame (describe())
+    verbatimTextOutput("numeric_…") pn.widgets.Tabulator (describe())
     plotOutput("histogram_plot")    pn.pane.Matplotlib
     plotOutput("boxplot_plot")      pn.pane.Matplotlib
     plotOutput("scatter_plot")      pn.pane.Matplotlib
-    renderUI("correlation_results") pn.pane.HTML (formatted table)
-    XICOR::xicor                    xicor package (v1 optional dep)
-    energy::dcor.test               dcor package (v1 optional dep)
+    renderUI("correlation_results") pn.widgets.Tabulator (formatted table)
+    XICOR::xicor                    scipy.stats.chatterjeexi
+    energy::dcor.test               dcor package
 """
 
 from __future__ import annotations
@@ -43,7 +43,8 @@ from scipy.stats import chatterjeexi, pearsonr, spearmanr
  
 import dcor
  
-from hbsaemp.app._state import AppState
+if TYPE_CHECKING:
+    from hbsaemp.app._app import AppState
 
 __all__: list[str] = ["ExploreTab"]
 
@@ -52,14 +53,15 @@ class ExploreTab(param.Parameterized):
     """Data exploration / EDA tab.
  
     Args:
-        state: Shared :class:`~hbsaemp.app._state.AppState`.  Reads
-            ``state.data`` (set by :class:`~hbsaemp.app.tabs.data_tab.DataTab`)
-            and refreshes all plots whenever it changes.
+        state: Shared :class:`~hbsaemp.app._app.AppState` instance.
+            Watches ``state.data`` (set by
+            :class:`~hbsaemp.app.tabs.data_tab.DataTab`) to refresh
+            selectors, statistics, and plots.
     """
  
     state: AppState = param.Parameter()
 
-    def __init__(self, state: AppState, **params) -> None:
+    def __init__(self, state: AppState, **params: Any) -> None:
         super().__init__(state=state, **params)
  
         self._hist_var = pn.widgets.Select(name="Variable (Histogram)", options=[])
@@ -93,7 +95,7 @@ class ExploreTab(param.Parameterized):
         for w in [self._x_var, self._y_var, self._x_trans, self._y_trans]:
             w.param.watch(self._update_scatter_corr, "value")
  
-    def _on_data_change(self, event) -> None:
+    def _on_data_change(self, event: param.parameterized.Event) -> None:
         df = self.state.data
         if df is None:
             return
@@ -124,7 +126,7 @@ class ExploreTab(param.Parameterized):
             .round(3)
         )
  
-    def _update_histogram(self, *_) -> None:
+    def _update_histogram(self, *_: Any) -> None:
         df  = self._numeric_df()
         var = self._hist_var.value
         if df is None or not var:
@@ -137,7 +139,7 @@ class ExploreTab(param.Parameterized):
         self._hist_pane.object = fig
         plt.close(fig)
  
-    def _update_boxplot(self, *_) -> None:
+    def _update_boxplot(self, *_: Any) -> None:
         df  = self._numeric_df()
         var = self._box_var.value
         if df is None or not var:
@@ -221,22 +223,22 @@ class ExploreTab(param.Parameterized):
                 ),
                 (
                     "Visualize Distribution",
-                    pn.Row(
+                    pn.FlexBox(
                         pn.Card(
                             pn.Column(self._hist_var, self._n_bins, self._hist_pane),
-                            title="Histogram", margin=10,
+                            title="Histogram", margin=10, min_width=320,
                         ),
                         pn.Card(
                             pn.Column(self._box_var, self._box_pane),
-                            title="Boxplot", margin=10,
+                            title="Boxplot", margin=10, min_width=320,
                         ),
                     ),
                 ),
                 (
                     "Scatter & Correlation",
                     pn.Column(
-                        pn.Row(self._x_var, self._y_var),
-                        pn.Row(self._x_trans, self._y_trans),
+                        pn.FlexBox(self._x_var, self._y_var),
+                        pn.FlexBox(self._x_trans, self._y_trans),
                         self._corr_title,
                         self._corr_table,
                         self._scatter_pane,
@@ -244,6 +246,6 @@ class ExploreTab(param.Parameterized):
                 ),
             ),
         )
-
+    
     def __repr__(self) -> str:
-        return "ExploreTab(data_loaded={self.state.data is not None})"
+        return "ExploreTab()"

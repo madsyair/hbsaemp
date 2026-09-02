@@ -36,18 +36,30 @@ from typing import TYPE_CHECKING, Any
 
 from hbsaemp._logging import get_logger
 from hbsaemp.app._config import AppConfig, DEFAULT_APP_CONFIG
-from hbsaemp.app._state import AppState
-from hbsaemp.app.tabs.data_tab import DataTab
-from hbsaemp.app.tabs.explore_tab import ExploreTab
-from hbsaemp.app.tabs.model_tab import ModelTab
-from hbsaemp.app.tabs.results_tab import ResultsTab
+from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab
 
 logger = get_logger(__name__)
 
 pn.extension("tabulator", sizing_mode="stretch_width")
 
-__all__: list[str] = ["App"]
+__all__: list[str] = ["App", "AppState"]
 
+class AppState(param.Parameterized):
+    """Shared reactive state passed to every tab.
+
+    Tabs read/write these parameters and use ``param.watch`` to react to
+    changes made by upstream tabs (e.g. :class:`~hbsaemp.app.tabs.data_tab.DataTab`
+    writing ``data`` triggers refreshes in
+    :class:`~hbsaemp.app.tabs.explore_tab.ExploreTab` and
+    :class:`~hbsaemp.app.tabs.model_tab.ModelTab`).
+    """
+
+    data         : object | None = param.Parameter(default=None)
+    model        : object | None = param.Parameter(default=None)
+    idata        : object | None = param.Parameter(default=None)
+    y_vals       : object | None = param.Parameter(default=None)
+    pred_names   : list          = param.Parameter(default=[])
+    response_col : str | None    = param.Parameter(default=None)
 
 class App:
     """hbsaemp web dashboard.
@@ -67,15 +79,13 @@ class App:
     def __init__(self, app_config: AppConfig | None = None) -> None:
         self._config: AppConfig = app_config or DEFAULT_APP_CONFIG
 
-        # Shared mutable state — tabs read/write to this dict.
-        # Equivalent to Shiny reactive values (reactiveVal).
-        self._state: AppState = AppState()
+        self._state = AppState()
 
-        # Instantiate tab controllers (stub objects in v0).
-        self._data_tab    = DataTab(self._state)
-        self._explore_tab = ExploreTab(self._state)
-        self._model_tab   = ModelTab(self._state)
-        self._results_tab = ResultsTab(self._state)
+        # Instantiate the existing tab controllers around the shared state.
+        self._data_tab    = DataTab(state=self._state)
+        self._explore_tab = ExploreTab(state=self._state)
+        self._model_tab   = ModelTab(state=self._state)
+        self._results_tab = ResultsTab(state=self._state)
 
         logger.debug("App created: title=%r, port=%d", self._config.title, self._config.port)
 
@@ -89,13 +99,12 @@ class App:
         """Shared :class:`~hbsaemp.app._state.AppState` (read-only view)"""
         return self._state
 
-    def build(self) -> pn.template.FastListTemplate:
+    def view(self) -> pn.template.FastListTemplate:
         """Assemble and return the Panel dashboard object (not yet served).
-        Useful for embedding the app in a Jupyter notebook, or for calling
-        ``.servable()`` on it inside a script launched with
-        ``panel serve script.py``, without starting a server via
-        :meth:`serve`.
- 
+
+        Useful for embedding the app in a Jupyter notebook, or calling
+        ``.servable()`` on the result to serve it with ``panel serve``.
+
         Returns:
             A ``panel.template.FastListTemplate`` instance.
         """
@@ -106,22 +115,43 @@ class App:
             ("Results",          self._results_tab.panel()),
             sizing_mode="stretch_width",
         )
+        sidebar = pn.Column(
+            pn.pane.Markdown(
+                "**HBSAEMP** is a dashboard for Hierarchical Bayesian "
+                "Small Area Estimation using Bambi, PyMC, and ArviZ."
+            ),
+            pn.layout.Divider(),
+            pn.pane.Markdown(
+                "**Workflow**\n"
+                "1. **Data Upload** — upload a CSV file.\n"
+                "2. **Data Exploration** — inspect summary stats, "
+                "distributions, and correlations.\n"
+                "3. **Modeling** — select variables, choose a family, "
+                "run prior/posterior predictive checks, and fit the model.\n"
+                "4. **Results** — review convergence diagnostics and "
+                "download the SAE estimation results."
+            ),
+            sizing_mode="stretch_width",
+        )
         return pn.template.FastListTemplate(
             title=self._config.title,
+            sidebar=[sidebar],
             main=[tabs],
-            accent="#A01346",
+            accent=self._config.accent,
         )
+
+    def build(self) -> pn.template.FastListTemplate:
+        """Alias for :meth:`view`, kept for backward compatibility."""
+        return self.view()
 
     def serve(self) -> None:
         """Build and serve the dashboard in the browser.
 
         Equivalent to R's ``shiny::runApp()`` / ``run_sae_app()``.
 
-        Raises:
-            NotImplementedError: In v0.
         """
         pn.serve(
-            self.build(),
+            self.view(),
             port=self._config.port,
             show=self._config.open_browser,
         )

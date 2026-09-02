@@ -39,13 +39,14 @@ class AppConfig:
         >>> launch_app(app_config=cfg)
     """
 
-    title: str = "hbsaemp — Hierarchical Bayesian SAE"
+    title: str = "HBSAEMP APP"
     port: int = 8080
     open_browser: bool = True
     theme: str = "bootstrap"
     max_upload_mb: int = 50
     show_sidebar: bool = True
     log_level: str = "WARNING"
+    accent: str = "#A01346"
 
     def __post_init__(self) -> None:
         if self.port < 1 or self.port > 65535:

@@ -1,4 +1,3 @@
-"""hbsaemp GUI — launch_app() adalah padanan run_sae_app() dari R hbsaems."""
 from __future__ import annotations
 from hbsaemp._logging import get_logger
 from hbsaemp.app._app import App
@@ -22,9 +21,6 @@ def launch_app(
         title: Browser tab title.
         open_browser: Open browser on launch. Default True.
         app_config: Full :class:`AppConfig` — overrides other kwargs.
-
-    Raises:
-        NotImplementedError: In v0 (requires panel>=1.3, v1).
 
     Examples:
         >>> import hbsaemp
