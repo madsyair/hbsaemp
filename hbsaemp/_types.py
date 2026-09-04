@@ -1,6 +1,10 @@
-"""Shared type aliases and literals for hbsaemp.
+"""Shared type aliases and literals for hbsaemp (PEP 695 `type` statements).
 
-All types are stable across v0 -> v1 -> v2+.
+Only aliases with a real consumer live here — speculative ones were removed.
+Two will widen in v2: `FamilyLiteral` gains `"lognormal"`
+(`docs/lognormal-v2.md`), and `MissingStrategyLiteral` widens only when a
+second strategy lands in **both** `DataValidator` and `DataPreprocessor`.
+Spatial aliases are parked in `docs/spatial-v2.md`, not defined here.
 """
 from __future__ import annotations
 

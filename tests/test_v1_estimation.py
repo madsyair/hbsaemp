@@ -194,6 +194,40 @@ class TestEstimateAreasGuard:
         with pytest.raises(hb.ModelNotFittedError):
             hb.estimate_areas(m)
 
+    def test_not_fitted_is_not_wrapped(self, data_beta):
+        """The fitted-model guard must not be reclassified as EstimationError.
+
+        `estimate_areas()` wraps its estimation body, but the guards before it
+        keep their own contract: callers distinguish "wrong call order" from
+        "this model/data cannot be estimated".
+        """
+        cfg = hb.ModelConfig(draws=100, tune=100, chains=2)
+        m = hb.create_model("y ~ x1", family="beta",
+                             data=data_beta, n="n", deff="deff", config=cfg)
+        with pytest.raises(hb.ModelNotFittedError):
+            hb.estimate_areas(m)
+        assert not issubclass(hb.ModelNotFittedError, hb.EstimationError)
+
+
+class TestEstimateAreasFailureWrapping:
+    """Estimation failures surface as EstimationError, not raw library errors."""
+
+    def test_new_data_missing_predictor_raises_estimation_error(
+        self, beta_fitted, data_beta
+    ):
+        bad = data_beta.tail(10).drop(columns=["x1"]).reset_index(drop=True)
+        with pytest.raises(hb.HBSAEError) as exc_info:
+            hb.estimate_areas(beta_fitted, new_data=bad)
+        # Either the data layer catches it first (DataValidationError) or the
+        # estimation body does (EstimationError) — both are package errors with
+        # an actionable message; a raw KeyError/ValueError would not be.
+        assert isinstance(
+            exc_info.value, (hb.EstimationError, hb.DataValidationError)
+        )
+
+    def test_estimation_error_is_hbsae_error(self):
+        assert issubclass(hb.EstimationError, hb.HBSAEError)
+
 
 # ---------------------------------------------------------------------------
 # AreaEstimatesResult helpers

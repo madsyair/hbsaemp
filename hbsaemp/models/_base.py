@@ -432,7 +432,11 @@ class BaseModel(abc.ABC):
     # predict() kind normalisation
 
     # Map of deprecated kind aliases → canonical Bambi 0.18+ kind.
+    # Scheduled for removal in hbsaemp 2.0.0 — see `_ALIAS_REMOVAL_VERSION`.
     _KIND_ALIASES: dict[str, str] = {"pps": "response", "mean": "response_params"}
+    #: Release that drops `_KIND_ALIASES`. A deprecation without a version is a
+    #: promise nobody can act on, so name it here and in the warning message.
+    _ALIAS_REMOVAL_VERSION: str = "2.0.0"
     # Kinds removed in Bambi 0.18+ — raise immediately before touching idata.
     _KIND_REMOVED: frozenset[str] = frozenset({"linear"})
     # Only these two canonical values are forwarded to ``bambi.Model.predict()``.
@@ -444,8 +448,8 @@ class BaseModel(abc.ABC):
         Mapping:
 
         * `"response"` / `"response_params"` — passthrough.
-        * `"pps"` -> `"response"` (FutureWarning).
-        * `"mean"` -> `"response_params"` (FutureWarning).
+        * `"pps"` -> `"response"` (FutureWarning; removed in 2.0.0).
+        * `"mean"` -> `"response_params"` (FutureWarning; removed in 2.0.0).
         * `"linear"` — removed in Bambi 0.18+ -> ValueError.
         * other — ValueError.
         """
@@ -460,7 +464,8 @@ class BaseModel(abc.ABC):
             canonical = self._KIND_ALIASES[kind]
             warnings.warn(
                 f"kind={kind!r} is deprecated; use {canonical!r} instead. "
-                f"This alias will be removed in a future version of hbsaemp.",
+                f"This alias will be removed in hbsaemp "
+                f"{self._ALIAS_REMOVAL_VERSION}.",
                 FutureWarning,
                 # stacklevel 3: warn() ← _normalize_predict_kind() ← predict() ← caller
                 stacklevel=3,
@@ -489,13 +494,7 @@ class BaseModel(abc.ABC):
         """
         if priors is None:
             return None
-        try:
-            import bambi as bmb
-        except ImportError as exc:
-            raise ImportError(
-                "Prior conversion requires bambi>=0.18. "
-                "Install with: pip install 'hbsaemp[bambi]'"
-            ) from exc
+        bmb = self._import_bambi()
 
         from hbsaemp.models._prior import Prior
 
@@ -547,9 +546,14 @@ class BaseModel(abc.ABC):
     def _import_bambi(self) -> Any:
         """Lazy-import bambi with the package's standard ImportError message.
 
-        Centralised so subclass hooks never import bambi themselves — this
-        method and `_build_backend` are the package's single Bambi contact
-        point (locked by `test_bambi_handoff_only_in_base`).
+        The package's single Bambi import site: subclass hooks receive the
+        module as an argument and never import it themselves, and
+        `_build_bambi_priors` routes through here too (locked by
+        `test_bambi_handoff_only_in_base`).
+
+        Callers must run `_pre_fit_checks()` *before* this, so a bad link or a
+        missing `trials` column raises its own `ValueError` rather than an
+        `ImportError` on a machine without bambi.
         """
         try:
             import bambi as bmb
@@ -656,6 +660,10 @@ class BaseModel(abc.ABC):
             ImportError: If `bambi` is not installed.
             DataValidationError: If the data fails validator checks.
         """
+        # Cheap family checks first, so bambi's ImportError never masks a bad
+        # link or a missing `trials` column. `_build_backend` repeats them.
+        self._pre_fit_checks()
+
         bmb = self._import_bambi()
         bmodel, _response, _group_col, _df_clean = self._build_backend(bmb)
 
@@ -685,7 +693,12 @@ class BaseModel(abc.ABC):
             ImportError: If `bambi` is not installed.
             DataValidationError: If the data fails validator checks.
         """
-        # 1-6. Lazy bambi import, then everything up to (not including) sampling.
+        # 1. Family-specific pre-flight checks, BEFORE the bambi import, so a bad
+        # link or a missing `trials` column reports its own error even when
+        # bambi is absent. `_build_backend` runs them again (idempotent).
+        self._pre_fit_checks()
+
+        # 2-6. Lazy bambi import, then everything up to (not including) sampling.
         bmb = self._import_bambi()
         bmodel, response, group_col, df_clean = self._build_backend(bmb)
 

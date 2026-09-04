@@ -64,7 +64,8 @@ launch_app()                 # ≡ run_sae_app() in R hbsaems
 hbsaemp/
 ├── _logging.py              configure_logging
 ├── _exceptions.py           HBSAEError hierarchy
-├── _types.py                TypeAlias, Literal
+├── _types.py                PEP 695 type aliases
+├── py.typed                 PEP 561 marker (package ships its type hints)
 ├── models/
 │   ├── _config.py           ModelConfig  (= trainControl)
 │   ├── _base.py             BaseModel ABC · ModelResult dataclass

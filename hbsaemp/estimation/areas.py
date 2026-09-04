@@ -11,6 +11,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from hbsaemp._exceptions import EstimationError, HBSAEError
 from hbsaemp._logging import get_logger
 from hbsaemp.models._base import BaseModel
 
@@ -78,6 +79,9 @@ def estimate_areas(
     Raises:
         ModelNotFittedError: If `model` has not been fitted.
         ImportError: If `arviz` is not installed.
+        EstimationError: If the posterior draws, the HDI, or the result table
+            cannot be computed — e.g. `new_data` is missing a predictor column
+            or has a shape the fitted design matrix cannot accept.
     """
     try:
         import arviz as az
@@ -106,57 +110,73 @@ def estimate_areas(
     # Using the posterior predictive (kind="response") would re-add the local
     # sampling variance D_i, inflating SD/MSE/RMSE and destroying shrinkage.
     # draws shape: (total_draws, n_obs)
-    draws: np.ndarray = model.predict(new_data=new_data, kind="response_params")
-    n_obs: int = draws.shape[1]
+    # Everything from here is the estimation proper. Failures inside it are
+    # wrapped as EstimationError so callers (and the GUI) can distinguish
+    # "this model/data combination cannot be estimated" from the guards above:
+    # ModelNotFittedError (wrong call order) and ImportError (missing dep).
+    try:
+        draws: np.ndarray = model.predict(new_data=new_data, kind="response_params")
+        n_obs: int = draws.shape[1]
 
-    # group labels
-    # Group labels must be positionally aligned with the draws array columns.
-    # result.data is already NaN-dropped (preprocessed during fit()).
-    # new_data is raw — it must be preprocessed to drop the same NaN rows that
-    # predict() drops internally, otherwise labels and draws are misaligned when
-    # new_data contains missing values.
-    group_labels: pd.Series | None = None
-    if group_col is not None:
-        if new_data is not None:
-            source_for_labels: pd.DataFrame = model._preprocess_new_data(new_data)
-        else:
-            source_for_labels = result.data
-        if group_col in source_for_labels.columns:
-            group_labels = source_for_labels[group_col].reset_index(drop=True)
+        # group labels
+        # Group labels must be positionally aligned with the draws array columns.
+        # result.data is already NaN-dropped (preprocessed during fit()).
+        # new_data is raw — it must be preprocessed to drop the same NaN rows that
+        # predict() drops internally, otherwise labels and draws are misaligned when
+        # new_data contains missing values.
+        group_labels: pd.Series | None = None
+        if group_col is not None:
+            if new_data is not None:
+                source_for_labels: pd.DataFrame = model._preprocess_new_data(new_data)
+            else:
+                source_for_labels = result.data
+            if group_col in source_for_labels.columns:
+                group_labels = source_for_labels[group_col].reset_index(drop=True)
 
-    # per-area statistics (vectorised over axis=0 = sample dim)
-    means = draws.mean(axis=0)
-    sds   = draws.std(axis=0)
-    mses  = draws.var(axis=0)
-    rmses = np.sqrt(mses)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        rse_pct = np.where(
-            means != 0.0,
-            sds / np.abs(means) * 100.0,
-            np.nan,
-        )
+        # per-area statistics (vectorised over axis=0 = sample dim)
+        means = draws.mean(axis=0)
+        sds   = draws.std(axis=0)
+        mses  = draws.var(axis=0)
+        rmses = np.sqrt(mses)
+        with np.errstate(divide="ignore", invalid="ignore"):
+            rse_pct = np.where(
+                means != 0.0,
+                sds / np.abs(means) * 100.0,
+                np.nan,
+            )
 
-    # HDI per area. Loop is the safe path: az.hdi has no vectorised 2-D
-    # variant in ArviZ 1.1 (calling with axis= aggregates incorrectly).
-    # `prob` is the canonical kwarg since ArviZ ≥0.20 (was `hdi_prob` before);
-    # lower-bound ≥1.1 makes runtime detection unnecessary.
-    hdi_arr = np.empty((n_obs, 2), dtype=float)
-    for i in range(n_obs):
-        hdi_arr[i] = az.hdi(draws[:, i], prob=ci_prob)
+        # HDI per area. Loop is the safe path: az.hdi has no vectorised 2-D
+        # variant in ArviZ 1.1 (calling with axis= aggregates incorrectly).
+        # `prob` is the canonical kwarg since ArviZ ≥0.20 (was `hdi_prob` before);
+        # lower-bound ≥1.1 makes runtime detection unnecessary.
+        hdi_arr = np.empty((n_obs, 2), dtype=float)
+        for i in range(n_obs):
+            hdi_arr[i] = az.hdi(draws[:, i], prob=ci_prob)
 
-    df_result = pd.DataFrame({
-        "mean":     means,
-        "sd":       sds,
-        "ci_lower": hdi_arr[:, 0],
-        "ci_upper": hdi_arr[:, 1],
-        "rse_pct":  rse_pct,
-        "mse":      mses,
-        "rmse":     rmses,
-    })
+        df_result = pd.DataFrame({
+            "mean":     means,
+            "sd":       sds,
+            "ci_lower": hdi_arr[:, 0],
+            "ci_upper": hdi_arr[:, 1],
+            "rse_pct":  rse_pct,
+            "mse":      mses,
+            "rmse":     rmses,
+        })
 
-    # Prepend group column when available
-    if group_labels is not None:
-        df_result.insert(0, group_col, group_labels.values[:n_obs])
+        # Prepend group column when available
+        if group_labels is not None:
+            df_result.insert(0, group_col, group_labels.values[:n_obs])
+
+    except HBSAEError:
+        # Package errors already carry their own contract (e.g. the
+        # DataValidationError _preprocess_new_data raises). Do not reclassify.
+        raise
+    except Exception as exc:
+        raise EstimationError(
+            f"estimate_areas() failed for family={result.family!r} "
+            f"({'in-sample' if new_data is None else f'new_data shape={new_data.shape}'}, "
+            f"ci_prob={ci_prob}): {exc}"
+        ) from exc
 
     logger.debug(
         "estimate_areas(): produced %d rows, columns=%s",

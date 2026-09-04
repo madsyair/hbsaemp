@@ -15,7 +15,7 @@ requires-python = ">=3.12"
 authors     = [{ name = "hbsaemp Contributors" }]
 keywords    = ["SAE", "HBSAE", "bayesian", "small area estimation", "MCMC"]
 classifiers = [
-    "Development Status :: 2 - Pre-Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
     "Programming Language :: Python :: 3.12",
@@ -85,7 +85,9 @@ include = ["hbsaemp*"]
 exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-hbsaemp = ["py.typed", "data/*.csv"]
+# PEP 561 marker only. Datasets are generated in data/datasets.py, never read
+# from disk, so there is no data file to ship.
+hbsaemp = ["py.typed"]
 
 # ===========================================================================
 # Tool configuration

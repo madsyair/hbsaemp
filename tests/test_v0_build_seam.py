@@ -12,13 +12,16 @@ reachable from the top level, and `import hbsaemp` does not drag in `app/`.
 """
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
+from pathlib import Path
 
 import pandas as pd
 import pytest
 
 import hbsaemp as hb
+import hbsaemp.models._base  # noqa: F401  — needed for the import-site scan
 
 
 # ---------------------------------------------------------------------------
@@ -124,6 +127,59 @@ def test_check_data_surfaces_bad_link(data_gaussian: pd.DataFrame):
 
     with pytest.raises(ValueError):
         model.check_data()
+
+
+# ---------------------------------------------------------------------------
+# Cheap checks run before the bambi import
+# ---------------------------------------------------------------------------
+
+def _explode(self):
+    raise ImportError("bambi is not installed (simulated)")
+
+
+def test_bad_link_beats_missing_bambi(data_gaussian: pd.DataFrame, monkeypatch):
+    """`fit()` must report the bad link, not an ImportError.
+
+    The pre-flight checks are deliberately ordered before the bambi import so a
+    user without bambi still gets the actionable error. Simulated by making
+    `_import_bambi` raise, which is what a bambi-less machine does.
+    """
+    monkeypatch.setattr(hb.BaseModel, "_import_bambi", _explode)
+    model = hb.hbm_gaussian("y", ["x1"], data_gaussian, link="logit")
+
+    with pytest.raises(ValueError, match="logit"):
+        model.fit()
+
+
+def test_missing_trials_beats_missing_bambi(data_binomial: pd.DataFrame, monkeypatch):
+    """Same ordering guarantee for BinomialModel's own pre-flight check."""
+    monkeypatch.setattr(hb.BaseModel, "_import_bambi", _explode)
+    model = hb.hbm_binomial("y", ["x1"], data_binomial, trials="n")
+    model._trials_col = None  # simulate the invalid state the guard exists for
+
+    with pytest.raises(ValueError):
+        model.fit()
+
+
+def test_prior_predictive_also_checks_before_import(
+    data_gaussian: pd.DataFrame, monkeypatch
+):
+    """The prior-predictive seam shares the ordering guarantee with `fit()`."""
+    monkeypatch.setattr(hb.BaseModel, "_import_bambi", _explode)
+    model = hb.hbm_gaussian("y", ["x1"], data_gaussian, link="logit")
+
+    with pytest.raises(ValueError, match="logit"):
+        model.prior_predictive_idata()
+
+
+def test_single_bambi_import_site():
+    """`_import_bambi` is the only `import bambi` in the package.
+
+    `_build_bambi_priors` used to carry a second one with a different message;
+    the docstring claiming a single contact point is now literally true.
+    """
+    src = Path(hb.models._base.__file__).read_text(encoding="utf-8")
+    assert len(re.findall(r"^\s*import bambi\b", src, re.M)) == 1
 
 
 def test_check_data_does_not_import_bambi(data_gaussian: pd.DataFrame):
