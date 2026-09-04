@@ -22,10 +22,14 @@ m3 = create_model("y ~ x1 + x2", family="binomial",   data=df, trials="n",   con
 m1.fit()
 
 # 4. Bayesian workflow — same API for every family
-check_prior(m1)              # prior predictive check  (alias: hbpc)
+check_prior(m1)              # prior predictive check  (alias: hbpc)  — see note below
 check_convergence(m1)        # Rhat, ESS, trace plots  (alias: hbcc)
 compare_models([m1, m2])     # LOO, pp_check           (alias: hbmc)
 estimate_areas(m1)           # RSE, MSE, RMSE, CI      (alias: hbsae)
+
+# Prior draws without fitting — the model stays unfitted
+m1.prior_predictive_idata(draws=500)
+m1.check_data()              # validate + preprocess, no MCMC, no Bambi import
 
 # R-style alias also works (for users migrating from hbsaems)
 from hbsaemp import hbm

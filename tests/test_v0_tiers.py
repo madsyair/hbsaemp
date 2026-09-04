@@ -7,6 +7,9 @@ to `create_model()`.
 """
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 
 import hbsaemp as hb
@@ -205,3 +208,26 @@ def test_delegation_chain_consistency(data_beta, default_config):
     assert m_specific.family == m_flex.family
     assert m_specific._n_col == m_flex._n_col
     assert m_specific._deff_col == m_flex._deff_col
+
+
+# Bambi handoff containment — single contact point in BaseModel
+
+def test_bambi_handoff_only_in_base():
+    """Lock the handoff contract: only `_base.py` may import `bambi`.
+
+    Family subclasses receive the `bmb` module as a hook argument from
+    `BaseModel.fit()`; tier 2/3 and the factory stay Bambi-free. Any other
+    `import bambi` under `models/` bypasses the single handoff point.
+    """
+    models_dir = Path(hb.models.__file__).parent
+    bambi_import = re.compile(r"^\s*(?:import bambi|from bambi)\b", re.MULTILINE)
+    offenders = sorted(
+        path.name
+        for path in models_dir.glob("*.py")
+        if path.name != "_base.py"
+        and bambi_import.search(path.read_text(encoding="utf-8"))
+    )
+    assert offenders == [], (
+        f"`import bambi` found outside _base.py: {offenders} — "
+        f"the Bambi handoff lives only in BaseModel."
+    )

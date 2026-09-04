@@ -508,14 +508,174 @@ class BaseModel(abc.ABC):
                 result[k] = Prior.from_dict(v, param=k).to_bambi(bmb)
         return result
 
+    # Pre-fit inspection (Bambi-free)
+
+    @property
+    def response_name(self) -> str:
+        """Response column parsed from the formula — available before `fit()`.
+
+        Lets callers label plots and tables without re-parsing the formula or
+        waiting for `ModelResult.extra["response"]`.
+        """
+        from hbsaemp.utils._formula import parse_formula
+
+        return str(parse_formula(self._formula)["response"])
+
+    def check_data(self) -> pd.DataFrame:
+        """Run the pre-flight checks and data pipeline without importing bambi.
+
+        Same work `fit()` does before it touches Bambi: family pre-flight
+        checks, then parse -> validate -> preprocess. Callers get the frame
+        `fit()` would actually use, so missing-row counts and family-domain
+        violations surface *before* paying for MCMC.
+
+        Returns:
+            The preprocessed copy of the training data (offset columns added,
+            rows with missing values dropped per `handle_missing`).
+
+        Raises:
+            DataValidationError: If the data fails validator checks.
+            ValueError: From `_pre_fit_checks` (unsupported link, missing
+                `trials`, invalid `squeeze`, ...).
+        """
+        self._pre_fit_checks()
+        _, _, _, _, df_clean = self._run_pipeline(self._data)
+        return df_clean
+
+    # Build / fit seam
+
+    def _import_bambi(self) -> Any:
+        """Lazy-import bambi with the package's standard ImportError message.
+
+        Centralised so subclass hooks never import bambi themselves — this
+        method and `_build_backend` are the package's single Bambi contact
+        point (locked by `test_bambi_handoff_only_in_base`).
+        """
+        try:
+            import bambi as bmb
+        except ImportError as exc:
+            raise ImportError(
+                f"{type(self).__name__} requires bambi>=0.18. "
+                "Install with: pip install 'hbsaemp[bambi]'"
+            ) from exc
+        return bmb
+
+    def _build_backend(
+        self, bmb_module: Any
+    ) -> tuple[Any, str, str | None, pd.DataFrame]:
+        """Everything `fit()` does *except* sampling; returns a built model.
+
+        pre_fit_checks -> run_pipeline (parse + validate + preprocess) ->
+        build formula+link -> merge priors -> `bmb.Model(...)` -> `.build()`.
+
+        The returned model is built but **unfitted**: no sampling has run and
+        `self._result` is untouched. Mirrors Bambi's own `Model.build()` /
+        `Model.fit()` split, which lets `prior_predictive_idata()` reuse the
+        entire pipeline instead of duplicating it.
+
+        Args:
+            bmb_module: Imported `bambi` module (from `_import_bambi`).
+
+        Returns:
+            `(bmodel, response, group_col, df_clean)`.
+
+        Raises:
+            DataValidationError: If the data fails validator checks.
+        """
+        # 1. Family-specific pre-flight checks (cheap, fail before any building).
+        self._pre_fit_checks()
+
+        # 2. parse → validate → preprocess
+        response, predictors, _, group_col, df_clean = self._run_pipeline(self._data)
+        logger.info(
+            "%s: response=%r, predictors=%r, group=%r, n=%d",
+            type(self).__name__, response, predictors, group_col, len(self._data),
+        )
+
+        # 3. Family-specific Bambi formula + link
+        bambi_formula, link = self._build_formula_and_link(bmb_module, response)
+
+        # 4. Priors — workaround layer first, user priors last so they win.
+        user_priors = self._build_bambi_priors(self._priors)
+        workaround = self._workaround_priors(bmb_module)
+        bambi_priors: dict[str, Any] | None = (
+            {**workaround, **(user_priors or {})}
+            if (workaround or user_priors)
+            else None
+        )
+
+        # 5. Build Bambi model using the family metadata from FAMILY_SPECS.
+        bmb_family = self._bambi_family()
+        logger.debug(
+            "Building bambi.Model (family=%r, link=%r)", bmb_family, link
+        )
+        bmodel = bmb_module.Model(
+            bambi_formula,
+            df_clean,
+            family=bmb_family,
+            link=link,
+            priors=bambi_priors,
+        )
+
+        # 6. Construct the PyMC model. Idempotent — Bambi's fit() calls it
+        # behind a `built` flag — but doing it here makes "built" a
+        # postcondition rather than an accident, which prior_predictive()
+        # depends on (it starts with its own _check_built()).
+        bmodel.build()
+
+        return bmodel, response, group_col, df_clean
+
+    def prior_predictive_idata(
+        self,
+        *,
+        draws: int = 500,
+        var_names: list[str] | None = None,
+        random_seed: int | None = None,
+    ) -> Any:
+        """Sample the prior predictive distribution — no MCMC, no fitting.
+
+        Runs the full build pipeline (validate -> preprocess -> offset columns
+        -> workaround priors -> user priors -> bambi) and then samples from the
+        prior only. The model stays unfitted: `self._result` is not written and
+        `is_fitted` stays `False`.
+
+        Counterpart of `predictive_idata()` on the posterior side — both return
+        a fresh `InferenceData` and mutate nothing.
+
+        Args:
+            draws: Number of prior draws. Default 500 (Bambi's own default).
+            var_names: Restrict the sampled variables; `None` samples all.
+            random_seed: Seed for reproducibility. Falls back to
+                `config.random_seed` when `None`.
+
+        Returns:
+            `arviz.InferenceData` with `prior`, `prior_predictive` and
+            `observed_data` groups.
+
+        Raises:
+            ImportError: If `bambi` is not installed.
+            DataValidationError: If the data fails validator checks.
+        """
+        bmb = self._import_bambi()
+        bmodel, _response, _group_col, _df_clean = self._build_backend(bmb)
+
+        seed = random_seed if random_seed is not None else self._config.random_seed
+        logger.info(
+            "%s.prior_predictive_idata(): draws=%d, seed=%r",
+            type(self).__name__, draws, seed,
+        )
+        return bmodel.prior_predictive(
+            draws=draws, var_names=var_names, random_seed=seed
+        )
+
     # Concrete fit() and predict()
 
     def fit(self) -> ModelResult:
         """Fit the model via Bambi MCMC and return a `ModelResult`.
 
-        Pipeline (shared across all families):
-        pre_fit_checks -> import bambi -> run_pipeline (parse + validate +
-        preprocess) -> build formula+link -> merge priors -> bmb.Model.fit().
+        Pipeline (shared across all families): `_build_backend()` — pre_fit
+        checks, parse + validate + preprocess, formula+link, prior merge,
+        `bmb.Model` — then sampling.
 
         Log-likelihood is computed post-sampling via
         `bmodel.compute_log_likelihood(idata)` (PyMC 6.0 / Bambi 0.18 pattern) —
@@ -525,49 +685,9 @@ class BaseModel(abc.ABC):
             ImportError: If `bambi` is not installed.
             DataValidationError: If the data fails validator checks.
         """
-        # 1. Family-specific pre-flight checks (raise BEFORE bambi import).
-        self._pre_fit_checks()
-
-        # 2. Lazy import of bambi.  Centralised so subclass hooks never import it.
-        try:
-            import bambi as bmb
-        except ImportError as exc:
-            raise ImportError(
-                f"{type(self).__name__}.fit() requires bambi>=0.18. "
-                "Install with: pip install 'hbsaemp[bambi]'"
-            ) from exc
-
-        # 3. parse → validate → preprocess
-        response, predictors, _, group_col, df_clean = self._run_pipeline(self._data)
-        logger.info(
-            "%s.fit(): response=%r, predictors=%r, group=%r, n=%d",
-            type(self).__name__, response, predictors, group_col, len(self._data),
-        )
-
-        # 4. Family-specific Bambi formula + link
-        bambi_formula, link = self._build_formula_and_link(bmb, response)
-
-        # 5. Priors — workaround layer first, user priors last so they win.
-        user_priors = self._build_bambi_priors(self._priors)
-        workaround = self._workaround_priors(bmb)
-        bambi_priors: dict[str, Any] | None = (
-            {**workaround, **(user_priors or {})}
-            if (workaround or user_priors)
-            else None
-        )
-
-        # 6. Build Bambi model using the family metadata from FAMILY_SPECS.
-        bmb_family = self._bambi_family()
-        logger.debug(
-            "Building bambi.Model (family=%r, link=%r)", bmb_family, link
-        )
-        bmodel = bmb.Model(
-            bambi_formula,
-            df_clean,
-            family=bmb_family,
-            link=link,
-            priors=bambi_priors,
-        )
+        # 1-6. Lazy bambi import, then everything up to (not including) sampling.
+        bmb = self._import_bambi()
+        bmodel, response, group_col, df_clean = self._build_backend(bmb)
 
         # 7. Sample
         sampler_kwargs = self._config.to_sampler_kwargs()
