@@ -1,49 +1,56 @@
 """Tab 4 — Results: diagnostics, SAE estimates, and export.
-
-Equivalent to the "Results" tab in R hbsaems Shiny app.
-
-v1: implemented with Panel + ArviZ plots + pandas tables.
-
-Sub-tabs
---------
-1. **Convergence Evaluation** — R-hat / ESS table, trace, autocorrelation
-   and density plots (all via ``arviz`` / ``arviz_plots``), plus a
-   divergent-transitions badge and an automatic issue summary.
-2. **SAE Estimation** — per-observation table (Actual, Prediction, SE,
-   RSE%) derived from the posterior predictive distribution, downloadable
-   as CSV.
-
 Mapping from R hbsaems
 -----------------------
 .. code-block:: text
 
     R Shiny output                          Panel v1 equivalent
     ─────────────────────────────────────── ──────────────────────────────────
-    verbatimTextOutput("diag_numerical")    pn.widgets.Tabulator (R-hat/ESS)
-    plotOutput("diag_plots")                pn.pane.Matplotlib (az.plot_trace, …)
-    DT::dataTableOutput("sae_table")        pn.widgets.Tabulator
+    verbatimTextOutput("diag_numerical")    pn.widgets.Tabulator (rhat_ess)
+    plotOutput("diag_plots")                pn.pane.Matplotlib (ConvergenceResult.plots)
+    DT::dataTableOutput("sae_table")        pn.widgets.Tabulator (AreaEstimatesResult.result_table)
     downloadButton("download_estimates")    pn.widgets.FileDownload
 """
 
 from __future__ import annotations
 
+import asyncio
 import io
+import warnings
 from typing import TYPE_CHECKING, Any
 
-import arviz as az
-import arviz_plots as azp
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import panel as pn
 import param
 
+from hbsaemp import (
+    ConvergenceResult,
+    ConvergenceWarning,
+    DataValidationError,
+    EstimationError,
+    HBSAEError,
+    ModelNotFittedError,
+    check_convergence,
+    estimate_areas,
+)
+from hbsaemp._logging import get_logger
+
 if TYPE_CHECKING:
     from hbsaemp.app._app import AppState
+    from hbsaemp.estimation.areas import AreaEstimatesResult
+
+logger = get_logger(__name__)
 
 __all__: list[str] = ["ResultsTab"]
+
+_PLOT_TITLES: dict[str, str] = {
+    "trace":  "Trace Plot",
+    "dens":   "Density Plot",
+    "acf":    "Autocorrelation Plot",
+    "rhat":   "R-hat Forest Plot",
+    "neff":   "Effective Sample Size Plot",
+    "energy": "NUTS Energy / BFMI Plot",
+}
+_PLOT_ORDER: tuple[str, ...] = ("trace", "dens", "acf", "rhat", "neff", "energy")
 
 
 def _error_box(title: str, body: str = "") -> str:
@@ -61,9 +68,38 @@ def _success_box(body: str) -> str:
     )
 
 
-def _has_group(idata: Any, name: str) -> bool:
-    """Check whether a group (e.g. ``'posterior_predictive'``) exists on an InferenceData."""
-    return any(g.strip("/") == name for g in idata.groups)
+def _warn_box(body: str) -> str:
+    return (
+        f'<div style="background:#f0ad4e;color:#3a2e00;padding:10px 16px;'
+        f'border-radius:8px;margin-top:8px">{body}</div>'
+    )
+
+
+def _info_box(body: str) -> str:
+    return (
+        f'<div style="background:#0072B2;color:white;padding:10px 16px;'
+        f'border-radius:8px;margin-top:8px">{body}</div>'
+    )
+
+
+def _describe_error(exc: Exception) -> tuple[str, str]:
+    """Map a backend exception to a (title, body) pair for the UI.
+
+    Mirrors :func:`hbsaemp.app.tabs.model_tab._describe_error` — kept as a
+    small local copy rather than a shared cross-tab helper module (see
+    ``app/`` package layout).
+    """
+    if isinstance(exc, ModelNotFittedError):
+        return "Model has not been fitted", "Please fit the model in the Modeling tab first."
+    if isinstance(exc, DataValidationError):
+        return "Data does not meet the family's requirements", str(exc)
+    if isinstance(exc, EstimationError):
+        return "Estimation failed", str(exc)
+    if isinstance(exc, ImportError):
+        return "Missing dependency", str(exc)
+    if isinstance(exc, HBSAEError):
+        return "Backend error", str(exc)
+    return "Unexpected error", str(exc)
 
 
 class ResultsTab(param.Parameterized):
@@ -71,36 +107,32 @@ class ResultsTab(param.Parameterized):
 
     Args:
         state: Shared :class:`~hbsaemp.app._app.AppState` instance. Reads
-            ``state.idata`` and ``state.y_vals`` (set by
-            :class:`~hbsaemp.app.tabs.model_tab.ModelTab` after fitting).
+            ``state.model`` — a fitted
+            :class:`~hbsaemp.models._base.BaseModel` written by
+            :class:`~hbsaemp.app.tabs.model_tab.ModelTab` after fitting.
     """
 
-    state: "AppState" = param.Parameter()
+    state: AppState = param.Parameter()
 
-    def __init__(self, state: "AppState", **params: Any) -> None:
+    def __init__(self, state: AppState, **params: Any) -> None:
         super().__init__(state=state, **params)
 
-        self._conv_run_btn    = pn.widgets.Button(
+        self._conv_run_btn   = pn.widgets.Button(
             name="Load Convergence Diagnostics", button_type="primary", max_width=280,
         )
-        self._conv_status     = pn.pane.HTML("")
-        self._rhat_ess_table  = pn.widgets.Tabulator(
-            pd.DataFrame(), show_index=False,
-            pagination="remote", page_size=15,
+        self._conv_status    = pn.pane.HTML("")
+        self._rhat_ess_table = pn.widgets.Tabulator(
+            pd.DataFrame(), show_index=False, pagination="remote", page_size=15,
         )
-        self._trace_pane      = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
-        self._divergence_badge = pn.pane.HTML("")
-        self._autocorr_pane   = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
-        self._density_pane    = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
+        self._plots_pane     = pn.Column()
         self._conv_run_btn.on_click(self._on_load_convergence)
 
-        self._sae_run_btn     = pn.widgets.Button(
+        self._sae_run_btn      = pn.widgets.Button(
             name="Run SAE Estimation", button_type="primary", max_width=280,
         )
-        self._sae_status      = pn.pane.HTML("")
-        self._sae_table       = pn.widgets.Tabulator(
-            pd.DataFrame(), show_index=False,
-            pagination="remote", page_size=20,
+        self._sae_status       = pn.pane.HTML("")
+        self._sae_table        = pn.widgets.Tabulator(
+            pd.DataFrame(), show_index=False, pagination="remote", page_size=20,
         )
         self._sae_download_btn = pn.widgets.FileDownload(
             label="Download CSV of SAE Results",
@@ -112,156 +144,122 @@ class ResultsTab(param.Parameterized):
         )
         self._sae_run_btn.on_click(self._on_run_sae_estimation)
 
-    def _get_idata(self):
-        """Return idata from state, or None if not yet available."""
-        return getattr(self.state, "idata", None)
-
-    def _get_y(self):
-        return getattr(self.state, "y_vals", None)
-
-    def _on_load_convergence(self, event: Any) -> None:
-        idata = self._get_idata()
-        if idata is None:
+    async def _on_load_convergence(self, event: Any) -> None:
+        if self._conv_run_btn.loading:  
+            return
+        model = getattr(self.state, "model", None)
+        if model is None or not model.is_fitted:
             self._conv_status.object = _error_box(
-                "Model has not been fitted. Please click <b>Fit Model</b> in the <b>Modeling</b> tab first."
+                "Model has not been fitted",
+                "Please click <b>Fit Model</b> in the <b>Modeling</b> tab first.",
             )
             return
 
-        self._conv_status.object = (
-            '<div style="background:#0072B2;color:white;padding:10px 16px;'
-            'border-radius:8px;margin-top:8px">Computing diagnostics</div>'
-        )
-
+        self._conv_run_btn.loading = self._conv_run_btn.disabled = True
+        self._conv_status.object = _info_box("Computing convergence diagnostics…")
         try:
-            var_names = [
-                v for v in idata.posterior.data_vars
-                if "__obs__" not in idata.posterior[v].dims
-            ]
-
-            summary_df = az.summary(idata, var_names=var_names, ci_prob=0.94, round_to=4)
-
-            rhat_col     = "r_hat"     if "r_hat"     in summary_df.columns else None
-            ess_bulk_col = "ess_bulk"  if "ess_bulk"  in summary_df.columns else None
-            ess_tail_col = "ess_tail"  if "ess_tail"  in summary_df.columns else None
-
-            df_conv = pd.DataFrame({"Parameter": summary_df.index})
-            if rhat_col:
-                df_conv["R-hat"]     = summary_df[rhat_col].values.round(4)
-                df_conv["Converged?"] = df_conv["R-hat"].apply(
-                    lambda v: "✔" if v < 1.01 else "✘"
-                )
-            if ess_bulk_col:
-                df_conv["ESS bulk"] = summary_df[ess_bulk_col].values.astype(int)
-            if ess_tail_col:
-                df_conv["ESS tail"] = summary_df[ess_tail_col].values.astype(int)
-
-            self._rhat_ess_table.value = df_conv.reset_index(drop=True)
-
-            az.plot_trace(idata, var_names=var_names)
-            fig_trace = plt.gcf()
-            fig_trace.suptitle("Trace Plots", fontsize=12, fontweight="bold")
-            plt.tight_layout()
-            self._trace_pane.object = fig_trace
-            plt.close(fig_trace)
-
-            pc_acf = azp.plot_autocorr(idata, var_names=var_names)
-            fig_acf = pc_acf.viz["figure"].item()
-            fig_acf.suptitle("Autocorrelation for Each Parameter", fontsize=12, fontweight="bold")
-            fig_acf.subplots_adjust(top=0.8)
-            self._autocorr_pane.object = fig_acf
-            plt.close(fig_acf)
-
-            pc_dens = azp.plot_dist(idata, group="posterior", var_names=var_names, kind="kde")
-            fig_dens = pc_dens.viz["figure"].item()
-            fig_dens.suptitle("Density Plot for Each Parameter", fontsize=12, fontweight="bold")
-            fig_dens.subplots_adjust(top=0.75)
-            self._density_pane.object = fig_dens
-            plt.close(fig_dens)
-
-            n_divergences = (
-                int(idata.sample_stats["diverging"].sum())
-                if "diverging" in idata.sample_stats else None
+            loop = asyncio.get_running_loop()
+            result, caught_warnings = await loop.run_in_executor(
+                None, self._convergence_blocking, model
             )
-            self._divergence_badge.object = (
-                f'<span style="background:{"#d62728" if n_divergences else "#2ca02c"};'
-                f'color:white;padding:5px 14px;border-radius:20px;font-weight:bold">'
-                f'Divergent Transitions: {n_divergences if n_divergences is not None else "N/A"}'
-                f'</span>'
+        except Exception as exc:
+            logger.exception("ResultsTab convergence check failed")
+            title, body = _describe_error(exc)
+            self._conv_status.object = _error_box(title, body)
+            return
+        finally:
+            self._conv_run_btn.loading = self._conv_run_btn.disabled = False
+
+        self._render_convergence(result, caught_warnings)
+
+    @staticmethod
+    def _convergence_blocking(
+        model: Any,
+    ) -> tuple[ConvergenceResult, list[str]]:
+        """Synchronous, Panel-free — runs in the executor thread.
+
+        ``ConvergenceWarning`` is a real warning from ``check_convergence()``
+        (R-hat/ESS out of threshold) and must reach the UI, not be silently
+        dropped — caught here (task #22) and returned alongside the result.
+        """
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", ConvergenceWarning)
+            result = check_convergence(model)
+        messages = [str(w.message) for w in caught if issubclass(w.category, ConvergenceWarning)]
+        return result, messages
+
+    def _render_convergence(self, result: ConvergenceResult, warning_messages: list[str]) -> None:
+        if result.rhat_ess is not None and not result.rhat_ess.empty:
+            self._rhat_ess_table.value = result.rhat_ess.reset_index().rename(
+                columns={"index": "Parameter"}
             )
 
-            max_rhat = float(df_conv["R-hat"].max()) if "R-hat" in df_conv.columns else float("nan")
-            min_ess  = int(df_conv["ESS bulk"].min()) if "ESS bulk" in df_conv.columns else 0
-
-            issues = []
-            if not np.isnan(max_rhat) and max_rhat >= 1.01:
-                issues.append(f"Max R-hat {max_rhat:.4f} ≥ 1.01 (indication of a lack of convergence).")
-            if min_ess and min_ess < 400:
-                issues.append(f"Min ESS bulk {min_ess} < 400 (lack of effective samples).")
-            if n_divergences:
-                issues.append(
-                    f"{n_divergences} divergent transition detected, the posterior results may be biased."
+        sections: list[tuple[str, Any]] = []
+        for ptype in _PLOT_ORDER:
+            title = _PLOT_TITLES.get(ptype, ptype)
+            if ptype in result.plots:
+                content = pn.pane.Matplotlib(
+                    result.plots[ptype], sizing_mode="stretch_width", tight=True, max_width=900,
                 )
-
-            if issues:
-                self._conv_status.object = _error_box(
-                    "Potential convergence issues detected",
-                    "<br>".join(f"• {i}" for i in issues) +
-                    "<br><br>Consider reviewing the model or data."
+            elif ptype in result.plot_errors:
+                content = pn.pane.HTML(
+                    _error_box(f"Could not render the {title.lower()}", result.plot_errors[ptype])
                 )
             else:
-                self._conv_status.object = _success_box(
-                    f"Diagnostics completed, no convergence issues detected. "
-                    f"Max R-hat: <b>{max_rhat:.4f}</b> (good if &lt; 1.01), "
-                    f"Min ESS bulk: <b>{min_ess}</b> (good if &gt; 400), "
-                    f"Divergent transitions: <b>{n_divergences}</b>."
-                )
+                continue
+            sections.append((title, pn.Column(content, sizing_mode="stretch_width")))
+        self._plots_pane.objects = [
+            pn.Accordion(*sections, active=[], sizing_mode="stretch_width")
+        ] if sections else [pn.pane.Markdown("*No plots were generated.*")]
 
-        except Exception as exc:
-            self._conv_status.object = _error_box("Diagnostik failed", str(exc))
+        if warning_messages:
+            self._conv_status.object = _warn_box(
+                "<b>Convergence issues detected:</b><br>"
+                + "<br>".join(f"• {m}" for m in warning_messages)
+                + "<br><br>Consider reviewing the model specification or the data."
+            )
+        else:
+            self._conv_status.object = _success_box(
+                "Diagnostics computed — no convergence warnings raised."
+            )
 
-    def _on_run_sae_estimation(self, event: Any) -> None:
-        idata = self._get_idata()
-        y     = self._get_y()
-        if idata is None or y is None:
+    async def _on_run_sae_estimation(self, event: Any) -> None:
+        if self._sae_run_btn.loading: 
+            return
+        model = getattr(self.state, "model", None)
+        if model is None or not model.is_fitted:
             self._sae_status.object = _error_box(
-                "Model has not been fitted. Please fit the model first in the <b>Modeling</b> tab."
+                "Model has not been fitted",
+                "Please fit the model in the <b>Modeling</b> tab first.",
             )
             return
 
-        self._sae_status.object = (
-            '<div style="background:#0072B2;color:white;padding:10px 16px;'
-            'border-radius:8px;margin-top:8px">Computing SAE estimates</div>'
+        self._sae_run_btn.loading = self._sae_run_btn.disabled = True
+        self._sae_status.object = _info_box("Computing SAE estimates…")
+        try:
+            loop = asyncio.get_running_loop()
+            result: AreaEstimatesResult = await loop.run_in_executor(
+                None, self._sae_blocking, model
+            )
+        except Exception as exc:
+            logger.exception("ResultsTab SAE estimation failed")
+            title, body = _describe_error(exc)
+            self._sae_status.object = _error_box(title, body)
+            return
+        finally:
+            self._sae_run_btn.loading = self._sae_run_btn.disabled = False
+
+        self._sae_table.value = result.result_table
+        self._sae_download_btn.disabled = False
+        self._sae_status.object = _success_box(
+            f"SAE estimation complete — mean RSE: <b>{result.mean_rse:.2f}%</b>, "
+            f"mean MSE: <b>{result.mean_mse:.4f}</b>."
         )
 
-        try:
-            y_arr  = np.asarray(y, dtype=float)
-            n      = len(y_arr)
-
-            response_var = list(idata.posterior_predictive.data_vars)[0]
-            post_y = idata.posterior_predictive[response_var].values.reshape(-1, n)
-
-            y_pred = post_y.mean(axis=0)
-            y_sd   = post_y.std(axis=0)
-
-            with np.errstate(divide="ignore", invalid="ignore"):
-                rse_obs = np.where(y_pred != 0, np.abs(y_sd / y_pred) * 100, np.nan)
-
-            df_sae = pd.DataFrame({
-                "Obs":      np.arange(1, n + 1),
-                "Actual":   np.round(y_arr,   4),
-                "Prediction": np.round(y_pred,  4),
-                "SE":       np.round(y_sd,    4),
-                "RSE (%)":  np.round(rse_obs, 4),
-            })
-            self._sae_table.value = df_sae
-            self._sae_download_btn.disabled = False
-
-            self._sae_status.object = _success_box(
-                f"SAE Estimation completed."
-            )
-
-        except Exception as exc:
-            self._sae_status.object = _error_box("SAE Estimation failed", str(exc))
+    @staticmethod
+    def _sae_blocking(model: Any) -> AreaEstimatesResult:
+        """Synchronous, Panel-free — runs in the executor thread."""
+        return estimate_areas(model, ci_prob=0.95)
 
     def _sae_csv_callback(self) -> io.StringIO:
         buf = io.StringIO()
@@ -269,32 +267,27 @@ class ResultsTab(param.Parameterized):
         buf.seek(0)
         return buf
 
-    def panel(self) -> pn.Column:
+    def panel(self) -> pn.Tabs:
         """Return the Panel layout for this tab."""
         convergenceevaluation_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "MCMC convergence evaluation is performed to ensure that the Markov Chain Monte Carlo (MCMC) "
-                    "sampling process has produced stable and representative posterior samples. The evaluation is "
-                    "conducted using several diagnostic measures, namely R-hat, Effective Sample Size (ESS), "
-                    "trace plots, autocorrelation plots, and density plots.",
+                    "MCMC convergence evaluation via `check_convergence()`: R-hat, "
+                    "Effective Sample Size (ESS), trace, autocorrelation, and density "
+                    "plots.",
                     margin=(4, 0, 8, 0),
                 ),
                 self._conv_run_btn,
                 self._conv_status,
                 pn.layout.Divider(),
-                self._divergence_badge,
                 pn.Accordion(
                     (
                         "R-hat and ESS",
                         pn.Column(
                             pn.pane.Markdown(
-                                "The R-hat (Gelman-Rubin) is used to assess convergence by comparing the "
-                                "between-chain variance with the within-chain variance. An R-hat value close "
-                                "to 1 indicates that the chains have converged and are sampling from similar "
-                                "posterior distributions. In contrast, an R-hat value greater than 1 may "
-                                "indicate differences between chains and suggest that the sampling process "
-                                "has not fully converged.",
+                                "R-hat close to 1 indicates the chains have converged. "
+                                "Values above 1.01, or an ESS below 400, trigger a "
+                                "`ConvergenceWarning` from the backend.",
                                 margin=(4, 0, 8, 0),
                             ),
                             self._rhat_ess_table,
@@ -303,64 +296,7 @@ class ResultsTab(param.Parameterized):
                     ),
                     active=[], sizing_mode="stretch_width", margin=(8, 0),
                 ),
-                pn.Accordion(
-                    (
-                        "Trace Plot",
-                        pn.Column(
-                            pn.pane.Markdown(
-                                "Trace plots display the sampled values of each parameter across iterations "
-                                "for each MCMC chain. They are used to visually assess the mixing and "
-                                "convergence of the chains. Well-converged chains generally exhibit a "
-                                "\u201chairy caterpillar\u201d pattern, where the sampled values fluctuate "
-                                "randomly around a stable region without noticeable long-term trends. In "
-                                "contrast, systematic trends, separated chains, or slow movement across the "
-                                "parameter space may indicate poor mixing or convergence problems.",
-                                margin=(4, 0, 8, 0),
-                            ),
-                            self._trace_pane,
-                            sizing_mode="stretch_width",
-                        ),
-                    ),
-                    active=[], sizing_mode="stretch_width", margin=(8, 0),
-                ),
-                pn.Accordion(
-                    (
-                        "Autocorrelation Plot",
-                        pn.Column(
-                            pn.pane.Markdown(
-                                "Autocorrelation plots display the correlation between sampled values at a "
-                                "given iteration and their values at previous iterations (lags). High "
-                                "autocorrelation indicates that consecutive samples are strongly dependent, "
-                                "which reduces the effective sample size. Ideally, autocorrelation should "
-                                "decrease rapidly as the lag increases, indicating that successive samples "
-                                "become increasingly independent.",
-                                margin=(4, 0, 8, 0),
-                            ),
-                            self._autocorr_pane,
-                            sizing_mode="stretch_width",
-                        ),
-                    ),
-                    active=[], sizing_mode="stretch_width", margin=(8, 0),
-                ),
-                pn.Accordion(
-                    (
-                        "Density Plot",
-                        pn.Column(
-                            pn.pane.Markdown(
-                                "Density plots visualize the estimated posterior distributions of the model "
-                                "parameters based on the MCMC samples. They provide information about the "
-                                "shape, central tendency, and spread of each posterior distribution. A "
-                                "smooth and consistent posterior distribution across chains provides "
-                                "additional evidence that the sampling process has adequately represented "
-                                "the posterior distribution.",
-                                margin=(4, 0, 8, 0),
-                            ),
-                            self._density_pane,
-                            sizing_mode="stretch_width",
-                        ),
-                    ),
-                    active=[], sizing_mode="stretch_width", margin=(8, 0),
-                ),
+                self._plots_pane,
             ),
             title="MCMC Convergence Evaluation",
             margin=10,
@@ -368,6 +304,12 @@ class ResultsTab(param.Parameterized):
 
         saeestimation_card = pn.Card(
             pn.Column(
+                pn.pane.Markdown(
+                    "Small area estimates via `estimate_areas()` — computed from the "
+                    "posterior of the latent mean parameter (never the posterior "
+                    "predictive, which would destroy the shrinkage estimate).",
+                    margin=(4, 0, 8, 0),
+                ),
                 self._sae_run_btn,
                 self._sae_status,
                 pn.layout.Divider(),
@@ -385,5 +327,6 @@ class ResultsTab(param.Parameterized):
         )
 
     def __repr__(self) -> str:
-        has_results = self._get_idata() is not None
+        model = getattr(self.state, "model", None)
+        has_results = bool(model is not None and getattr(model, "is_fitted", False))
         return f"ResultsTab(has_results={has_results})"

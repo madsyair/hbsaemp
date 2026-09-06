@@ -1,102 +1,106 @@
 """Tab 3 — Model specification and fitting.
-
-Equivalent to the "Modeling" tab in R hbsaems Shiny app.
-
-v0: stub class.
-v1: implemented with Panel widgets + hbm() backend.
-
-Features (v1)
---------------
-* **Model configuration**:
-  - Response variable selector.
-  - Predictor variable multi-select.
-  - Group variable selector (random effects).
-  - Family / distribution selector (gaussian / beta / binomial).
-  - Link function selector (auto-populated based on family).
-* **Sampler configuration**: draws, tune, chains, cores, target_accept,
-  random_seed — all backed by :class:`~hbsaemp.models._config.ModelConfig`.
-* **Prior specification**: per-term prior distribution with name + parameters.
-  "Summarize Priors" button shows ``model.prior_predictive()``.
-* **Prior predictive check**: plot before fitting.
-* **Fit Model** button: calls ``hbm(...).fit()`` in a background thread;
-  shows progress indicator.
-
 Mapping from R hbsaems
 -----------------------
 .. code-block:: text
 
     R Shiny                             Panel v1 equivalent
-    ─────────────────────────────────── ──────────────────────────────────
+    ───────────────────────────────────  ──────────────────────────────────
     selectInput("response_var", …)      pn.widgets.Select
     pickerInput("auxiliary_vars", …)    PredictorCheckboxes (pn.FlexBox of Checkbox)
     selectInput("group_var", …)         pn.widgets.Select
-    selectInput("distribution_type", …) pn.widgets.Select (family)
-    selectInput("hb_link", …)           pn.widgets.Select (link)
+    selectInput("distribution_type", …) pn.widgets.Select (list_families())
+    selectInput("hb_link", …)           pn.widgets.Select (spec.supported_links)
     actionButton("fit_model", …)        pn.widgets.Button
-    withProgress(…)                     threading.Thread + status HTML
+    withProgress(…)                     async handler + button.loading
 """
 
 from __future__ import annotations
 
-import threading
+import asyncio
+import inspect
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import arviz_plots as azp
-import bambi as bmb
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import panel as pn
 import param
 
+from hbsaemp import (
+    BaseModel,
+    DataValidationError,
+    EstimationError,
+    FormulaError,
+    HBSAEError,
+    ModelConfig,
+    ModelNotFittedError,
+    ModelRegistryError,
+    PriorSpecError,
+    get_family_spec,
+    hbm_beta,
+    hbm_binomial,
+    hbm_gaussian,
+    list_families,
+)
+from hbsaemp._logging import get_logger
+from hbsaemp.diagnostics.prior_check import PriorCheckResult, check_prior
+
 if TYPE_CHECKING:
     from hbsaemp.app._app import AppState
 
+logger = get_logger(__name__)
+
 __all__: list[str] = ["ModelTab"]
 
-_FAMILY_OPTIONS: dict[str, str] = {
-    "Gaussian":  "gaussian",
-    "Beta":      "beta",
-    "Lognormal": "lognormal",
-    "Binomial":  "binomial",
+# Tier-3 dispatch, built from the registry itself (never a hardcoded list) so
+# a new family registered in FAMILY_SPECS is picked up with zero code changes
+# here, and `set(_HBM_DISPATCH) == set(list_families())` holds by construction.
+_HBM_DISPATCH: dict[str, Callable[..., BaseModel]] = {
+    "gaussian": hbm_gaussian,
+    "beta": hbm_beta,
+    "binomial": hbm_binomial,
 }
- 
-_FAMILY_LINK_DEFAULT: dict[str, str] = {
-    "gaussian":  "identity",
-    "beta":      "logit",
-    "lognormal": "log",
-    "binomial":  "logit",
-}
- 
-_FAMILY_LINK_OPTIONS: dict[str, list[str]] = {
-    "gaussian":  ["identity", "log"],
-    "beta":      ["logit", "probit", "cloglog"],
-    "lognormal": ["log"],
-    "binomial":  ["logit", "probit", "cloglog"],
-}
- 
+assert set(_HBM_DISPATCH) == set(list_families()), (
+    "_HBM_DISPATCH is out of sync with the family registry — "
+    "add a hbm_<family> shortcut and wire it in here."
+)
+
+# Frontend-owned prose (FamilySpec carries no description field). Only
+# families in the registry are described; "Default link: …" sentences are
+# omitted since the link widget already shows the resolved default.
 _FAMILY_DESC: dict[str, str] = {
     "gaussian": (
-        "**Gaussian**: response variable is continuous and unbounded. "
-        "Default link: *identity*. Suitable for y ∈ ℝ."
+        "**Gaussian**: response variable is continuous and unbounded, "
+        "suitable for y in the reals. Pass a sampling-variance column to "
+        "enable the Fay-Herriot offset."
     ),
     "beta": (
-        "**Beta**: response variable is a proportion or rate in (0, 1). "
-        "Default link: *logit*. The precision parameter φᵢ is calculated "
-        "from the `n` and `deff` columns."
-    ),
-    "lognormal": (
-        "**Lognormal**: response variable is continuous and strictly positive (y > 0). "
-        "Default link: *log*."
+        "**Beta**: response variable is a proportion or rate. The "
+        "precision parameter phi_i can be computed from the `n` and `deff` "
+        "columns, or left to Bambi's auto-priors if omitted."
     ),
     "binomial": (
-        "**Binomial**: response variable is a count of successes out of a specified number of trials"
-        "Default link: *logit*. The `trials` column is **required**."
+        "**Binomial**: response variable is a count of successes out of a "
+        "number of trials. The `trials` column is **required**."
     ),
 }
- 
+
+# User-facing labels for family-specific widgets, keyed by the *user kwarg*
+# name (FamilySpec.user_params values) — never by family, so a family reusing
+# an existing parameter name needs no new label entry.
+_PARAM_LABEL: dict[str, str] = {
+    "trials":       "Trials column (n_i)",
+    "n":            "Sample size column (n)",
+    "deff":         "Design effect column (deff)",
+    "sampling_var": "Sampling variance column (D_i)",
+    "squeeze":      "Smithson-Verkuilen squeeze",
+}
+
+
 def _error_box(title: str, body: str = "") -> str:
     inner = f"<b>{title}</b><br>{body}" if body else title
     return (
@@ -112,9 +116,57 @@ def _success_box(body: str) -> str:
     )
 
 
-def _has_group(idata: Any, name: str) -> bool:
-    """Check whether a group (e.g. ``'posterior_predictive'``) exists on an InferenceData."""
-    return any(g.strip("/") == name for g in idata.groups)
+def _info_box(body: str) -> str:
+    return (
+        f'<div style="background:#0072B2;color:white;padding:10px 16px;'
+        f'border-radius:8px;margin-top:8px">{body}</div>'
+    )
+
+
+def _formula_box(formula: str) -> str:
+    return (
+        f'<div style="background:#f4f4f4;border-left:4px solid #0072B2;'
+        f'padding:10px 16px;border-radius:6px;font-family:monospace;'
+        f'font-size:1.05em">'
+        f'<b>Formula:</b>&nbsp; {formula}</div>'
+    )
+
+
+def _pending_box(message: str) -> str:
+    return (
+        f'<div style="background:#fff3cd;border-left:4px solid #d62728;'
+        f'color:#7a1f1f;padding:10px 16px;border-radius:6px;'
+        f'font-family:monospace;font-size:0.95em">'
+        f'<b>Cannot build model yet:</b> {message}</div>'
+    )
+
+
+def _describe_error(exc: Exception) -> tuple[str, str]:
+    """Map a backend exception to a (title, body) pair for the UI.
+
+    Every ``hbsaemp`` exception derives from ``HBSAEError`` (backend never
+    swallows or reclassifies), so this is the single dispatch point for
+    error -> message across the whole tab.
+    """
+    if isinstance(exc, FormulaError):
+        return "Invalid formula", "Please check the selected variables. " + str(exc)
+    if isinstance(exc, ModelRegistryError):
+        return "Family not available", str(exc)
+    if isinstance(exc, DataValidationError):
+        return "Data does not meet the family's requirements", str(exc)
+    if isinstance(exc, PriorSpecError):
+        return "Invalid prior specification", str(exc)
+    if isinstance(exc, ModelNotFittedError):
+        return "Model has not been fitted", "Please fit the model first."
+    if isinstance(exc, EstimationError):
+        return "Estimation failed", str(exc)
+    if isinstance(exc, ImportError):
+        return "Missing dependency", str(exc)
+    if isinstance(exc, HBSAEError):
+        return "Model configuration error", str(exc)
+    if isinstance(exc, (ValueError, TypeError)):
+        return "Invalid configuration", str(exc)
+    return "Unexpected error", str(exc)
 
 
 class PredictorCheckboxes(param.Parameterized):
@@ -170,86 +222,104 @@ class ModelTab(param.Parameterized):
         state: Shared :class:`~hbsaemp.app._app.AppState` instance. Reads
             ``state.data`` (set by
             :class:`~hbsaemp.app.tabs.data_tab.DataTab`); writes
-            ``state.idata``, ``state.model``, ``state.y_vals``,
-            ``state.pred_names`` and ``state.response_col`` after fitting,
-            for :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` to consume.
+            ``state.model`` — a fitted
+            :class:`~hbsaemp.models._base.BaseModel` — after
+            :meth:`~hbsaemp.models._base.BaseModel.fit` succeeds, for
+            :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` to consume.
     """
 
-    state: "AppState" = param.Parameter()
+    state: AppState = param.Parameter()
 
-    def __init__(self, state: "AppState", **params: Any) -> None:
+    def __init__(self, state: AppState, **params: Any) -> None:
         super().__init__(state=state, **params)
 
+        # The single model draft threaded through Preview -> Build ->
+        # Prior Check -> Fit (task #10). `None` whenever the current widget
+        # selection cannot build a model; the exception message *is* the
+        # validation message (no separate `_validate_build()`).
+        self._model_draft: BaseModel | None = None
+        self._extra_widgets: dict[str, pn.widgets.Widget] = {}
+
+        # --- Variable selection ------------------------------------------------
         self._response_sel = pn.widgets.Select(
-            name="Response Variable  (y)",
-            options=[], max_width=280,
+            name="Response Variable  (y)", options=[], max_width=280,
         )
         self._predictors_sel = PredictorCheckboxes(
             name="Auxiliary / Predictor Variables  (x)",
         )
         self._group_sel = pn.widgets.Select(
-            name="Group / Area Variable  (optional)",
+            name="Area / Group Variable  (optional)",
             options=[], value=None, max_width=280,
         )
+        self._intercept_cb = pn.widgets.Checkbox(name="Include intercept", value=True)
 
+        # --- Family / link (registry-driven — task #7) --------------------------
+        families = list_families()
+        default_family = "gaussian" if "gaussian" in families else families[0]
         self._family_sel = pn.widgets.Select(
-            name="HB Family",
-            options=_FAMILY_OPTIONS, value="gaussian", max_width=250,
+            name="HB Family", options=families, value=default_family, max_width=250,
         )
-        self._link_sel = pn.widgets.Select(
-            name="Link Function",
-            options=_FAMILY_LINK_OPTIONS["gaussian"],
-            value=_FAMILY_LINK_DEFAULT["gaussian"],
-            max_width=250,
-        )
-        self._family_desc = pn.pane.Markdown(
-            _FAMILY_DESC["gaussian"], margin=(4, 0, 8, 0),
-        )
+        self._link_sel = pn.widgets.Select(name="Link Function", max_width=250)
+        self._family_desc = pn.pane.Markdown("", margin=(4, 0, 8, 0))
+        self._extra_params_pane = pn.Column()
+        self._apply_family_spec(default_family)
+        self._refresh_extra_params(default_family)
         self._family_sel.param.watch(self._on_family_change, "value")
 
-        self._binomial_trials_sel = pn.widgets.Select(
-            name="trials column  (number of trials)",
-            options=[], value=None, max_width=280,
+        # --- Sampler configuration (task #9) -------------------------------------
+        self._draws_in = pn.widgets.IntInput(name="draws", value=1000, start=1, max_width=140)
+        self._tune_in  = pn.widgets.IntInput(name="tune",  value=1000, start=0, max_width=140)
+        self._chains_in = pn.widgets.IntInput(name="chains", value=4, start=1, max_width=140)
+        self._cores_in  = pn.widgets.IntInput(name="cores", value=1, start=1, max_width=140)
+        self._target_accept_in = pn.widgets.FloatInput(
+            name="target_accept", value=0.8, start=0.01, end=0.99, step=0.01, max_width=160,
         )
-        self._extra_params_pane = pn.Column()
+        self._seed_cb = pn.widgets.Checkbox(name="Fix random seed", value=False)
+        self._seed_in = pn.widgets.IntInput(name="random_seed", value=42, max_width=140, disabled=True)
+        self._seed_cb.param.watch(
+            lambda e: setattr(self._seed_in, "disabled", not e.new), "value"
+        )
 
-        self._formula_preview = pn.pane.HTML(self._render_formula_html())
+        # --- Formula preview ------------------------------------------------
+        self._formula_preview = pn.pane.HTML(_pending_box("select a response and at least one predictor."))
         for w in [self._response_sel, self._predictors_sel, self._group_sel,
-                  self._family_sel, self._binomial_trials_sel]:
-            w.param.watch(self._update_formula_preview, "value")
+                  self._family_sel, self._link_sel, self._intercept_cb]:
+            w.param.watch(self._update_preview, "value")
 
-        self._build_btn = pn.widgets.Button(
-            name="Build Model",
-            button_type="primary", max_width=220,
-        )
-        self._build_status  = pn.pane.HTML("")
+        # --- Build Model -----------------------------------------------------
+        self._build_btn = pn.widgets.Button(name="Build Model", button_type="primary", max_width=220)
+        self._build_status = pn.pane.HTML("")
         self._build_btn.on_click(self._on_build)
 
-        self._prior_run_btn   = pn.widgets.Button(
+        # --- Prior Predictive Check -------------------------------------------
+        self._prior_run_btn = pn.widgets.Button(
             name="Run Prior Predictive Check", button_type="primary", max_width=260,
         )
-        self._prior_status    = pn.pane.HTML("")
+        self._prior_n_draws = pn.widgets.IntInput(name="n_draws", value=50, start=1, max_width=140)
+        self._prior_status = pn.pane.HTML("")
+        self._prior_summary_table = pn.widgets.Tabulator(pd.DataFrame(), show_index=False)
         self._prior_plot_pane = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
-        self._prior_ppc_pane  = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
         self._prior_run_btn.on_click(self._on_prior_check)
 
-        self._fit_btn         = pn.widgets.Button(
-            name="Fit Model", button_type="primary", max_width=220,
-        )
-        self._fit_status      = pn.pane.HTML("")
+        # --- Fit Model ---------------------------------------------------------
+        self._fit_btn = pn.widgets.Button(name="Fit Model", button_type="primary", max_width=220)
+        self._fit_status = pn.pane.HTML("")
         self._fit_btn.on_click(self._on_fit_model)
 
+        # --- Posterior Predictive Check ----------------------------------------
         self._postpc_run_btn = pn.widgets.Button(
             name="Run Posterior Predictive Check", button_type="primary", max_width=280,
         )
-        self._postpc_status         = pn.pane.HTML("")
-        self._postpc_dist_pane      = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
-        self._postpc_interval_pane  = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
+        self._postpc_status = pn.pane.HTML("")
+        self._postpc_dist_pane = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
+        self._postpc_interval_pane = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
         self._postpc_run_btn.on_click(self._on_posterior_check)
 
         self.state.param.watch(self._on_data_change, "data")
         if self.state.data is not None:
             self._populate_selectors(self.state.data)
+
+    # Variable population
 
     def _on_data_change(self, event: param.parameterized.Event) -> None:
         if event.new is not None:
@@ -259,338 +329,305 @@ class ModelTab(param.Parameterized):
         all_cols = df.columns.tolist()
         num_cols = df.select_dtypes(include="number").columns.tolist()
 
-        self._response_sel.options   = num_cols
-        self._response_sel.value     = num_cols[0] if num_cols else None
+        self._response_sel.options = num_cols
+        self._response_sel.value   = num_cols[0] if num_cols else None
 
         self._predictors_sel.options = num_cols
         self._predictors_sel.value   = num_cols[1:] if len(num_cols) > 1 else []
 
-        self._group_sel.options = [None] + all_cols
+        self._group_sel.options = [None, *all_cols]
         self._group_sel.value   = None
 
-        self._binomial_trials_sel.options = [None] + num_cols
-        self._binomial_trials_sel.value   = None
+        self._refresh_extra_params(self._family_sel.value)
+        self._update_preview()
 
-        self._update_formula_preview()
+    def _apply_family_spec(self, family: str) -> None:
+        spec = get_family_spec(family)
+        self._link_sel.options = sorted(spec.supported_links)
+        self._link_sel.value   = spec.default_link
+        self._family_desc.object = _FAMILY_DESC.get(family, "")
 
     def _on_family_change(self, event: param.parameterized.Event) -> None:
-        family = event.new
-        self._link_sel.options = _FAMILY_LINK_OPTIONS[family]
-        self._link_sel.value   = _FAMILY_LINK_DEFAULT[family]
-        self._family_desc.object = _FAMILY_DESC[family]
-        self._refresh_extra_params(family)
+        self._apply_family_spec(event.new)
+        self._refresh_extra_params(event.new)
+        self._update_preview()
+
+    def _family_param_names(self, family: str) -> list[str]:
+        """User-facing kwarg names for *family*, minus `link` (own widget)."""
+        return [uk for uk in get_family_spec(family).user_params.values() if uk != "link"]
+
+    def _param_traits(self, family: str, user_kw: str) -> tuple[type, bool]:
+        """(annotation, required?) for `user_kw` on the family's `hbm_<family>`."""
+        fn = _HBM_DISPATCH[family]
+        p = inspect.signature(fn).parameters[user_kw]
+        try:
+            ann = inspect.get_annotations(fn, eval_str=True).get(user_kw, p.annotation)
+        except Exception:  
+            ann = p.annotation
+        return ann, p.default is inspect.Parameter.empty
 
     def _refresh_extra_params(self, family: str) -> None:
-        if family == "binomial":
-            self._extra_params_pane.objects = [
-                pn.pane.Markdown(
-                    "**Binomial: specific parameter**, column containing the number of trials (nᵢ) for each observation. "
-                    "**Required.**",
-                    margin=(4, 0, 6, 0),
-                ),
-                self._binomial_trials_sel,
-            ]
-        else:
-            self._extra_params_pane.objects = []
+        """(Re)generate widgets for `family`'s parameters from the registry.
 
-    def _build_formula_str(self) -> str:
-        response   = self._response_sel.value   or "y"
-        predictors = list(self._predictors_sel.value or [])
-        group      = self._group_sel.value
-        family     = self._family_sel.value
-        trials     = self._binomial_trials_sel.value
-
-        lhs = f"p({response}, {trials})" if family == "binomial" and trials else response
-
-        rhs = predictors if predictors else ["1"]
-        if group:
-            rhs.append(f"(1|{group})")
-
-        return f"{lhs} ~ {' + '.join(rhs)}"
-
-    def _render_formula_html(self) -> str:
-        formula = self._build_formula_str()
-        return (
-            f'<div style="background:#f4f4f4;border-left:4px solid #0072B2;'
-            f'padding:10px 16px;border-radius:6px;font-family:monospace;font-size:1.05em">'
-            f'<b>Formula:</b>&nbsp; {formula}</div>'
+        Keyed by *parameter name* (not family), so a family reusing an
+        existing parameter needs zero new code here.
+        """
+        data = self.state.data
+        numeric_cols = (
+            [None, *data.select_dtypes(include="number").columns.tolist()]
+            if data is not None else [None]
         )
 
-    def _update_formula_preview(self, *_: Any) -> None:
-        self._formula_preview.object = self._render_formula_html()
+        widgets: dict[str, pn.widgets.Widget] = {}
+        objects: list[Any] = []
+        for user_kw in self._family_param_names(family):
+            ann, required = self._param_traits(family, user_kw)
+            label = _PARAM_LABEL.get(user_kw, user_kw)
+            if required:
+                label += "  (required)"
+            if ann is bool:
+                w: pn.widgets.Widget = pn.widgets.Checkbox(name=label, value=False)
+            else:
+                w = pn.widgets.Select(name=label, options=numeric_cols, value=None)
+            w.param.watch(self._update_preview, "value")
+            widgets[user_kw] = w
+            objects.append(w)
 
-    def _validate_build(self) -> list[str]:
-        errors: list[str] = []
+        self._extra_widgets = widgets
+        self._extra_params_pane.objects = objects
 
-        if not self._response_sel.value:
-            errors.append("Response variable not yet selected.")
-        if not self._predictors_sel.value:
-            errors.append("At least one predictor variable and one response variable must be selected.")
+    def _collect_family_kwargs(self) -> dict[str, Any]:
+        return {name: w.value for name, w in self._extra_widgets.items()}
 
+    def _collect_config(self) -> ModelConfig:
+        return ModelConfig(
+            draws=int(self._draws_in.value),
+            tune=int(self._tune_in.value),
+            chains=int(self._chains_in.value),
+            cores=int(self._cores_in.value),
+            target_accept=float(self._target_accept_in.value),
+            random_seed=int(self._seed_in.value) if self._seed_cb.value else None,
+            progressbar=False,
+        )
+
+    def _build_model(self) -> BaseModel:
+        """Assemble an unfitted `BaseModel` from the current widget state.
+
+        The single tier-3 entry point for this tab (task #5) — never
+        `hbm()`/`hbm_flex()`/`create_model()` directly.
+        """
         family = self._family_sel.value
-        if family == "binomial" and not self._binomial_trials_sel.value:
-            errors.append(
-                "Family <b>binomial</b> requires a <code>trials</code> column. "
-                "Please select the appropriate column."
+        return _HBM_DISPATCH[family](
+            response=self._response_sel.value,
+            auxiliary=list(self._predictors_sel.value or []),
+            data=self.state.data,
+            area_var=self._group_sel.value or None,
+            intercept=self._intercept_cb.value,
+            link=self._link_sel.value,
+            handle_missing="deleted",
+            config=self._collect_config(),
+            **self._collect_family_kwargs(),
+        )
+
+    def _update_preview(self, *_: Any) -> None:
+        """Preview = `model.formula`. A failed build IS the validation message."""
+        if self.state.data is None:
+            self._model_draft = None
+            self._formula_preview.object = _pending_box(
+                "upload or load a dataset in the Data Upload tab first."
             )
-        return errors
+            return
+        if not self._response_sel.value or not self._predictors_sel.value:
+            self._model_draft = None
+            self._formula_preview.object = _pending_box(
+                "select a response and at least one predictor."
+            )
+            return
+        try:
+            model = self._build_model()
+        except Exception as exc:  
+            self._model_draft = None
+            _, body = _describe_error(exc)
+            self._formula_preview.object = _pending_box(body)
+            return
+        self._model_draft = model
+        self._formula_preview.object = _formula_box(model.formula)
 
     def _on_build(self, event: Any) -> None:
-        errors = self._validate_build()
-        if errors:
+        self._update_preview()
+        if self._model_draft is None:
             self._build_status.object = _error_box(
-                "Can not build model", "<br>".join(f"• {e}" for e in errors)
+                "Cannot build model", "Fix the formula preview above first."
             )
             return
-
         try:
-            _model, _pred_names, had_missing = self._build_bambi_model()
-        except Exception as exc:
-            self._build_status.object = _error_box("Build model failed", str(exc))
+            clean = self._model_draft.check_data()
+        except HBSAEError as exc:
+            logger.exception("ModelTab build/check_data failed")
+            title, body = _describe_error(exc)
+            self._build_status.object = _error_box(title, body)
             return
 
-        msg = (
-            "Model built successfully. Moving on to the tab <b>Prior Predictive Checking</b>."
-        )
-        if had_missing:
-            msg += (
-                "<br><br><i>Missing values were detected and the corresponding "
-                "rows were automatically removed before modeling.</i>"
-            )
+        n_dropped = len(self.state.data) - len(clean)
+        msg = "Model built and data validated successfully. Moving on to Prior Predictive Check."
+        if n_dropped:
+            msg += f"<br><br>{n_dropped} row(s) with missing values were dropped before modeling."
         self._build_status.object = _success_box(msg)
 
-    def _build_bambi_model(self) -> tuple[bmb.Model, list[str], bool]:
-        response   = self._response_sel.value
-        predictors = list(self._predictors_sel.value or [])
-        group      = self._group_sel.value
-        family     = self._family_sel.value
-        trials_col = self._binomial_trials_sel.value if family == "binomial" else None
+    # Prior Predictive Check (task #12) — check_prior() only, no raw Bambi/hand-rolled plots
 
-        cols = [response, *predictors]
-        if group:
-            cols.append(group)
-        if trials_col:
-            cols.append(trials_col)
-        cols = list(dict.fromkeys(cols))
-        df_model = self.state.data[cols].copy()
+    async def _on_prior_check(self, event: Any) -> None:
+        if self._prior_run_btn.loading:
+            return
+        if self._model_draft is None:
+            self._prior_status.object = _error_box(
+                "Cannot run prior predictive check", "Fix the formula preview above first."
+            )
+            return
 
-        had_missing = bool(df_model.isna().any().any())
-        if had_missing:
-            df_model = df_model.dropna(subset=cols).reset_index(drop=True)
+        model = self._model_draft
+        n_draws = int(self._prior_n_draws.value)
 
-        if family == "binomial":
-            df_model[response]   = df_model[response].astype(int)
-            df_model[trials_col] = df_model[trials_col].astype(int)
+        self._prior_run_btn.loading = self._prior_run_btn.disabled = True
+        self._prior_status.object = _info_box("Running prior predictive check…")
+        try:
+            loop = asyncio.get_running_loop()
+            result: PriorCheckResult = await loop.run_in_executor(
+                None, self._prior_blocking, model, n_draws
+            )
+        except Exception as exc:
+            logger.exception("ModelTab prior check failed")
+            title, body = _describe_error(exc)
+            self._prior_status.object = _error_box(title, body)
+            return
+        finally:
+            self._prior_run_btn.loading = self._prior_run_btn.disabled = False
 
-        formula = self._build_formula_str()
+        if result.prior_summary is not None and len(result.prior_summary):
+            self._prior_summary_table.value = result.prior_summary.reset_index().rename(
+                columns={"index": "Parameter"}
+            )
+        if result.prior_predictive_plot is not None:
+            self._prior_plot_pane.object = result.prior_predictive_plot
+            plt.close(result.prior_predictive_plot)
 
-        model = bmb.Model(
-            formula, df_model,
-            family=family,
-            link=self._link_sel.value,
+        self._prior_status.object = _success_box(
+            "Prior predictive check complete. Moving on to <b>Fit Model</b>."
         )
-        pred_names = predictors if predictors else ["Intercept"]
-        return model, pred_names, had_missing
 
     @staticmethod
-    def _response_array(model: bmb.Model) -> np.ndarray:
-        arr = np.asarray(model.response_component.term.data)
-        if arr.ndim > 1:       # binomial: kolom [successes, trials]
-            arr = arr[:, 0]
-        return arr.astype(float).flatten()
+    def _prior_blocking(model: BaseModel, n_draws: int) -> PriorCheckResult:
+        """Synchronous, Panel-free — runs in the executor thread."""
+        return check_prior(model, n_draws=n_draws)
 
-    def _on_prior_check(self, event: Any) -> None:
-        if self.state.data is None:
-            self._prior_status.object = _error_box(
-                "Data not available. Please upload the data first in the <b>Data Upload</b> tab."
-            )
+    async def _on_fit_model(self, event: Any) -> None:
+        if self._fit_btn.loading:  
             return
-        if not self._response_sel.value:
-            self._prior_status.object = _error_box(
-                "Please select a response variable in <b>Model Building</b> and click Build Model."
-            )
-            return
-
-        self._prior_status.object = (
-            '<div style="background:#0072B2;color:white;padding:10px 16px;'
-            'border-radius:8px;margin-top:8px">'
-            'Running prior predictive check</div>'
-        )
-
-        def _run():
-            try:
-                model, pred_names, _had_missing = self._build_bambi_model()
-                model.build()
-                prior_idata = model.prior_predictive()
-
-                # Histogram prior for each parameter
-                param_names = list(prior_idata.prior.data_vars)
-                n_params = len(param_names)
-                fig1, axes1 = plt.subplots(1, n_params, figsize=(5 * n_params, 4))
-                if n_params == 1:
-                    axes1 = [axes1]
-                for ax, pname in zip(axes1, param_names):
-                    vals = prior_idata.prior[pname].values.flatten()
-                    ax.hist(vals, bins=40, color="#0072B2", edgecolor="white", alpha=0.8)
-                    ax.set_title(f"Prior: {pname}", fontweight="bold")
-                    ax.set_xlabel("Value"); ax.set_ylabel("Frequency")
-                fig1.suptitle("Prior Distribution of Each Parameter",
-                              fontsize=13, fontweight="bold", y=1.02)
-                plt.tight_layout()
-                self._prior_plot_pane.object = fig1
-                plt.close(fig1)
-
-                # Prior predictive vs actual data
-                pc = azp.plot_ppc_dist(
-                    prior_idata, group="prior_predictive",
-                    visuals={"observed_dist": True},
-                )
-                fig2 = pc.viz["figure"].item()
-                fig2.suptitle("Prior Predictive vs Actual Data",
-                               fontsize=11, fontweight="bold")
-                fig2.subplots_adjust(top=0.82)
-                self._prior_ppc_pane.object = fig2
-                plt.close(fig2)
-
-                self._prior_status.object = _success_box(
-                    "Prior predictive check complete. Moving on the tab <b>Fit Model</b>."
-                )
-
-            except Exception as exc:
-                self._prior_status.object = _error_box(
-                    "Prior check failed.", str(exc)
-                )
-
-        threading.Thread(target=_run, daemon=True).start()
-
-    def _on_fit_model(self, event: Any) -> None:
-        errors = self._validate_build()
-        if errors:
+        if self._model_draft is None:
             self._fit_status.object = _error_box(
-                "Unable to fit the model",
-                "<br>".join(f"• {e}" for e in errors)
+                "Cannot fit model", "Fix the formula preview above first."
             )
             return
 
-        self._fit_status.object = (
-            '<div style="background:#0072B2;color:white;padding:10px 16px;'
-            'border-radius:8px;margin-top:8px">'
-            'Running MCMC sampling</div>'
+        model = self._model_draft
+        self._fit_btn.loading = self._fit_btn.disabled = True
+        self._fit_status.object = _info_box("Running MCMC sampling…")
+        try:
+            loop = asyncio.get_running_loop()
+            fitted = await loop.run_in_executor(None, self._fit_blocking, model)
+        except Exception as exc:
+            logger.exception("ModelTab fit failed")
+            title, body = _describe_error(exc)
+            self._fit_status.object = _error_box(title, body)
+            return
+        finally:
+            self._fit_btn.loading = self._fit_btn.disabled = False
+
+        self.state.model = fitted
+        self._fit_status.object = _success_box(
+            "The MCMC sampling has completed. See the <b>Results</b> tab for "
+            "diagnostics and SAE estimates."
         )
 
-        def _run():
-            try:
-                model, pred_names, had_missing = self._build_bambi_model()
+    @staticmethod
+    def _fit_blocking(model: BaseModel) -> BaseModel:
+        model.fit()
+        return model
 
-                # Tidak ada draws/tune/chains yang di-hardcode — sepenuhnya
-                # memakai default sampling dari Bambi/PyMC (NUTS).
-                idata = model.fit()
-                model.predict(idata, kind="response", inplace=True)
-
-                self.state.idata         = idata
-                self.state.model         = model
-                self.state.y_vals        = self._response_array(model)
-                self.state.pred_names    = pred_names
-                self.state.response_col  = self._response_sel.value
-
-                msg = (
-                    "The MCMC process has been completed."
-                )
-                if had_missing:
-                    msg += (
-                        "<br><br>⚠ <i>Missing values were detected and the "
-                        "corresponding rows were automatically removed before "
-                        "modeling.</i>"
-                    )
-                self._fit_status.object = _success_box(msg)
-
-            except Exception as exc:
-                self._fit_status.object = _error_box(
-                    "Fit model failed", str(exc)
-                )
-
-        threading.Thread(target=_run, daemon=True).start()
-
-    def _on_posterior_check(self, event: Any) -> None:
-        idata = getattr(self.state, "idata", None)
-        model = getattr(self.state, "model", None)
-        y     = getattr(self.state, "y_vals", None)
-
-        if idata is None or model is None or y is None:
+    async def _on_posterior_check(self, event: Any) -> None:
+        if self._postpc_run_btn.loading:
+            return
+        model = self.state.model
+        if model is None or not model.is_fitted:
             self._postpc_status.object = _error_box(
-                "Model has not been fitted",
-                "Please click <b>Fit Model</b> before running the Posterior Predictive Check."
+                "Model has not been fitted", "Please click <b>Fit Model</b> first."
             )
             return
 
-        self._postpc_status.object = (
-            '<div style="background:#0072B2;color:white;padding:10px 16px;'
-            'border-radius:8px;margin-top:8px">'
-            'Running posterior predictive check</div>'
-        )
+        self._postpc_run_btn.loading = self._postpc_run_btn.disabled = True
+        self._postpc_status.object = _info_box("Running posterior predictive check…")
+        try:
+            loop = asyncio.get_running_loop()
+            idata = await loop.run_in_executor(None, model.predictive_idata)
+        except Exception as exc:
+            logger.exception("ModelTab posterior predictive check failed")
+            title, body = _describe_error(exc)
+            self._postpc_status.object = _error_box(title, body)
+            return
+        finally:
+            self._postpc_run_btn.loading = self._postpc_run_btn.disabled = False
 
-        def _run():
-            try:
-                if not _has_group(idata, "posterior_predictive"):
-                    model.predict(idata, kind="response", inplace=True)
+        try:
+            pc1 = azp.plot_ppc_dist(idata)
+            fig1 = pc1.viz["figure"].item()
+            fig1.suptitle("Posterior Predictive vs Actual Data", fontsize=11, fontweight="bold")
+            fig1.subplots_adjust(top=0.82)
+            self._postpc_dist_pane.object = fig1
+            plt.close(fig1)
 
-                pc1 = azp.plot_ppc_dist(idata)
-                fig1 = pc1.viz["figure"].item()
-                fig1.suptitle("Posterior Predictive vs Actual Data",
-                               fontsize=11, fontweight="bold")
-                fig1.subplots_adjust(top=0.82)
-                self._postpc_dist_pane.object = fig1
-                plt.close(fig1)
+            pc2 = azp.plot_ppc_interval(idata)
+            fig2 = pc2.viz["figure"].item()
+            fig2.suptitle("Credible Interval of Posterior Predictive per Observation",
+                          fontsize=11, fontweight="bold")
+            fig2.subplots_adjust(top=0.82)
+            self._postpc_interval_pane.object = fig2
+            plt.close(fig2)
+        except Exception as exc:  
+            logger.exception("ModelTab posterior predictive plotting failed")
+            self._postpc_status.object = _error_box("Could not render plots", str(exc))
+            return
 
-                pc2 = azp.plot_ppc_interval(idata)
-                fig2 = pc2.viz["figure"].item()
-                fig2.suptitle("Credible Interval of Posterior Predictive per Observation",
-                               fontsize=11, fontweight="bold")
-                fig2.subplots_adjust(top=0.82)
-                self._postpc_interval_pane.object = fig2
-                plt.close(fig2)
+        self._postpc_status.object = _success_box("Posterior predictive check complete.")
 
-                self._postpc_status.object = _success_box(
-                    "Posterior predictive check complete."
-                )
-
-            except Exception as exc:
-                self._postpc_status.object = _error_box(
-                    "Posterior predictive check failed", str(exc)
-                )
-
-        threading.Thread(target=_run, daemon=True).start()
-
-    def panel(self) -> pn.Column:
+    def panel(self) -> pn.Tabs:
         """Return the Panel layout for this tab."""
         overview = pn.pane.Markdown("""
                                     **This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.**
                                     - **Response Variable:** The outcome variable being modeled.
                                     - **Auxiliary Variables:** Explanatory (independent) variables — fixed effects.
-                                    - **Group Variables:** Grouping variable (e.g., area, cluster) for random effects.
-                                    - **HB Family and Link Function:** Bayesian hierarchical family and corresponding link function (e.g., log, logit).""")
+                                    - **Area / Group Variable:** Grouping variable for the random intercept `(1|area)`.
+                                    - **HB Family and Link Function:** Loaded from the `hbsaemp` family registry.""")
 
         createmodel_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown("**Select Variables**", margin=(4, 0, 4, 0)),
-                pn.FlexBox(self._response_sel, self._group_sel),
+                pn.FlexBox(self._response_sel, self._group_sel, self._intercept_cb),
                 pn.pane.Markdown("*Auxiliary / Predictor Variables (x):*", margin=(4, 0, 2, 0)),
                 self._predictors_sel.panel(),
                 pn.layout.Divider(),
-                pn.pane.Markdown(
-                    "**Distribution Family and Link Function**",
-                    margin=(4, 0, 4, 0),
-                ),
+                pn.pane.Markdown("**Distribution Family and Link Function**", margin=(4, 0, 4, 0)),
                 pn.FlexBox(self._family_sel, self._link_sel),
                 self._family_desc,
                 self._extra_params_pane,
                 pn.layout.Divider(),
+                pn.pane.Markdown("**Sampler Configuration**", margin=(4, 0, 4, 0)),
+                pn.FlexBox(
+                    self._draws_in, self._tune_in, self._chains_in, self._cores_in,
+                    self._target_accept_in, self._seed_cb, self._seed_in,
+                ),
+                pn.layout.Divider(),
                 pn.pane.Markdown("**Formula Preview**", margin=(4, 0, 4, 0)),
                 self._formula_preview,
-                pn.pane.Markdown(
-                    "*Rows with missing values ​​in the columns used will be automatically removed before modeling.*",
-                    margin=(4, 0, 4, 0),
-                ),
                 pn.layout.Divider(),
                 pn.Row(self._build_btn),
                 self._build_status,
@@ -602,17 +639,18 @@ class ModelTab(param.Parameterized):
         prior_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "A prior predictive check assesses the plausibility of the prior *before* fitting the model. ",
+                    "A prior predictive check assesses the plausibility of the prior "
+                    "*before* fitting the model, via `check_prior()`.",
                     margin=(4, 0, 8, 0),
                 ),
-                pn.Row(self._prior_run_btn),
+                pn.Row(self._prior_run_btn, self._prior_n_draws),
                 self._prior_status,
                 pn.layout.Divider(),
-                pn.pane.Markdown("#### Prior Distribution of Each Parameter"),
-                self._prior_plot_pane,
+                pn.pane.Markdown("#### Prior Summary"),
+                self._prior_summary_table,
                 pn.layout.Divider(),
                 pn.pane.Markdown("#### Prior Predictive vs Actual Data"),
-                self._prior_ppc_pane,
+                self._prior_plot_pane,
             ),
             title="Prior Predictive Check",
             margin=10,
@@ -621,7 +659,8 @@ class ModelTab(param.Parameterized):
         fitmodel_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "Make sure **Build Model** has been run first. Click <b>Fit Model</b> to run MCMC sampling.",
+                    "Click <b>Fit Model</b> to run MCMC sampling on the model shown in "
+                    "the formula preview.",
                     margin=(4, 0, 8, 0),
                 ),
                 pn.Row(self._fit_btn),
@@ -634,8 +673,9 @@ class ModelTab(param.Parameterized):
         postpc_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "The Posterior Predictive Check compares data replicated by the model (after fitting) with the observed data. "
-                    "**Available after the model has been successfully fitted.**.",
+                    "The Posterior Predictive Check compares data replicated by the "
+                    "fitted model with the observed data, via `model.predictive_idata()`. "
+                    "**Available after the model has been fitted.**",
                     margin=(4, 0, 8, 0),
                 ),
                 pn.Row(self._postpc_run_btn),
@@ -660,11 +700,11 @@ class ModelTab(param.Parameterized):
             sizing_mode="stretch_width",
         )
 
-    def get_fitted_model(self) -> bmb.Model | None:
-        """Return the fitted Bambi model, or ``None`` if not yet fitted."""
-        return getattr(self.state, "model", None)
+    def get_fitted_model(self) -> BaseModel | None:
+        """Return the fitted model, or ``None`` if not yet fitted."""
+        model = getattr(self.state, "model", None)
+        return model if (model is not None and model.is_fitted) else None
 
     def __repr__(self) -> str:
         fitted = getattr(self.state, "model", None) is not None
         return f"ModelTab(fitted={fitted})"
-

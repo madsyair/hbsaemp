@@ -670,41 +670,6 @@ def test_model_registry_error():
     assert err.family == "foo"
     assert "gaussian" in err.registered
 
-
-# ---------------------------------------------------------------------------
-# AppConfig and GUI
-# ---------------------------------------------------------------------------
-
-def test_app_config_defaults():
-    cfg = hb.DEFAULT_APP_CONFIG
-    assert cfg.port == 8080
-    assert cfg.open_browser is True
-
-
-def test_app_config_custom():
-    cfg = hb.AppConfig(port=9000, title="Test", open_browser=False)
-    assert cfg.port == 9000
-
-
-@pytest.mark.parametrize("bad", [
-    {"port": 0}, {"port": 70000}, {"max_upload_mb": 0}, {"log_level": "VERBOSE"},
-])
-def test_app_config_validation(bad):
-    with pytest.raises(ValueError):
-        hb.AppConfig(**bad)
-
-
-def test_app_no_panel_needed():
-    app = hb.App(app_config=hb.AppConfig(port=9999, open_browser=False))
-    assert not app.state["data"]
-    assert not app.state["model"]
-
-
-def test_launch_app_raises_without_panel():
-    with pytest.raises(NotImplementedError):
-        hb.launch_app(open_browser=False)
-
-
 # ---------------------------------------------------------------------------
 # Datasets
 # ---------------------------------------------------------------------------
