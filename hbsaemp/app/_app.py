@@ -1,41 +1,55 @@
 """Main application class for the hbsaemp web dashboard.
 
 :class:`App` assembles the four tabs into a single Panel dashboard and
-manages the shared application state (uploaded data, fitted model).
-
-v0: stub — all rendering methods raise :exc:`NotImplementedError`.
-v1: implemented with ``panel.template.FastListTemplate``.
+manages the shared, reactive application state.
 
 Architecture
 ------------
 .. code-block:: text
 
-    App (v0 stub / v1 Panel dashboard)
-    ├── shared state dict  {"data": DataFrame|None, "model": BaseModel|None}
-    ├── DataTab    — tab 1: upload + preview
-    ├── ExploreTab — tab 2: EDA (histogram, boxplot, scatter, corr)
-    ├── ModelTab   — tab 3: hbm() config + fit
-    └── ResultsTab — tab 4: convergence + SAE + save
+    App (Panel dashboard orchestrator)
+    ├── AppState (param.Parameterized)  — shared reactive state
+    │     data, model
+    ├── DataTab    — tab 1: upload + preview            (writes: data)
+    ├── ExploreTab — tab 2: EDA (histogram, boxplot,     (reads:  data)
+    │                 scatter, corr)
+    ├── ModelTab   — tab 3: public hbsaemp API + fit     (reads:  data
+    │                                                      writes: model)
+    └── ResultsTab — tab 4: check_convergence/           (reads:  model)
+                     estimate_areas
+
+``AppState`` is deliberately minimal (P1.6): ``model`` is the fitted (or
+unfitted) :class:`~hbsaemp.models._base.BaseModel` itself, so
+``model.result``, ``model.result.idata``, ``model.formula``, and
+``model.response_name`` are always available without duplicating them as
+separate state fields.
+
+Data flows one-way, left to right, through ``param.watch`` callbacks
+registered by each tab on ``AppState``: uploading data in ``DataTab``
+automatically refreshes the selectors/plots in ``ExploreTab`` and
+``ModelTab``; fitting a model in ``ModelTab`` writes ``state.model``, which
+``ResultsTab`` reads on demand.
 
 Mapping from R hbsaems
 -----------------------
 .. code-block:: text
 
     R Shiny structure                  Panel v1 equivalent
-    ────────────────────────────────── ────────────────────────────────────
+    ─────────────────────────────────  ────────────────────────────────────
     dashboardPage(header, sidebar, …)  pn.template.FastListTemplate(...)
     dashboardSidebar(sidebarMenu(…))   sidebar= parameter of template
     dashboardBody(tabItems(…))         main= parameter of template
-    reactiveVal(NULL)                  Python dict (app_state)
+    reactiveValues(data=NULL, …)       AppState(param.Parameterized)
     observe({ if model_fit… })         pn.param.watch callback
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import panel as pn
+import param
 
-from hbsaemp._logging import get_logger
-from hbsaemp.app._config import AppConfig, DEFAULT_APP_CONFIG
+from hbsaemp._logging import configure_logging, get_logger
+from hbsaemp.app._config import DEFAULT_APP_CONFIG, AppConfig
 from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab
 
 logger = get_logger(__name__)
@@ -43,6 +57,20 @@ logger = get_logger(__name__)
 pn.extension("tabulator", sizing_mode="stretch_width")
 
 __all__: list[str] = ["App", "AppState"]
+
+#: AppConfig.theme -> Panel Theme class. Unknown values fall back to the
+#: default (appearance-only, never worth crashing the whole app over).
+_THEME_MAP: dict[str, type] = {}
+
+
+def _resolve_theme(name: str) -> type:
+    """Panel ``Theme`` class for *name* (`"dark"` -> DarkTheme, else default)."""
+    from panel.theme import DarkTheme, DefaultTheme
+
+    if not _THEME_MAP:
+        _THEME_MAP.update({"dark": DarkTheme, "bootstrap": DefaultTheme})
+    return _THEME_MAP.get(name, DefaultTheme)
+
 
 class AppState(param.Parameterized):
     """Shared reactive state passed to every tab.
@@ -52,25 +80,31 @@ class AppState(param.Parameterized):
     writing ``data`` triggers refreshes in
     :class:`~hbsaemp.app.tabs.explore_tab.ExploreTab` and
     :class:`~hbsaemp.app.tabs.model_tab.ModelTab`).
+
+    Attributes:
+        data: Uploaded/loaded :class:`pandas.DataFrame`, or ``None``.
+        model: A :class:`~hbsaemp.models._base.BaseModel` written by
+            :class:`~hbsaemp.app.tabs.model_tab.ModelTab` after a successful
+            :meth:`~hbsaemp.models._base.BaseModel.fit`. ``model.is_fitted``
+            tells :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` whether
+            results are ready; ``model.result`` raises
+            :class:`~hbsaemp._exceptions.ModelNotFittedError` otherwise.
     """
 
-    data         : object | None = param.Parameter(default=None)
-    model        : object | None = param.Parameter(default=None)
-    idata        : object | None = param.Parameter(default=None)
-    y_vals       : object | None = param.Parameter(default=None)
-    pred_names   : list          = param.Parameter(default=[])
-    response_col : str | None    = param.Parameter(default=None)
+    data:  object | None = param.Parameter(default=None)
+    model: object | None = param.Parameter(default=None)
+
 
 class App:
     """hbsaemp web dashboard.
- 
+
     Assembles :class:`~hbsaemp.app.tabs.data_tab.DataTab`,
     :class:`~hbsaemp.app.tabs.explore_tab.ExploreTab`,
     :class:`~hbsaemp.app.tabs.model_tab.ModelTab`, and
-    :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` into one
-    ``panel.template.FastListTemplate`` dashboard, all sharing a single
-    :class:`~hbsaemp.app._state.AppState`.
- 
+    :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` around one shared
+    :class:`AppState` instance, and exposes a servable Panel dashboard via
+    :meth:`view`.
+
     Args:
         app_config: Appearance and server configuration.
             Defaults to :data:`~hbsaemp.app._config.DEFAULT_APP_CONFIG`.
@@ -79,15 +113,22 @@ class App:
     def __init__(self, app_config: AppConfig | None = None) -> None:
         self._config: AppConfig = app_config or DEFAULT_APP_CONFIG
 
+        # AppConfig.log_level actually configures the package logger — not
+        # just validated-and-ignored.
+        configure_logging(level=self._config.log_level)
+
+        # Shared reactive state — equivalent to Shiny's reactiveValues().
         self._state = AppState()
 
-        # Instantiate the existing tab controllers around the shared state.
-        self._data_tab    = DataTab(state=self._state)
+        # Instantiate the tab controllers around the shared state.
+        self._data_tab    = DataTab(state=self._state, app_config=self._config)
         self._explore_tab = ExploreTab(state=self._state)
         self._model_tab   = ModelTab(state=self._state)
         self._results_tab = ResultsTab(state=self._state)
 
-        logger.debug("App created: title=%r, port=%d", self._config.title, self._config.port)
+        logger.debug(
+            "App created: title=%r, port=%d", self._config.title, self._config.port
+        )
 
     @property
     def config(self) -> AppConfig:
@@ -96,7 +137,7 @@ class App:
 
     @property
     def state(self) -> AppState:
-        """Shared :class:`~hbsaemp.app._state.AppState` (read-only view)"""
+        """Shared :class:`AppState` instance (read-only view)."""
         return self._state
 
     def view(self) -> pn.template.FastListTemplate:
@@ -115,29 +156,36 @@ class App:
             ("Results",          self._results_tab.panel()),
             sizing_mode="stretch_width",
         )
-        sidebar = pn.Column(
-            pn.pane.Markdown(
-                "**HBSAEMP** is a dashboard for Hierarchical Bayesian "
-                "Small Area Estimation using Bambi, PyMC, and ArviZ."
-            ),
-            pn.layout.Divider(),
-            pn.pane.Markdown(
-                "**Workflow**\n"
-                "1. **Data Upload** — upload a CSV file.\n"
-                "2. **Data Exploration** — inspect summary stats, "
-                "distributions, and correlations.\n"
-                "3. **Modeling** — select variables, choose a family, "
-                "run prior/posterior predictive checks, and fit the model.\n"
-                "4. **Results** — review convergence diagnostics and "
-                "download the SAE estimation results."
-            ),
-            sizing_mode="stretch_width",
-        )
+        sidebar = [
+            pn.Column(
+                pn.pane.Markdown(
+                    "**HBSAEMP** is a dashboard for Hierarchical Bayesian "
+                    "Small Area Estimation, built entirely on the public "
+                    "`hbsaemp` API."
+                ),
+                pn.layout.Divider(),
+                pn.pane.Markdown(
+                    "**Workflow**\n"
+                    "1. **Data Upload** — upload a CSV or load a built-in "
+                    "dataset.\n"
+                    "2. **Data Exploration** — inspect summary stats, "
+                    "distributions, and correlations.\n"
+                    "3. **Modeling** — select variables, choose a family, "
+                    "run prior/posterior predictive checks, and fit the "
+                    "model.\n"
+                    "4. **Results** — review convergence diagnostics and "
+                    "download the SAE estimation results."
+                ),
+                sizing_mode="stretch_width",
+            )
+        ] if self._config.show_sidebar else []
+
         return pn.template.FastListTemplate(
             title=self._config.title,
-            sidebar=[sidebar],
+            sidebar=sidebar,
             main=[tabs],
             accent=self._config.accent,
+            theme=_resolve_theme(self._config.theme),
         )
 
     def build(self) -> pn.template.FastListTemplate:
@@ -148,7 +196,6 @@ class App:
         """Build and serve the dashboard in the browser.
 
         Equivalent to R's ``shiny::runApp()`` / ``run_sae_app()``.
-
         """
         pn.serve(
             self.view(),
@@ -159,6 +206,6 @@ class App:
     def __repr__(self) -> str:
         return (
             f"App(title={self._config.title!r}, port={self._config.port}, "
-            f"data_loaded={self._state['data'] is not None}, "
-            f"model_fitted={self._state['model'] is not None})"
+            f"data_loaded={self._state.data is not None}, "
+            f"model_fitted={getattr(self._state.model, 'is_fitted', False)})"
         )
