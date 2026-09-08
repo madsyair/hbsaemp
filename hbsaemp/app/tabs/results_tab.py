@@ -304,12 +304,6 @@ class ResultsTab(param.Parameterized):
 
         saeestimation_card = pn.Card(
             pn.Column(
-                pn.pane.Markdown(
-                    "Small area estimates via `estimate_areas()` — computed from the "
-                    "posterior of the latent mean parameter (never the posterior "
-                    "predictive, which would destroy the shrinkage estimate).",
-                    margin=(4, 0, 8, 0),
-                ),
                 self._sae_run_btn,
                 self._sae_status,
                 pn.layout.Divider(),
