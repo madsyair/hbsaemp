@@ -580,14 +580,14 @@ class ModelTab(param.Parameterized):
         try:
             pc1 = azp.plot_ppc_dist(idata)
             fig1 = pc1.viz["figure"].item()
-            fig1.suptitle("Posterior Predictive vs Actual Data", fontsize=11, fontweight="bold")
+            fig1.suptitle("Posterior Predictive Plot", fontsize=11, fontweight="bold")
             fig1.subplots_adjust(top=0.82)
             self._postpc_dist_pane.object = fig1
             plt.close(fig1)
 
             pc2 = azp.plot_ppc_interval(idata)
             fig2 = pc2.viz["figure"].item()
-            fig2.suptitle("Credible Interval of Posterior Predictive per Observation",
+            fig2.suptitle("Rootgram",
                           fontsize=11, fontweight="bold")
             fig2.subplots_adjust(top=0.82)
             self._postpc_interval_pane.object = fig2
@@ -640,7 +640,7 @@ class ModelTab(param.Parameterized):
             pn.Column(
                 pn.pane.Markdown(
                     "A prior predictive check assesses the plausibility of the prior "
-                    "*before* fitting the model, via `check_prior()`.",
+                    "*before* fitting the model",
                     margin=(4, 0, 8, 0),
                 ),
                 pn.Row(self._prior_run_btn, self._prior_n_draws),
@@ -649,7 +649,7 @@ class ModelTab(param.Parameterized):
                 pn.pane.Markdown("#### Prior Summary"),
                 self._prior_summary_table,
                 pn.layout.Divider(),
-                pn.pane.Markdown("#### Prior Predictive vs Actual Data"),
+                pn.pane.Markdown("#### Prior Predictive ECDF Plot"),
                 self._prior_plot_pane,
             ),
             title="Prior Predictive Check",
@@ -674,17 +674,17 @@ class ModelTab(param.Parameterized):
             pn.Column(
                 pn.pane.Markdown(
                     "The Posterior Predictive Check compares data replicated by the "
-                    "fitted model with the observed data, via `model.predictive_idata()`. "
+                    "fitted model with the observed data`. "
                     "**Available after the model has been fitted.**",
                     margin=(4, 0, 8, 0),
                 ),
                 pn.Row(self._postpc_run_btn),
                 self._postpc_status,
                 pn.layout.Divider(),
-                pn.pane.Markdown("#### Posterior Predictive vs Actual Data"),
+                pn.pane.Markdown("#### Posterior Predictive Plot"),
                 self._postpc_dist_pane,
                 pn.layout.Divider(),
-                pn.pane.Markdown("#### Credible Interval for each Observation"),
+                pn.pane.Markdown("#### Posterior Predictive Credible Intervals by Observation"),
                 self._postpc_interval_pane,
             ),
             title="Posterior Predictive Check",
