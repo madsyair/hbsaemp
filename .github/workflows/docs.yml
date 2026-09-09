@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  schedule:
+    # Mondays 03:00 UTC — only the linkcheck job runs on this trigger.
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -16,8 +20,14 @@ concurrency:
   group: pages
   cancel-in-progress: false
 
+env:
+  # The tutorials call the diagnostics helpers, which plot. Without a headless
+  # backend a CI runner has no display and the notebook execution dies.
+  MPLBACKEND: Agg
+
 jobs:
   build:
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -30,11 +40,20 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      # `pip install -e .` pulls only numpy + pandas, which is all autodoc
-      # needs: no module imported at package import time requires bambi,
-      # arviz, matplotlib or panel.
+      # PyTensor compiles C extensions on first use and caches them here.
+      # Without this the cost is paid again on every single run.
+      - name: Cache PyTensor compiledir
+        uses: actions/cache@v4
+        with:
+          path: ~/.pytensor
+          key: pytensor-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml') }}
+          restore-keys: pytensor-${{ runner.os }}-py3.12-
+
+      # The [bambi] extra is required from v0.2 on: `nb_execution_mode` is
+      # "force" when CI is set, so the tutorials genuinely sample rather than
+      # being rendered as dead text.
       - name: Install package and documentation toolchain
-        run: pip install -e . -r docs/requirements-docs.txt
+        run: pip install -e ".[bambi]" -r docs/requirements-docs.txt
 
       # -W turns every warning into an error. --keep-going is deliberately
       # absent: it has been the default since Sphinx 8.1.
@@ -49,9 +68,42 @@ jobs:
         with:
           path: docs/_build/html
 
+  # Runs the code examples that are cheap and deterministic. Anything that
+  # samples is marked +SKIP in the pages themselves; proof that MCMC still
+  # works comes from the executed tutorials in `build`, not from here.
+  doctest:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package and documentation toolchain
+        run: pip install -e ".[bambi]" -r docs/requirements-docs.txt
+      - name: Run documentation doctests
+        run: sphinx-build -b doctest docs/source docs/_build/doctest
+
+  # Deliberately not a pull-request gate: a third-party site being down is not
+  # a reason to block a merge. Weekly, plus on demand.
+  linkcheck:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install package and documentation toolchain
+        run: pip install -e ".[bambi]" -r docs/requirements-docs.txt
+      - name: Check external links
+        run: sphinx-build -b linkcheck docs/source docs/_build/linkcheck
+
   deploy:
     needs: build
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
