@@ -1,0 +1,23 @@
+# Optional local hooks. This file does nothing until a contributor opts in:
+#
+#     pip install pre-commit
+#     pre-commit install
+#
+# Nobody else's workflow changes, and CI does not depend on it.
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-merge-conflict
+
+  - repo: https://github.com/kynan/nbstripout
+    rev: 0.9.1
+    hooks:
+      # No notebook exists yet. Installing the rule now means the very first
+      # .ipynb is committed without its outputs, rather than after someone
+      # notices a 40 MB diff.
+      - id: nbstripout
