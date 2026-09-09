@@ -5,6 +5,8 @@
 
 Design philosophy: **one function for all models**, like R's `caret::train()`.
 
+📖 **Documentation: <https://madsyair.github.io/hbsaemp/>**
+
 ## Quick start
 
 ```python

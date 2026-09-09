@@ -22,6 +22,7 @@ extensions = [
     "myst_nb",  # loads myst_parser as well; never list both
     "sphinx.ext.autodoc",
     "sphinx.ext.autosummary",
+    "sphinx.ext.doctest",
     "sphinx.ext.napoleon",
     "sphinx.ext.intersphinx",
     "sphinx.ext.viewcode",
@@ -31,8 +32,9 @@ extensions = [
 ]
 
 # Narrative pages are Markdown; only the API reference files are reStructuredText,
-# because `autosummary` is an rST directive.
-source_suffix = {".rst": "restructuredtext", ".md": "myst-nb"}
+# because `autosummary` is an rST directive. Tutorials are notebooks, executed on
+# CI only (see below).
+source_suffix = {".rst": "restructuredtext", ".md": "myst-nb", ".ipynb": "myst-nb"}
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "**.ipynb_checkpoints"]
 
@@ -47,11 +49,14 @@ myst_enable_extensions = [
 myst_heading_anchors = 3  # direct links to sub-headings
 
 # -- Notebook execution ---------------------------------------------------
-# Nothing is executed in v0.1. `on_ci` and the error settings are written now
-# so that turning execution on in v0.2 is a one-line change:
-#     nb_execution_mode = "force" if on_ci else "off"
+# Executed on CI, never on a local build: a local `make html` stays fast, while
+# every push proves the tutorials still run against the current package.
+#
+# "force", not "cache", on purpose. A cache makes CI quick but hides code that
+# has already broken, which is exactly what this check exists to catch.
+# Set CI=1 locally to reproduce what CI does.
 on_ci = bool(os.environ.get("CI", ""))
-nb_execution_mode = "off"
+nb_execution_mode = "force" if on_ci else "off"
 nb_execution_allow_errors = False
 nb_execution_raise_on_error = True
 nb_execution_timeout = 900
@@ -67,6 +72,17 @@ autodoc_default_options = {
 autodoc_typehints = "description"
 napoleon_google_docstring = True
 napoleon_numpy_docstring = False
+
+# -- Doctest --------------------------------------------------------------
+# Only blocks that explicitly ask to be tested (`.. testcode::`, `.. doctest::`)
+# are run. Plain `>>>` blocks are left alone.
+#
+# Without this, `-b doctest` also collects the `Examples:` sections of the
+# package's own docstrings, which are illustrative fragments: they use
+# `create_model`, `ModelConfig` and `df` without importing or defining them, so
+# they can only ever fail. Making them runnable is a change to the package, not
+# to the documentation, and is tracked separately.
+doctest_test_doctest_blocks = ""
 
 # Every source module is underscore-private (_base.py, _factory.py, ...).
 # Without this, signatures render as `hbsaemp.models._base.BaseModel` instead

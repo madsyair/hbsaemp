@@ -2,15 +2,29 @@
 __pycache__/
 *.py[cod]
 
-# Caches present
+# Tool caches — every one of these tools is declared in pyproject.toml
 .pytest_cache/
 .ruff_cache/
+.mypy_cache/
+
+# Coverage output (pytest-cov + [tool.coverage.*])
+.coverage
+.coverage.*
+htmlcov/
 
 # Editor
 .vscode/
 
 # Packaging
 *.egg-info/
+# Anchored to the repository root so a directory named build/ or dist/ inside
+# the package is not hidden by accident.
+/build/
+/dist/
+
+# Virtual environments
+.venv/
+.venv-*/
 
 # Project artefacts / logs
 outputs/
