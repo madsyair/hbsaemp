@@ -53,7 +53,8 @@ Which call raises what
      - ``create_model()``, ``get_family_spec()``
    * - :class:`ModelNotFittedError`
      - A result is requested before sampling has happened
-     - ``predict()``, ``summary()``, ``estimate_areas()``
+     - ``predict()``, ``estimate_areas()``, ``check_convergence()``,
+       ``compare_models()``, ``update_model()``
    * - :class:`EstimationError`
      - Per-area estimation fails for a reason that is not one of the above
      - ``estimate_areas()``
@@ -68,6 +69,12 @@ validation and resurface later as an obscure backend error. Pre-compute it as a
 DataFrame column instead. And :class:`ModelNotFittedError` is deliberately
 *not* wrapped by :class:`EstimationError`, so "called in the wrong order" stays
 distinguishable from "this model and data cannot be estimated".
+
+.. note::
+
+   ``summary()`` is the exception to the rule above: calling it before ``fit()``
+   returns a short "not fitted" description instead of raising, so it is always
+   safe to print a model to see what it will do.
 
 Not raised in this version
 --------------------------
