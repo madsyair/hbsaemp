@@ -1,0 +1,27 @@
+/* Stub marker.
+ *
+ * Every page whose content is still owed carries an admonition with
+ * `:class: stub`. Styling it distinctly makes unwritten pages obvious at a
+ * glance, and makes them countable from the built HTML:
+ *
+ *     grep -rl --include='*.html' 'stub admonition' docs/_build/html | wc -l
+ *
+ * Two details that make or break that count: docutils emits the classes in
+ * the order "stub admonition", not the reverse; and the search must be
+ * restricted to *.html, or this stylesheet matches itself.
+ *
+ * Colours come from the theme's own variables so the marker stays legible in
+ * both light and dark mode instead of hard-coding one palette.
+ */
+.admonition.stub {
+  border-left-color: #a5552b;
+  opacity: 0.85;
+}
+
+.admonition.stub > .admonition-title {
+  background-color: rgba(165, 85, 43, 0.15);
+}
+
+.admonition.stub > .admonition-title::after {
+  color: #a5552b;
+}

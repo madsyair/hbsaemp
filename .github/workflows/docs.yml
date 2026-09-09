@@ -1,0 +1,61 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two Pages deployments run at once, and never cancel one midway:
+# a cancelled deploy can leave the live site in a half-updated state.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # 3.12 is the package's declared floor (`requires-python = ">=3.12"`).
+      # Building on the floor proves the floor is honest; newer versions then
+      # follow for free.
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # `pip install -e .` pulls only numpy + pandas, which is all autodoc
+      # needs: no module imported at package import time requires bambi,
+      # arviz, matplotlib or panel.
+      - name: Install package and documentation toolchain
+        run: pip install -e . -r docs/requirements-docs.txt
+
+      # -W turns every warning into an error. --keep-going is deliberately
+      # absent: it has been the default since Sphinx 8.1.
+      - name: Build documentation
+        run: sphinx-build -b html -W docs/source docs/_build/html
+
+      # `actions/configure-pages` is deliberately not used. It only supplies a
+      # base path for generators that need one, which Sphinx does not, and it
+      # fails until Pages has been switched on in Settings. Leaving it out
+      # keeps this job green on pull requests from the very first run.
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs/_build/html
+
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -12,10 +12,19 @@ __pycache__/
 # Packaging
 *.egg-info/
 
-# Project artefacts / docs / logs
+# Project artefacts / logs
 outputs/
-docs/
 *.log
+
+# docs/: internal working notes stay private; the Sphinx site is tracked.
+docs/*
+!docs/source/
+!docs/requirements-docs.txt
+!docs/Makefile
+!docs/make.bat
+docs/_build/
+docs/source/python/reference/generated/
+**/.ipynb_checkpoints/
 
 # Claude Code
 .claude/

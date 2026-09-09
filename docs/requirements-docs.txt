@@ -1,0 +1,16 @@
+# Documentation toolchain. Pinned exactly so a CI build and a local build
+# produce the same site. Resolved and verified together on 2026-09-09.
+#
+# Install alongside the package itself, which autodoc imports for real:
+#     pip install -e .
+#     pip install -r docs/requirements-docs.txt
+#
+# `pip install -e .` pulls only numpy + pandas; no module imported at package
+# import time needs bambi, arviz, matplotlib or panel, so the docs build does
+# not need the [bambi] or [gui] extras.
+
+sphinx==9.1.0
+myst-nb==1.4.0
+pydata-sphinx-theme==0.21.0
+sphinx-design==0.7.0
+sphinx-copybutton==0.5.2
