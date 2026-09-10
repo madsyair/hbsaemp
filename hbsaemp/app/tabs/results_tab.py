@@ -1,4 +1,8 @@
 """Tab 4 — Results: diagnostics, SAE estimates, and export.
+Mapping from R hbsaems
+-----------------------
+.. code-block:: text
+
     R Shiny output                          Panel v1 equivalent
     ─────────────────────────────────────── ──────────────────────────────────
     verbatimTextOutput("diag_numerical")    pn.widgets.Tabulator (rhat_ess)
@@ -79,6 +83,12 @@ def _info_box(body: str) -> str:
 
 
 def _describe_error(exc: Exception) -> tuple[str, str]:
+    """Map a backend exception to a (title, body) pair for the UI.
+
+    Mirrors :func:`hbsaemp.app.tabs.model_tab._describe_error` — kept as a
+    small local copy rather than a shared cross-tab helper module (see
+    ``app/`` package layout).
+    """
     if isinstance(exc, ModelNotFittedError):
         return "Model has not been fitted", "Please fit the model in the Modeling tab first."
     if isinstance(exc, DataValidationError):
@@ -241,12 +251,13 @@ class ResultsTab(param.Parameterized):
         self._sae_table.value = result.result_table
         self._sae_download_btn.disabled = False
         self._sae_status.object = _success_box(
-            f"SAE estimation complete — mean RSE: <b>{result.mean_rse:.2f}%</b>, "
-            f"mean MSE: <b>{result.mean_mse:.4f}</b>."
+            f"SAE estimation complete. Mean RSE: <b>{result.mean_rse:.2f}%</b>, "
+            f"Mean MSE: <b>{result.mean_mse:.4f}</b>."
         )
 
     @staticmethod
     def _sae_blocking(model: Any) -> AreaEstimatesResult:
+        """Synchronous, Panel-free — runs in the executor thread."""
         return estimate_areas(model, ci_prob=0.95)
 
     def _sae_csv_callback(self) -> io.StringIO:
@@ -259,7 +270,9 @@ class ResultsTab(param.Parameterized):
         convergenceevaluation_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "MCMC convergence evaluation via R-hat, Effective Sample Size (ESS), trace, autocorrelation, and density plots.",
+                    "MCMC convergence evaluation: R-hat, "
+                    "Effective Sample Size (ESS), trace, autocorrelation, and density "
+                    "plots.",
                     margin=(4, 0, 8, 0),
                 ),
                 self._conv_run_btn,
@@ -270,11 +283,10 @@ class ResultsTab(param.Parameterized):
                         "R-hat and ESS",
                         pn.Column(
                             pn.pane.Markdown(
-                                "The **R-hat (Gelman-Rubin)** diagnostic is used to assess the convergence of MCMC chains " \
-                                "by comparing the variability within each chain with the variability across chains. " \
-                                "An **R-hat** value greater than `1` may indicate that the chains have not mixed adequately "
-                                "and that parameter estimates vary between chains. In general, values below `1.05` are considered " \
-                                "indicative of satisfactory convergence.",
+                                "The **R-hat (Gelman-Rubin)** diagnostic is used to assess the convergence of MCMC chains by " \
+                                "comparing the variability within each chain with the variability across chains. An **R-hat** value " \
+                                "greater than `1` may indicate that the chains have not mixed adequately and that parameter estimates " \
+                                "vary between chains. In general, values below `1.05` are considered indicative of satisfactory convergence.",
                                 margin=(4, 0, 8, 0),
                             ),
                             self._rhat_ess_table,

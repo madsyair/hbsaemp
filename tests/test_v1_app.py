@@ -11,15 +11,15 @@ import hbsaemp as hb
 pn = pytest.importorskip("panel")
 pytestmark = pytest.mark.gui
 
-from hbsaemp.app._app import App, AppState  
-from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab, UpdateModelTab  
-from hbsaemp.app.tabs.model_tab import _HBM_DISPATCH  
+from hbsaemp.app._app import App, AppState  # noqa: E402
+from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab, UpdateModelTab  # noqa: E402
+from hbsaemp.app.tabs.model_tab import _HBM_DISPATCH  # noqa: E402
 
 APP_DIR = Path(__file__).resolve().parent.parent / "hbsaemp" / "app"
 
 
 # ---------------------------------------------------------------------------
-# AppConfig (moved from test_v0.py — lazily requires hbsaemp.app)
+# AppConfig 
 # ---------------------------------------------------------------------------
 
 def test_app_config_defaults():
@@ -110,7 +110,7 @@ def test_model_tab_uses_tier3_dispatch():
 
 
 # ---------------------------------------------------------------------------
-# Family/link/extra-param registry consistency 
+# Family/link/extra-param registry consistency (guards against drift)
 # ---------------------------------------------------------------------------
 
 def test_dispatch_covers_every_family():
@@ -232,8 +232,6 @@ def test_update_tab_reacts_to_first_fit(data_gaussian: pd.DataFrame):
 
 @pytest.mark.slow
 def test_update_tab_refits_in_place(data_gaussian: pd.DataFrame):
-    """update_model() mutates the same object — state.model identity must
-    not change, only its config/result/data."""
     import asyncio
 
     state = AppState()
@@ -260,7 +258,7 @@ def test_update_tab_refits_in_place(data_gaussian: pd.DataFrame):
     asyncio.run(ut._on_update(None))
 
     assert "refit complete" in ut._update_status.object.lower()
-    assert state.model is model_before  # same object, mutated in place
+    assert state.model is model_before  
     assert state.model.config.target_accept == 0.95
     assert state.model.config.target_accept != original_target_accept
 
