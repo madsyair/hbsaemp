@@ -600,7 +600,7 @@ class ModelTab(param.Parameterized):
     def panel(self) -> pn.Tabs:
         """Return the Panel layout for this tab."""
         overview = pn.pane.Markdown("""
-                                    **This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.**
+                                    This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.
                                     - **Response Variable:** The outcome variable being modeled.
                                     - **Auxiliary Variables:** Explanatory (independent) variables.
                                     - **Area / Group Variable:** Grouping variable for the random intercept `(1|area)`.
@@ -637,8 +637,7 @@ class ModelTab(param.Parameterized):
         prior_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "A prior predictive check assesses the plausibility of the prior "
-                    "*before* fitting the model",
+                    "A prior predictive check assesses the plausibility of the prior before fitting the model",
                     margin=(4, 0, 8, 0),
                 ),
                 pn.Row(self._prior_run_btn, self._prior_n_draws),
