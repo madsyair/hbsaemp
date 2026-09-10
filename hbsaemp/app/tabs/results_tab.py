@@ -279,8 +279,8 @@ class ResultsTab(param.Parameterized):
         self._sae_table.value = result.result_table
         self._sae_download_btn.disabled = False
         self._sae_status.object = _success_box(
-            f"SAE estimation complete — mean RSE: <b>{result.mean_rse:.2f}%</b>, "
-            f"mean MSE: <b>{result.mean_mse:.4f}</b>."
+            f"SAE estimation complete. Mean RSE: <b>{result.mean_rse:.2f}%</b>, "
+            f"Mean MSE: <b>{result.mean_mse:.4f}</b>."
         )
 
     @staticmethod
