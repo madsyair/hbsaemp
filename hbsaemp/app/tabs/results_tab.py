@@ -103,6 +103,16 @@ def _describe_error(exc: Exception) -> tuple[str, str]:
 
 
 def _matplotlib_pane(fig: Any, *, max_width: int = 850) -> pn.pane.Matplotlib:
+    """A ``Matplotlib`` pane sized to *fig*'s own aspect ratio.
+
+    ``sizing_mode="stretch_width"`` alone leaves height to Panel's default,
+    which does not track a wide/short figure's actual proportions — every
+    plot from ``check_convergence()`` is ~4x wider than tall, so that left
+    a large empty gap below each rendered plot (and a correspondingly
+    longer scroll to reach the next one). Deriving both `width` and
+    `height` directly from ``fig.get_size_inches()`` guarantees the pane's
+    box matches the image exactly, with no leftover space.
+    """
     fig_w, fig_h = fig.get_size_inches()
     width = min(max_width, int(fig_w * 100))
     height = int(width * (fig_h / fig_w))
@@ -132,6 +142,15 @@ class ResultsTab(param.Parameterized):
             pd.DataFrame(), show_index=False, pagination="remote", page_size=15,
         )
         self._plots_pane     = pn.Column()
+        self._last_plots: dict[str, Any] = {}
+        self._plots_download_btn = pn.widgets.FileDownload(
+            label="Download Plots (PDF)",
+            filename="convergence_plots.pdf",
+            callback=self._plots_pdf_callback,
+            button_type="success",
+            max_width=280,
+            disabled=True,
+        )
         self._conv_run_btn.on_click(self._on_load_convergence)
 
         self._sae_run_btn      = pn.widgets.Button(
@@ -183,6 +202,12 @@ class ResultsTab(param.Parameterized):
     def _convergence_blocking(
         model: Any,
     ) -> tuple[ConvergenceResult, list[str]]:
+        """Synchronous, Panel-free — runs in the executor thread.
+
+        ``ConvergenceWarning`` is a real warning from ``check_convergence()``
+        (R-hat/ESS out of threshold) and must reach the UI, not be silently
+        dropped — caught here (task #22) and returned alongside the result.
+        """
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always", ConvergenceWarning)
             result = check_convergence(model)
@@ -194,6 +219,9 @@ class ResultsTab(param.Parameterized):
             self._rhat_ess_table.value = result.rhat_ess.reset_index().rename(
                 columns={"index": "Parameter"}
             )
+
+        self._last_plots = dict(result.plots)
+        self._plots_download_btn.disabled = not self._last_plots
 
         sections: list[tuple[str, Any]] = []
         for ptype in _PLOT_ORDER:
@@ -219,7 +247,7 @@ class ResultsTab(param.Parameterized):
             )
         else:
             self._conv_status.object = _success_box(
-                "Diagnostics computed — no convergence warnings raised."
+                "Diagnostics computed. No convergence warnings raised."
             )
 
     async def _on_run_sae_estimation(self, event: Any) -> None:
@@ -251,13 +279,12 @@ class ResultsTab(param.Parameterized):
         self._sae_table.value = result.result_table
         self._sae_download_btn.disabled = False
         self._sae_status.object = _success_box(
-            f"SAE estimation complete. Mean RSE: <b>{result.mean_rse:.2f}%</b>, "
-            f"Mean MSE: <b>{result.mean_mse:.4f}</b>."
+            f"SAE estimation complete — mean RSE: <b>{result.mean_rse:.2f}%</b>, "
+            f"mean MSE: <b>{result.mean_mse:.4f}</b>."
         )
 
     @staticmethod
     def _sae_blocking(model: Any) -> AreaEstimatesResult:
-        """Synchronous, Panel-free — runs in the executor thread."""
         return estimate_areas(model, ci_prob=0.95)
 
     def _sae_csv_callback(self) -> io.StringIO:
@@ -266,15 +293,21 @@ class ResultsTab(param.Parameterized):
         buf.seek(0)
         return buf
 
+    def _plots_pdf_callback(self) -> io.BytesIO:
+        from matplotlib.backends.backend_pdf import PdfPages
+
+        buf = io.BytesIO()
+        with PdfPages(buf) as pdf:
+            for ptype in _PLOT_ORDER:
+                fig = self._last_plots.get(ptype)
+                if fig is not None:
+                    pdf.savefig(fig)
+        buf.seek(0)
+        return buf
+
     def panel(self) -> pn.Tabs:
         convergenceevaluation_card = pn.Card(
             pn.Column(
-                pn.pane.Markdown(
-                    "MCMC convergence evaluation: R-hat, "
-                    "Effective Sample Size (ESS), trace, autocorrelation, and density "
-                    "plots.",
-                    margin=(4, 0, 8, 0),
-                ),
                 self._conv_run_btn,
                 self._conv_status,
                 pn.layout.Divider(),
@@ -296,6 +329,7 @@ class ResultsTab(param.Parameterized):
                     active=[], sizing_mode="stretch_width", margin=(8, 0),
                 ),
                 self._plots_pane,
+                pn.Row(self._plots_download_btn),
             ),
             title="MCMC Convergence Evaluation",
             margin=10,
