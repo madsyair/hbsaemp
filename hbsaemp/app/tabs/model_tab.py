@@ -170,8 +170,6 @@ def _describe_error(exc: Exception) -> tuple[str, str]:
 
 
 class PredictorCheckboxes(param.Parameterized):
-    """A dynamic set of checkboxes used to multi-select predictor columns."""
-
     value   = param.List(default=[])
     options = param.List(default=[])
 
@@ -674,7 +672,7 @@ class ModelTab(param.Parameterized):
             pn.Column(
                 pn.pane.Markdown(
                     "The Posterior Predictive Check compares data replicated by the "
-                    "fitted model with the observed data`. "
+                    "fitted model with the observed data. "
                     "**Available after the model has been fitted.**",
                     margin=(4, 0, 8, 0),
                 ),

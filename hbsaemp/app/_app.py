@@ -1,35 +1,4 @@
 """Main application class for the hbsaemp web dashboard.
-
-:class:`App` assembles the four tabs into a single Panel dashboard and
-manages the shared, reactive application state.
-
-Architecture
-------------
-.. code-block:: text
-
-    App (Panel dashboard orchestrator)
-    ├── AppState (param.Parameterized)  — shared reactive state
-    │     data, model
-    ├── DataTab    — tab 1: upload + preview            (writes: data)
-    ├── ExploreTab — tab 2: EDA (histogram, boxplot,     (reads:  data)
-    │                 scatter, corr)
-    ├── ModelTab   — tab 3: public hbsaemp API + fit     (reads:  data
-    │                                                      writes: model)
-    └── ResultsTab — tab 4: check_convergence/           (reads:  model)
-                     estimate_areas
-
-``AppState`` is deliberately minimal (P1.6): ``model`` is the fitted (or
-unfitted) :class:`~hbsaemp.models._base.BaseModel` itself, so
-``model.result``, ``model.result.idata``, ``model.formula``, and
-``model.response_name`` are always available without duplicating them as
-separate state fields.
-
-Data flows one-way, left to right, through ``param.watch`` callbacks
-registered by each tab on ``AppState``: uploading data in ``DataTab``
-automatically refreshes the selectors/plots in ``ExploreTab`` and
-``ModelTab``; fitting a model in ``ModelTab`` writes ``state.model``, which
-``ResultsTab`` reads on demand.
-
 Mapping from R hbsaems
 -----------------------
 .. code-block:: text
@@ -50,7 +19,7 @@ import param
 
 from hbsaemp._logging import configure_logging, get_logger
 from hbsaemp.app._config import DEFAULT_APP_CONFIG, AppConfig
-from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab
+from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab, UpdateModelTab
 
 logger = get_logger(__name__)
 
@@ -58,8 +27,6 @@ pn.extension("tabulator", sizing_mode="stretch_width")
 
 __all__: list[str] = ["App", "AppState"]
 
-#: AppConfig.theme -> Panel Theme class. Unknown values fall back to the
-#: default (appearance-only, never worth crashing the whole app over).
 _THEME_MAP: dict[str, type] = {}
 
 
@@ -113,18 +80,15 @@ class App:
     def __init__(self, app_config: AppConfig | None = None) -> None:
         self._config: AppConfig = app_config or DEFAULT_APP_CONFIG
 
-        # AppConfig.log_level actually configures the package logger — not
-        # just validated-and-ignored.
         configure_logging(level=self._config.log_level)
 
-        # Shared reactive state — equivalent to Shiny's reactiveValues().
         self._state = AppState()
 
-        # Instantiate the tab controllers around the shared state.
         self._data_tab    = DataTab(state=self._state, app_config=self._config)
         self._explore_tab = ExploreTab(state=self._state)
         self._model_tab   = ModelTab(state=self._state)
         self._results_tab = ResultsTab(state=self._state)
+        self._update_tab  = UpdateModelTab(state=self._state)
 
         logger.debug(
             "App created: title=%r, port=%d", self._config.title, self._config.port
@@ -154,27 +118,25 @@ class App:
             ("Data Exploration", self._explore_tab.panel()),
             ("Modeling",         self._model_tab.panel()),
             ("Results",          self._results_tab.panel()),
+            ("Update Model",     self._update_tab.panel()),
             sizing_mode="stretch_width",
         )
         sidebar = [
             pn.Column(
                 pn.pane.Markdown(
-                    "**HBSAEMP** is a dashboard for Hierarchical Bayesian "
-                    "Small Area Estimation, built entirely on the public "
-                    "`hbsaemp` API."
+                    "The `launch_app()` function in the `hbsaemp` package provides an interactive dashboard "
+                    "for Hierarchical Bayesian Small Area Estimation (HBSAE) in Python. The application offers " \
+                    "a user-friendly graphical interface that allows users to upload data, specify models, and obtain " \
+                    "estimation results without requiring extensive Python programming."
                 ),
                 pn.layout.Divider(),
                 pn.pane.Markdown(
                     "**Workflow**\n"
-                    "1. **Data Upload** — upload a CSV or load a built-in "
-                    "dataset.\n"
-                    "2. **Data Exploration** — inspect summary stats, "
-                    "distributions, and correlations.\n"
-                    "3. **Modeling** — select variables, choose a family, "
-                    "run prior/posterior predictive checks, and fit the "
-                    "model.\n"
-                    "4. **Results** — review convergence diagnostics and "
-                    "download the SAE estimation results."
+                    "1. **Data Upload**: Upload a CSV file or load a built-in dataset.\n"
+                    "2. **Data Exploration**: View summary statistics, data distributions, and correlations.\n"
+                    "3. **Modeling**: Select variables, choose the model family, check priors and posterior predictions, and fit the model.\n"
+                    "4. **Results**: Review convergence diagnostics and download the SAE estimates.\n"
+                    "5. **Update Model**: Refit with different sampler settings or replacement data, without starting over."
                 ),
                 sizing_mode="stretch_width",
             )
@@ -193,12 +155,8 @@ class App:
         return self.view()
 
     def serve(self) -> None:
-        """Build and serve the dashboard in the browser.
-
-        Equivalent to R's ``shiny::runApp()`` / ``run_sae_app()``.
-        """
         pn.serve(
-            self.view(),
+            self.view,
             port=self._config.port,
             show=self._config.open_browser,
         )
