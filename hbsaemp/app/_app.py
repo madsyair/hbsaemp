@@ -130,7 +130,7 @@ class App:
                     "dataset.\n"
                     "2. **Data Exploration**: View summary stats, "
                     "distributions, and correlations.\n"
-                    "3. **Modeling**: Select variables, choose the model family, check priors and posterior predictions, and fit the model.\n"
+                    "3. **Modeling**: Select variables, choose the model family, check priors, fit the model, and check posterior predictions.\n"
                     "4. **Results**: Review convergence diagnostics and download the SAE estimates.\n"
                     "5. **Update Model**: Refit with different sampler "
                     "settings or replacement data, without starting over."
