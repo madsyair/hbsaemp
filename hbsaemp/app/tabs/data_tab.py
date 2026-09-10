@@ -168,7 +168,7 @@ class DataTab(param.Parameterized):
                                       **File format notes:**
                                       - `.csv`: comma (`,`) separator, period (`.`) decimal.
 
-                                      **Missing Values:** Rows with missing values in the columns used will be automatically removed before modeling in the Modeling tab).""")
+                                      **Missing Values:** Rows with missing values in the columns used will be automatically removed before modeling in the Modeling tab.""")
 
         return pn.Column(
             pn.Card(guidelines,                            title="Data Requirements & Format Guidelines", margin=10),
