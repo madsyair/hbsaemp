@@ -104,11 +104,7 @@ class App:
         return self._state
 
     def view(self) -> pn.template.FastListTemplate:
-        """Assemble and return the Panel dashboard object (not yet served).
-
-        Useful for embedding the app in a Jupyter notebook, or calling
-        ``.servable()`` on the result to serve it with ``panel serve``.
-
+        """Assemble and return the Panel dashboard object 
         Returns:
             A ``panel.template.FastListTemplate`` instance.
         """
@@ -123,23 +119,20 @@ class App:
         sidebar = [
             pn.Column(
                 pn.pane.Markdown(
-                    "**HBSAEMP** is a dashboard for Hierarchical Bayesian "
-                    "Small Area Estimation, built entirely on the public "
-                    "`hbsaemp` API."
+                    "The `launch_app()` function in the `hbsaemp` package provides an interactive dashboard for Hierarchical " \
+                    "Bayesian Small Area Estimation (HBSAE) in Python. The application offers a user-friendly graphical interface " \
+                    "that allows users to upload data, specify models, and obtain estimation results without requiring extensive Python programming."
                 ),
                 pn.layout.Divider(),
                 pn.pane.Markdown(
-                    "**Workflow**\n"
-                    "1. **Data Upload** — upload a CSV or load a built-in "
+                    "**WORKFLOW**\n"
+                    "1. **Data Upload**: Upload a CSV or load a built-in "
                     "dataset.\n"
-                    "2. **Data Exploration** — inspect summary stats, "
+                    "2. **Data Exploration**: View summary stats, "
                     "distributions, and correlations.\n"
-                    "3. **Modeling** — select variables, choose a family, "
-                    "run prior/posterior predictive checks, and fit the "
-                    "model.\n"
-                    "4. **Results** — review convergence diagnostics and "
-                    "download the SAE estimation results.\n"
-                    "5. **Update Model** — refit with different sampler "
+                    "3. **Modeling**: Select variables, choose the model family, check priors and posterior predictions, and fit the model.\n"
+                    "4. **Results**: Review convergence diagnostics and download the SAE estimates.\n"
+                    "5. **Update Model**: Refit with different sampler "
                     "settings or replacement data, without starting over."
                 ),
                 sizing_mode="stretch_width",
