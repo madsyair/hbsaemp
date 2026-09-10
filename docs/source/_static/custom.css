@@ -25,3 +25,32 @@
 .admonition.stub > .admonition-title::after {
   color: #a5552b;
 }
+
+/* Output blocks.
+ *
+ * A `{testoutput}` block renders as a plain grey box that looks exactly like a
+ * code block, so on a page that alternates code and output several times a
+ * reader cannot tell which is which. This labels them.
+ *
+ * The only hook available is `.highlight-none`: Sphinx does not put a
+ * distinguishing class on testoutput. That works because every code block on
+ * this site declares its language, so an unlabelled block is in practice
+ * always output. If you ever add a fenced block with no language, it will pick
+ * up this label — give it a language instead.
+ */
+.bd-article div[class="highlight-none notranslate"] {
+  position: relative;
+  border-left: 3px solid var(--pst-color-border, #c9c9c9);
+}
+
+.bd-article div[class="highlight-none notranslate"]::before {
+  content: "Output";
+  position: absolute;
+  top: 0;
+  right: 0.5rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--pst-color-text-muted, #6c6c6c);
+  pointer-events: none;
+}

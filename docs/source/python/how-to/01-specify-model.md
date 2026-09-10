@@ -65,18 +65,37 @@ y ~ x1 + log_x3 + (1|group)
 
 ## Check it worked
 
-Three properties answer "did it understand me?", and none of them sample:
+`create_model()` returns a model object; like any Python assignment it prints nothing by
+itself. Ask the model to describe itself, and you see the whole specification at once:
 
 ```{testcode}
-print(model.response_name)
-print(model.family)
-print(model.is_fitted)
+print(model.summary())
 ```
 
 ```{testoutput}
-y
-gaussian
-False
+GaussianModel [not fitted]
+  Formula : y ~ x1 + x2 + (1|group)
+  Family  : gaussian
+  n       : 30
+  Config  : draws=1000, chains=4
+```
+
+Read it as a checklist. The formula is the one that will be used, including anything
+added for you. `n` is the number of areas that survived — if it is smaller than your
+DataFrame, rows were dropped. `Config` is the sampler setting that will apply, so a
+default you meant to override is visible here rather than after a long run.
+
+Calling `summary()` before fitting is safe, and is the exception to the usual rule:
+everything else that reports a result raises until you have sampled.
+
+The same facts are available individually when you need them in code:
+
+```{testcode}
+print(model.response_name, model.family, model.is_fitted)
+```
+
+```{testoutput}
+y gaussian False
 ```
 
 Then run the data pipeline on its own. `check_data()` validates the frame and applies
