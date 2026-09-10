@@ -602,7 +602,7 @@ class ModelTab(param.Parameterized):
         overview = pn.pane.Markdown("""
                                     **This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.**
                                     - **Response Variable:** The outcome variable being modeled.
-                                    - **Auxiliary Variables:** Explanatory (independent) variables — fixed effects.
+                                    - **Auxiliary Variables:** Explanatory (independent) variables.
                                     - **Area / Group Variable:** Grouping variable for the random intercept `(1|area)`.
                                     - **HB Family and Link Function:** Loaded from the `hbsaemp` family registry.""")
 
