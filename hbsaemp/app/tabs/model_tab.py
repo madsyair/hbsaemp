@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import io
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -284,6 +285,20 @@ class ModelTab(param.Parameterized):
                   self._family_sel, self._link_sel, self._intercept_cb]:
             w.param.watch(self._update_preview, "value")
 
+        # --- Code export (save/preview equivalent hbsaemp CLI code) --------
+        self._code_view = pn.widgets.CodeEditor(
+            value="", language="python", theme="monokai", readonly=True,
+            height=320, sizing_mode="stretch_width",
+        )
+        self._code_download_btn = pn.widgets.FileDownload(
+            callback=self._get_code_bytes,
+            filename="hbsaemp_model.py",
+            label="Save Code (.py)",
+            button_type="success",
+            disabled=True,
+            max_width=220,
+        )
+
         # --- Build Model -----------------------------------------------------
         self._build_btn = pn.widgets.Button(name="Build Model", button_type="primary", max_width=220)
         self._build_status = pn.pane.HTML("")
@@ -351,11 +366,9 @@ class ModelTab(param.Parameterized):
         self._update_preview()
 
     def _family_param_names(self, family: str) -> list[str]:
-        """User-facing kwarg names for *family*, minus `link` (own widget)."""
         return [uk for uk in get_family_spec(family).user_params.values() if uk != "link"]
 
     def _param_traits(self, family: str, user_kw: str) -> tuple[type, bool]:
-        """(annotation, required?) for `user_kw` on the family's `hbm_<family>`."""
         fn = _HBM_DISPATCH[family]
         p = inspect.signature(fn).parameters[user_kw]
         try:
@@ -408,17 +421,18 @@ class ModelTab(param.Parameterized):
             progressbar=False,
         )
 
-    def _build_model(self) -> BaseModel:
-        """Assemble an unfitted `BaseModel` from the current widget state.
+    def _collect_build_kwargs(self) -> dict[str, Any]:
+        """Every keyword `_build_model()` passes to `_HBM_DISPATCH[family]`,
+        except `data` (kept separate since it's a DataFrame, not something
+        `to_code()` can render as a literal).
 
-        The single tier-3 entry point for this tab (task #5) — never
-        `hbm()`/`hbm_flex()`/`create_model()` directly.
+        This is the **single source of truth** shared by `_build_model()`
+        and `to_code()`: change what gets built here and both the live GUI model and the exported code
+        snippet update together — there is no second place to keep in sync.
         """
-        family = self._family_sel.value
-        return _HBM_DISPATCH[family](
+        return dict(
             response=self._response_sel.value,
             auxiliary=list(self._predictors_sel.value or []),
-            data=self.state.data,
             area_var=self._group_sel.value or None,
             intercept=self._intercept_cb.value,
             link=self._link_sel.value,
@@ -427,19 +441,78 @@ class ModelTab(param.Parameterized):
             **self._collect_family_kwargs(),
         )
 
+    def _build_model(self) -> BaseModel:
+        """Assemble an unfitted `BaseModel` from the current widget state.
+        """
+        family = self._family_sel.value
+        return _HBM_DISPATCH[family](data=self.state.data, **self._collect_build_kwargs())
+
+    def to_code(self, *, include_fit: bool = True) -> str:
+        """Render the current widget selection as a standalone Python script.
+
+        Built from :meth:`_collect_build_kwargs` — the exact kwargs
+        `_build_model()` uses — so the snippet always reproduces what
+        **Build Model** / **Fit Model** actually do. This is intentionally
+        *not* a hand-maintained second copy of the assembly logic: if it
+        were, the two could silently drift apart (GUI does one thing, the
+        saved code does another) without any test catching it.
+
+        Args:
+            include_fit: If ``True`` (default), also emit `model.fit()` and
+                an `estimate_areas()` call mirroring the Results tab. Set
+                ``False`` to get just the model-construction lines (used by
+                fast unit tests that don't want to run real MCMC).
+        """
+        family = self._family_sel.value
+        fn_name = _HBM_DISPATCH[family].__name__  
+        kwargs = self._collect_build_kwargs()
+        config = kwargs.pop("config")
+
+        imports = ["import pandas as pd", f"from hbsaemp import {fn_name}, ModelConfig"]
+        if include_fit:
+            imports[-1] += ", estimate_areas"
+
+        lines = [
+            *imports,
+            "",
+            "# Replace this with however you load your own data.",
+            'data = pd.read_csv("your_data.csv")',
+            "",
+            f"config = ModelConfig(draws={config.draws}, tune={config.tune}, "
+            f"chains={config.chains}, cores={config.cores}, "
+            f"target_accept={config.target_accept}, "
+            f"random_seed={config.random_seed!r})",
+            "",
+            f"model = {fn_name}(",
+            "    data=data,",
+            *(f"    {key}={value!r}," for key, value in kwargs.items()),
+            "    config=config,",
+            ")",
+        ]
+        if include_fit:
+            lines += [
+                "model.fit()",
+                "",
+                "result = estimate_areas(model, ci_prob=0.95)",
+                "print(result.estimates)",
+            ]
+        return "\n".join(lines)
+
     def _update_preview(self, *_: Any) -> None:
-        """Preview = `model.formula`. A failed build IS the validation message."""
+        """Preview = `model.formula`"""
         if self.state.data is None:
             self._model_draft = None
             self._formula_preview.object = _pending_box(
                 "upload or load a dataset in the Data Upload tab first."
             )
+            self._update_code_view()
             return
         if not self._response_sel.value or not self._predictors_sel.value:
             self._model_draft = None
             self._formula_preview.object = _pending_box(
                 "select a response and at least one predictor."
             )
+            self._update_code_view()
             return
         try:
             model = self._build_model()
@@ -447,9 +520,25 @@ class ModelTab(param.Parameterized):
             self._model_draft = None
             _, body = _describe_error(exc)
             self._formula_preview.object = _pending_box(body)
+            self._update_code_view()
             return
         self._model_draft = model
         self._formula_preview.object = _formula_box(model.formula)
+        self._update_code_view()
+
+    def _update_code_view(self) -> None:
+        """Keep the code editor / download button in lockstep with the
+        formula preview: no valid `_model_draft` -> nothing safe to export.
+        """
+        if self._model_draft is None:
+            self._code_view.value = ""
+            self._code_download_btn.disabled = True
+            return
+        self._code_view.value = self.to_code()
+        self._code_download_btn.disabled = False
+
+    def _get_code_bytes(self) -> io.BytesIO:
+        return io.BytesIO(self.to_code().encode("utf-8"))
 
     def _on_build(self, event: Any) -> None:
         self._update_preview()
@@ -598,7 +687,6 @@ class ModelTab(param.Parameterized):
         self._postpc_status.object = _success_box("Posterior predictive check complete.")
 
     def panel(self) -> pn.Tabs:
-        """Return the Panel layout for this tab."""
         overview = pn.pane.Markdown("""
                                     This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.
                                     - **Response Variable:** The outcome variable being modeled.
@@ -629,6 +717,13 @@ class ModelTab(param.Parameterized):
                 pn.layout.Divider(),
                 pn.Row(self._build_btn),
                 self._build_status,
+                pn.pane.Markdown(
+                    "**Note:** Save this code to reproduce the model using the "
+                    "`hbsaemp` Python API without the GUI.",
+                    margin=(8, 0, 4, 0),
+                ),
+                self._code_view,
+                pn.Row(self._code_download_btn),
             ),
             title="Model Building",
             margin=10,
@@ -698,7 +793,6 @@ class ModelTab(param.Parameterized):
         )
 
     def get_fitted_model(self) -> BaseModel | None:
-        """Return the fitted model, or ``None`` if not yet fitted."""
         model = getattr(self.state, "model", None)
         return model if (model is not None and model.is_fitted) else None
 

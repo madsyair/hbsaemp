@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -298,3 +299,110 @@ def test_end_to_end_fit_and_sae(data_gaussian: pd.DataFrame):
     conv, warnings_ = rt._convergence_blocking(state.model)
     assert conv.rhat_ess is not None
     assert isinstance(warnings_, list)
+
+
+# ---------------------------------------------------------------------------
+# Code export (`ModelTab.to_code()`) — GUI to CLI code correctness
+# ---------------------------------------------------------------------------
+
+def test_to_code_disabled_without_valid_model_draft(data_binomial: pd.DataFrame):
+    """No `_model_draft` (e.g. binomial missing its required `trials`
+    widget) -> nothing safe to export yet."""
+    state = AppState()
+    state.data = data_binomial
+    tab = ModelTab(state=state)
+    tab._family_sel.value = "binomial"
+    tab._response_sel.value = "y"
+    tab._predictors_sel.value = ["x1", "x2"]
+
+    assert tab._model_draft is None
+    assert tab._code_view.value == ""
+    assert tab._code_download_btn.disabled is True
+
+
+@pytest.mark.parametrize("family", hb.list_families())
+def test_to_code_reproduces_gui_model_draft(
+    family, data_gaussian, data_beta, data_binomial,
+):
+    """Exec the generated snippet and check it builds the *same* formula as
+    the model the GUI itself built (`_model_draft`) — the actual proof that
+    the exported code matches GUI behaviour, not just that it looks plausible.
+    """
+    data = {"gaussian": data_gaussian, "beta": data_beta, "binomial": data_binomial}[family]
+
+    state = AppState()
+    state.data = data
+    tab = ModelTab(state=state)
+    tab._family_sel.value = family
+    tab._response_sel.value = "y"
+    tab._predictors_sel.value = ["x1", "x2"]
+    tab._group_sel.value = "group"
+
+    if family == "binomial":
+        tab._extra_widgets["trials"].value = "n"
+        tab._update_preview()
+    elif family == "beta":
+        tab._extra_widgets["n"].value = "n"
+        tab._extra_widgets["deff"].value = "deff"
+        tab._update_preview()
+
+    assert tab._model_draft is not None, f"GUI could not build a {family} model draft"
+    assert tab._code_download_btn.disabled is False
+
+    code = tab.to_code(include_fit=False)
+    code = code.replace('data = pd.read_csv("your_data.csv")', "pass")
+
+    namespace: dict[str, Any] = {"data": data}
+    exec(code, namespace)  
+    model_from_code = namespace["model"]
+
+    assert model_from_code.formula == tab._model_draft.formula
+    assert model_from_code.is_fitted is False
+
+
+def test_to_code_matches_build_kwargs_single_source_of_truth(data_gaussian: pd.DataFrame):
+    """`to_code()` must read from `_collect_build_kwargs()` — the same dict
+    `_build_model()` uses — never a hand-duplicated copy of it. This guards
+    against the two silently drifting apart after a future edit.
+    """
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    tab._response_sel.value = "y"
+    tab._predictors_sel.value = ["x1", "x2"]
+    tab._family_sel.value = "gaussian"
+
+    for key, value in tab._collect_build_kwargs().items():
+        if key == "config":
+            continue
+        assert f"{key}={value!r}" in tab.to_code(), f"{key} missing/mismatched in generated code"
+
+
+def test_to_code_includes_estimate_areas_by_default(data_gaussian: pd.DataFrame):
+    """Default export mirrors the full GUI workflow: build -> fit -> estimate_areas."""
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    tab._response_sel.value = "y"
+    tab._predictors_sel.value = ["x1", "x2"]
+
+    code = tab.to_code()
+    assert "model.fit()" in code
+    assert "estimate_areas(model, ci_prob=0.95)" in code
+
+    code_no_fit = tab.to_code(include_fit=False)
+    assert "model.fit()" not in code_no_fit
+    assert "estimate_areas" not in code_no_fit
+
+
+def test_code_download_callback_returns_matching_bytes(data_gaussian: pd.DataFrame):
+    """`FileDownload`'s callback (what the user actually saves to disk) must
+    return the same content shown in the code viewer."""
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    tab._response_sel.value = "y"
+    tab._predictors_sel.value = ["x1", "x2"]
+
+    downloaded = tab._get_code_bytes().getvalue().decode("utf-8")
+    assert downloaded == tab._code_view.value == tab.to_code()
