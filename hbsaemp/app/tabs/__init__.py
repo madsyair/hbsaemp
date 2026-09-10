@@ -11,5 +11,6 @@ from hbsaemp.app.tabs.data_tab import DataTab
 from hbsaemp.app.tabs.explore_tab import ExploreTab
 from hbsaemp.app.tabs.model_tab import ModelTab
 from hbsaemp.app.tabs.results_tab import ResultsTab
+from hbsaemp.app.tabs.update_tab import UpdateModelTab
 
-__all__: list[str] = ["DataTab", "ExploreTab", "ModelTab", "ResultsTab"]
+__all__: list[str] = ["DataTab", "ExploreTab", "ModelTab", "ResultsTab", "UpdateModelTab"]

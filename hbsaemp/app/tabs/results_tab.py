@@ -1,8 +1,4 @@
 """Tab 4 — Results: diagnostics, SAE estimates, and export.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
     R Shiny output                          Panel v1 equivalent
     ─────────────────────────────────────── ──────────────────────────────────
     verbatimTextOutput("diag_numerical")    pn.widgets.Tabulator (rhat_ess)
@@ -83,12 +79,6 @@ def _info_box(body: str) -> str:
 
 
 def _describe_error(exc: Exception) -> tuple[str, str]:
-    """Map a backend exception to a (title, body) pair for the UI.
-
-    Mirrors :func:`hbsaemp.app.tabs.model_tab._describe_error` — kept as a
-    small local copy rather than a shared cross-tab helper module (see
-    ``app/`` package layout).
-    """
     if isinstance(exc, ModelNotFittedError):
         return "Model has not been fitted", "Please fit the model in the Modeling tab first."
     if isinstance(exc, DataValidationError):
@@ -100,6 +90,13 @@ def _describe_error(exc: Exception) -> tuple[str, str]:
     if isinstance(exc, HBSAEError):
         return "Backend error", str(exc)
     return "Unexpected error", str(exc)
+
+
+def _matplotlib_pane(fig: Any, *, max_width: int = 850) -> pn.pane.Matplotlib:
+    fig_w, fig_h = fig.get_size_inches()
+    width = min(max_width, int(fig_w * 100))
+    height = int(width * (fig_h / fig_w))
+    return pn.pane.Matplotlib(fig, width=width, height=height, tight=True)
 
 
 class ResultsTab(param.Parameterized):
@@ -176,12 +173,6 @@ class ResultsTab(param.Parameterized):
     def _convergence_blocking(
         model: Any,
     ) -> tuple[ConvergenceResult, list[str]]:
-        """Synchronous, Panel-free — runs in the executor thread.
-
-        ``ConvergenceWarning`` is a real warning from ``check_convergence()``
-        (R-hat/ESS out of threshold) and must reach the UI, not be silently
-        dropped — caught here (task #22) and returned alongside the result.
-        """
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always", ConvergenceWarning)
             result = check_convergence(model)
@@ -198,9 +189,7 @@ class ResultsTab(param.Parameterized):
         for ptype in _PLOT_ORDER:
             title = _PLOT_TITLES.get(ptype, ptype)
             if ptype in result.plots:
-                content = pn.pane.Matplotlib(
-                    result.plots[ptype], sizing_mode="stretch_width", tight=True, max_width=900,
-                )
+                content = _matplotlib_pane(result.plots[ptype])
             elif ptype in result.plot_errors:
                 content = pn.pane.HTML(
                     _error_box(f"Could not render the {title.lower()}", result.plot_errors[ptype])
@@ -258,7 +247,6 @@ class ResultsTab(param.Parameterized):
 
     @staticmethod
     def _sae_blocking(model: Any) -> AreaEstimatesResult:
-        """Synchronous, Panel-free — runs in the executor thread."""
         return estimate_areas(model, ci_prob=0.95)
 
     def _sae_csv_callback(self) -> io.StringIO:
@@ -268,13 +256,10 @@ class ResultsTab(param.Parameterized):
         return buf
 
     def panel(self) -> pn.Tabs:
-        """Return the Panel layout for this tab."""
         convergenceevaluation_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "MCMC convergence evaluation via `check_convergence()`: R-hat, "
-                    "Effective Sample Size (ESS), trace, autocorrelation, and density "
-                    "plots.",
+                    "MCMC convergence evaluation via R-hat, Effective Sample Size (ESS), trace, autocorrelation, and density plots.",
                     margin=(4, 0, 8, 0),
                 ),
                 self._conv_run_btn,
@@ -285,9 +270,11 @@ class ResultsTab(param.Parameterized):
                         "R-hat and ESS",
                         pn.Column(
                             pn.pane.Markdown(
-                                "R-hat close to 1 indicates the chains have converged. "
-                                "Values above 1.01, or an ESS below 400, trigger a "
-                                "`ConvergenceWarning` from the backend.",
+                                "The **R-hat (Gelman-Rubin)** diagnostic is used to assess the convergence of MCMC chains " \
+                                "by comparing the variability within each chain with the variability across chains. " \
+                                "An **R-hat** value greater than `1` may indicate that the chains have not mixed adequately "
+                                "and that parameter estimates vary between chains. In general, values below `1.05` are considered " \
+                                "indicative of satisfactory convergence.",
                                 margin=(4, 0, 8, 0),
                             ),
                             self._rhat_ess_table,
