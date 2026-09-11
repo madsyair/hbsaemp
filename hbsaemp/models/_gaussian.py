@@ -52,7 +52,7 @@ class GaussianModel(BaseModel):
             bmb_module,
             self._formula,
             param="sigma",
-            offset_col="log_sqrt_D" if self._sampling_var_col is not None else None,
+            offset_col=self._spec.offset_col if self._sampling_var_col is not None else None,
             mu_link=self._link,
         )
 

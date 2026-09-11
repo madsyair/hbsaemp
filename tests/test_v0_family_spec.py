@@ -189,3 +189,25 @@ def test_binomial_has_no_preprocess():
     # Binomial needs no offset transform — the spec stores None and the
     # preprocessor skips it (mirrors the response_check=None branch).
     assert FAMILY_SPECS["binomial"].preprocess is None
+
+
+# offset_col names the column preprocess adds (read by _prepare_mean_data)
+
+def test_offset_col_in_spec():
+    assert FAMILY_SPECS["gaussian"].offset_col == "log_sqrt_D"
+    assert FAMILY_SPECS["beta"].offset_col == "log_phi"
+    assert FAMILY_SPECS["binomial"].offset_col is None
+
+
+@pytest.mark.parametrize(
+    ("family", "df", "ctx"),
+    [
+        ("gaussian", pd.DataFrame({"y": [5.0], "D": [0.25]}), {"sampling_var_col": "D"}),
+        ("beta", pd.DataFrame({"y": [0.2], "n": [100.0], "deff": [2.0]}),
+         {"n_col": "n", "deff_col": "deff", "squeeze": False}),
+    ],
+)
+def test_preprocess_adds_exactly_offset_col(family, df, ctx):
+    """The spec's offset_col and the column preprocess writes must not drift."""
+    out = FAMILY_SPECS[family].preprocess(df.copy(), "y", ctx)
+    assert set(out.columns) - set(df.columns) == {FAMILY_SPECS[family].offset_col}

@@ -33,6 +33,11 @@ ResponseCheck = Callable[[pd.DataFrame, str, dict], None]
 #: (e.g. `log_phi`, `log_sqrt_D`). `ctx` carries the same pipeline kwargs.
 Preprocess = Callable[[pd.DataFrame, str, dict], pd.DataFrame]
 
+#: Offset columns written by the preprocess functions below and declared as
+#: `FamilySpec.offset_col` — one name each, so spec and transform cannot drift.
+_GAUSSIAN_OFFSET = "log_sqrt_D"
+_BETA_OFFSET = "log_phi"
+
 
 @dataclass(frozen=True)
 class FamilySpec:
@@ -62,6 +67,15 @@ class FamilySpec:
         addition_template: `str.format` template for the formula left-hand
             side when the family wraps the response (e.g. Binomial
             `"p({response}, {trials_col})"`), or `None` for a bare response.
+        offset_col: Column `preprocess` adds for the secondary distributional
+            parameter (`sigma`/`kappa`) when the survey-design columns are
+            given, or `None` when the family has no offset. The mean
+            parameter never depends on it.
+        offset_source_fields: Pipeline fields (`self._<name>`) naming the data
+            columns `offset_col` is derived from — the counterpart of the
+            hidden `.hbsaems_<par>_fixed` columns in hbsaems. `update_model()`
+            carries them over when replacement data lacks them. Empty when
+            the family has no offset.
     """
 
     bambi_family: str
@@ -75,6 +89,8 @@ class FamilySpec:
     response_check: ResponseCheck | None = None
     preprocess: Preprocess | None = None
     addition_template: str | None = None
+    offset_col: str | None = None
+    offset_source_fields: tuple[str, ...] = ()
 
 
 # Family behavior — module-level functions (cycle-free: only numpy/pandas/
@@ -100,10 +116,10 @@ def _preprocess_gaussian(df: pd.DataFrame, response: str, ctx: dict) -> pd.DataF
     sampling_var_col = ctx.get("sampling_var_col")
     if sampling_var_col is not None:
         D = df[sampling_var_col].to_numpy(dtype=float)
-        df["log_sqrt_D"] = 0.5 * np.log(D)
+        df[_GAUSSIAN_OFFSET] = 0.5 * np.log(D)
         logger.debug(
             "Gaussian FH: log_sqrt_D in [%.3f, %.3f].",
-            df["log_sqrt_D"].min(), df["log_sqrt_D"].max(),
+            df[_GAUSSIAN_OFFSET].min(), df[_GAUSSIAN_OFFSET].max(),
         )
     return df
 
@@ -180,10 +196,10 @@ def _preprocess_beta(df: pd.DataFrame, response: str, ctx: dict) -> pd.DataFrame
                 "Beta: Smithson-Verkuilen squeeze applied (squeeze=True)."
             )
 
-        df["log_phi"] = np.log(n_vals / deff_vals - 1)
+        df[_BETA_OFFSET] = np.log(n_vals / deff_vals - 1)
         logger.debug(
             "Beta: log_phi in [%.3f, %.3f].",
-            df["log_phi"].min(), df["log_phi"].max(),
+            df[_BETA_OFFSET].min(), df[_BETA_OFFSET].max(),
         )
     return df
 
@@ -235,6 +251,8 @@ FAMILY_SPECS: dict[str, FamilySpec] = {
         user_params={"sampling_var_col": "sampling_var", "link": "link"},
         response_check=_check_gaussian,
         preprocess=_preprocess_gaussian,
+        offset_col=_GAUSSIAN_OFFSET,
+        offset_source_fields=("sampling_var_col",),
     ),
     "beta": FamilySpec(
         bambi_family="beta",
@@ -251,6 +269,8 @@ FAMILY_SPECS: dict[str, FamilySpec] = {
         },
         response_check=_check_beta,
         preprocess=_preprocess_beta,
+        offset_col=_BETA_OFFSET,
+        offset_source_fields=("n_col", "deff_col"),
     ),
     "binomial": FamilySpec(
         bambi_family="binomial",

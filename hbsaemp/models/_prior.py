@@ -11,7 +11,7 @@ from typing import Any
 
 from hbsaemp._exceptions import PriorSpecError
 
-__all__: list[str] = ["Prior"]
+__all__: list[str] = ["Prior", "validate_priors"]
 
 
 @dataclass(frozen=True)
@@ -73,3 +73,19 @@ class Prior:
     def __repr__(self) -> str:
         params_str = ", ".join(f"{k}={v!r}" for k, v in self.params.items())
         return f"Prior({self.dist!r}, {params_str})"
+
+
+def validate_priors(priors: dict[str, Any] | None) -> None:
+    """Validate a prior mapping eagerly, before any `bambi` import.
+
+    `Prior` instances are validated at construction already; legacy dict
+    entries are checked through `Prior.from_dict`. `None` is accepted.
+
+    Raises:
+        PriorSpecError: If a dict entry is malformed.
+    """
+    if priors is None:
+        return
+    for name, spec in priors.items():
+        if not isinstance(spec, Prior):
+            Prior.from_dict(spec, param=name)

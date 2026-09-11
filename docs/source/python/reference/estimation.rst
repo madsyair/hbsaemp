@@ -2,7 +2,8 @@ Estimation
 ==========
 
 Per-area estimates from a fitted model, and refitting an existing model
-specification against new data or a new sampler configuration.
+specification against new data, a changed formula or priors, or a new sampler
+configuration.
 
 .. currentmodule:: hbsaemp
 
@@ -22,6 +23,7 @@ Refitting
    :toctree: generated/
 
    update_model
+   update_formula
 
 R aliases
 ---------

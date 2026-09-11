@@ -120,6 +120,19 @@ class TestIntegrationGaussian:
         result = hb.estimate_areas(model, new_data=new_data)
         assert len(result.result_table) == 5
 
+    def test_estimate_areas_new_areas(self, model, df):
+        """Non-sampled areas: unseen groups, no y and no D (dummy log_sqrt_D).
+
+        They carry the between-area spread, so they are less certain than
+        the sampled areas.
+        """
+        new_data = df.tail(5).drop(columns=["y", "D"]).reset_index(drop=True)
+        new_data["group"] = np.arange(9001, 9006)
+        result = hb.estimate_areas(model, new_data=new_data)
+        _check_area_result(result, 5)
+        in_sample_sd = hb.estimate_areas(model).result_table["sd"]
+        assert result.result_table["sd"].mean() > in_sample_sd.median()
+
 
 # ===========================================================================
 # Beta logit-normal integration
@@ -229,6 +242,15 @@ class TestIntegrationBinomial:
         means = result.result_table["mean"]
         assert (means > 0).all() and (means < 1).all(), \
             f"Binomial p estimates must be in (0, 1): {means.describe()}"
+
+    def test_estimate_areas_new_areas(self, model, df):
+        """Non-sampled areas need neither successes nor trials to estimate p."""
+        new_data = df.tail(5).drop(columns=["y", "n"]).reset_index(drop=True)
+        new_data["group"] = np.arange(9001, 9006)
+        result = hb.estimate_areas(model, new_data=new_data)
+        _check_area_result(result, 5)
+        means = result.result_table["mean"]
+        assert ((means > 0) & (means < 1)).all()
 
     def test_check_convergence(self, model):
         result = hb.check_convergence(model, plot_types=[])

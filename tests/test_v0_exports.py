@@ -10,7 +10,7 @@ import pytest
 
 import hbsaemp as hb
 
-_FRONT_DOOR = ("Prior", "FamilySpec", "list_families", "get_family_spec")
+_FRONT_DOOR = ("Prior", "FamilySpec", "list_families", "get_family_spec", "update_formula")
 
 
 @pytest.mark.parametrize("name", _FRONT_DOOR)

@@ -89,6 +89,7 @@ from hbsaemp.models._shortcuts import (
     hbm_binomial as hbm_binomial,
     hbm_gaussian as hbm_gaussian,
 )
+from hbsaemp.utils._formula import update_formula as update_formula
 
 # GUI (frontend) — imported lazily.
 #
@@ -155,6 +156,7 @@ __all__: list[str] = [
     # Estimation (Python names + R aliases)
     "AreaEstimatesResult", "estimate_areas", "hbsae",
     "update_model", "update_hbm",
+    "update_formula",        # R update.formula-style template for update_model(formula=...)
     # GUI
     "launch_app", "App", "AppConfig", "DEFAULT_APP_CONFIG",
 ]

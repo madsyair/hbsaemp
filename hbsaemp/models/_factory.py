@@ -205,11 +205,9 @@ def create_model(
     # Validate prior dicts early — before fit() so errors surface immediately.
     # Prior objects are already validated at construction; only raw dicts need
     # checking here.  Import is inline to keep bambi as a lazy dependency.
-    if priors is not None:
-        from hbsaemp.models._prior import Prior
-        for pname, pspec in priors.items():
-            if not isinstance(pspec, Prior):
-                Prior.from_dict(pspec, param=pname)  # raises PriorSpecError if malformed
+    from hbsaemp.models._prior import validate_priors
+
+    validate_priors(priors)  # raises PriorSpecError if malformed
 
     # Auto-inject a random intercept for `group`, but only when the formula has
     # no random effect for it already (structural check via parse_formula — an

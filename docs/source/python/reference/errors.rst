@@ -40,13 +40,15 @@ Which call raises what
    * - :class:`DataValidationError`
      - A column is missing, non-numeric, infinite, or outside the domain the
        family allows; or dropping missing rows would empty the frame
-     - ``create_model()``, ``check_data()``, ``fit()``
+     - ``create_model()``, ``check_data()``, ``fit()``,
+       ``predict(new_data=...)``, ``estimate_areas(new_data=...)``,
+       ``update_model(new_data=...)``
    * - :class:`FormulaError`
      - The formula string cannot be parsed, or a term is not a bare column name
-     - ``create_model()``, ``hbm_flex()``
+     - ``create_model()``, ``hbm_flex()``, ``update_model(formula=...)``
    * - :class:`PriorSpecError`
      - A prior specification is malformed
-     - ``Prior(...)``, ``priors=`` in ``create_model()``
+     - ``Prior(...)``, ``priors=`` in ``create_model()`` and ``update_model()``
    * - :class:`ModelRegistryError`
      - ``family=`` names something that is not registered, including a family
        planned for a later version

@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 import pandas as pd
 
-from hbsaemp._exceptions import ModelNotFittedError
+from hbsaemp._exceptions import DataValidationError, ModelNotFittedError
 from hbsaemp._logging import get_logger
 from hbsaemp._types import FamilyLiteral, FormulaStr, PriorDict
 from hbsaemp.models._family_spec import FAMILY_SPECS, FamilySpec
@@ -429,6 +429,55 @@ class BaseModel(abc.ABC):
             **self._extra_pipeline_kwargs(),
         )
 
+    def _prepare_mean_data(self, new_data: pd.DataFrame) -> pd.DataFrame:
+        """Prepare out-of-sample rows for mean-parameter prediction only.
+
+        The mean parameter (`mu`/`p`) depends on the predictors and the group
+        column alone, so only those columns are required and only their
+        missing values drop a row. The response and survey-design columns
+        (`sampling_var`, `n`/`deff`, `trials`) may be absent or NaN, as they
+        are for a non-sampled area. Validation is skipped.
+
+        Raises:
+            ModelNotFittedError: If `fit()` has not been called.
+            DataValidationError: If a predictor or group column is missing,
+                or no row is complete in those columns.
+        """
+        from hbsaemp.utils._formula import parse_formula
+
+        result = self.result  # raises ModelNotFittedError if not fitted
+        group_col: str | None = result.extra.get("group")
+        required: list[str] = [
+            *parse_formula(self._formula)["fixed"],
+            *([group_col] if group_col is not None else []),
+        ]
+
+        missing = [c for c in required if c not in new_data.columns]
+        if missing:
+            raise DataValidationError(
+                f"new_data is missing column(s) {missing} required to predict "
+                f"{self._mean_param_key!r}.",
+                column=missing[0],
+                context={"missing_columns": missing},
+            )
+
+        df = new_data.dropna(subset=required).reset_index(drop=True)
+        if df.empty:
+            raise DataValidationError(
+                f"All {len(new_data)} new_data row(s) have missing values in "
+                f"the columns required to predict {self._mean_param_key!r}: "
+                f"{required}.",
+                context={"required_columns": required, "n_original": len(new_data)},
+            )
+
+        offset_col = self._spec.offset_col
+        if offset_col is not None and offset_col in result.data.columns:
+            # The fitted formula evaluates the offset for sigma/kappa, so the
+            # column must exist; mu never reads it, so any finite value gives
+            # the same mean draws.
+            df[offset_col] = 0.0
+        return df
+
     # predict() kind normalisation
 
     # Map of deprecated kind aliases → canonical Bambi 0.18+ kind.
@@ -740,7 +789,11 @@ class BaseModel(abc.ABC):
         return self._result
 
     def _predict_idata(
-        self, new_data: pd.DataFrame | None = None, *, kind: str
+        self,
+        new_data: pd.DataFrame | None = None,
+        *,
+        kind: str,
+        sample_new_groups: bool = False,
     ) -> Any:
         """Return a fresh `InferenceData` with the predicted group populated.
 
@@ -755,6 +808,12 @@ class BaseModel(abc.ABC):
         `predict()` normalises before calling. The public `predictive_idata()`
         wraps this for the `"response"` case so `compare_models()` and advanced
         users get mutation-free PPC without reaching into a private method.
+
+        Out-of-sample `"response_params"` rows go through `_prepare_mean_data`
+        (predictors + group only); `"response"` keeps the full training-time
+        preprocessing, since posterior-predictive draws need the trials,
+        sampling variance or precision. `sample_new_groups` admits unseen
+        group labels; their draws are seeded by `config.random_seed`.
         """
         result = self.result  # raises ModelNotFittedError if not fitted
         bmodel = result.backend_model
@@ -763,25 +822,40 @@ class BaseModel(abc.ABC):
         # Bambi 0.18+ raises a TypeError ("'str' cannot be interpreted as an
         # integer") on distributional models with offset() when data=None,
         # because the offset column lookup expects an explicit DataFrame.
-        processed = (
-            self._preprocess_new_data(new_data)
-            if new_data is not None
-            else result.data
+        if new_data is None:
+            processed = result.data
+        elif kind == "response_params":
+            processed = self._prepare_mean_data(new_data)
+        else:
+            processed = self._preprocess_new_data(new_data)
+        return bmodel.predict(
+            result.idata,
+            data=processed,
+            kind=kind,
+            inplace=False,
+            sample_new_groups=sample_new_groups,
+            # Seed only when new groups may be drawn, so the default path —
+            # including compare_models()' posterior-predictive check — is
+            # unchanged.
+            random_seed=self._config.random_seed if sample_new_groups else None,
         )
-        return bmodel.predict(result.idata, data=processed, kind=kind, inplace=False)
 
     def predict(
         self,
         new_data: pd.DataFrame | None = None,
         *,
         kind: str = "response",
+        sample_new_groups: bool = False,
         n_samples: int | None = None,
     ) -> np.ndarray:
         """Draw posterior samples; returns `(total_draws, n_obs)`.
 
         Args:
-            new_data: Out-of-sample data. `None` uses training data.
-                For Binomial, must include `trials_col`.
+            new_data: Out-of-sample data. `None` uses training data. With
+                `kind="response_params"` only the predictor and group columns
+                are required. With `kind="response"` the survey-design
+                columns are required too; for Binomial that includes
+                `trials_col`.
             kind:
                 - `"response"` (default): posterior predictive Y_rep, from
                   `idata.posterior_predictive[response]`.
@@ -789,11 +863,17 @@ class BaseModel(abc.ABC):
                   (`mu` or `p`), from `idata.posterior[self._mean_param_key]`.
                 - `"pps"` / `"mean"`: deprecated aliases (FutureWarning).
                 - `"linear"`: removed in Bambi 0.18+ -> ValueError.
+            sample_new_groups: Allow rows whose group label was not seen
+                during fitting. Each posterior draw for such a row takes the
+                group effect of a randomly chosen fitted group (brms
+                `sample_new_levels="uncertainty"`), seeded by
+                `config.random_seed`. `False` raises on unseen groups.
             n_samples: Number of posterior draws to return; `None` = all.
 
         Raises:
             ModelNotFittedError: If `fit()` has not been called.
             ValueError: For unsupported or removed *kind* values.
+            DataValidationError: If `new_data` lacks a required column.
         """
         result = self.result  # raises ModelNotFittedError if not fitted
         response: str = result.extra["response"]
@@ -812,7 +892,9 @@ class BaseModel(abc.ABC):
         # inplace=False → Bambi returns a NEW idata; result.idata stays intact
         # (it holds only the sampled parameter posteriors; mu/p are computed on
         # demand, never stored at fit() time).
-        pred_idata = self._predict_idata(new_data, kind=kind)
+        pred_idata = self._predict_idata(
+            new_data, kind=kind, sample_new_groups=sample_new_groups
+        )
 
         # Extract draws. kind is always canonical after _normalize_predict_kind():
         #   "response"        → pred_idata.posterior_predictive[_response_pp_key(response)]

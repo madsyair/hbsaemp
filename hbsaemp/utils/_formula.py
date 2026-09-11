@@ -5,7 +5,7 @@ import re
 
 from hbsaemp._exceptions import FormulaError
 
-__all__: list[str] = ["parse_formula"]
+__all__: list[str] = ["parse_formula", "update_formula"]
 
 
 def parse_formula(formula: str) -> dict:
@@ -84,3 +84,83 @@ def parse_formula(formula: str) -> dict:
         "fixed": fixed,
         "random_groups": random_groups,
     }
+
+
+def _split_terms(rhs: str) -> list[tuple[str, str]]:
+    """Split *rhs* on top-level ``+``/``-`` into ``(sign, term)`` pairs.
+
+    Signs inside parentheses belong to the term, so ``(0 + x1 | g)`` stays whole.
+    """
+    terms: list[tuple[str, str]] = []
+    sign, depth, start = "+", 0, 0
+    for i, char in enumerate(rhs):
+        if char == "(":
+            depth += 1
+        elif char == ")":
+            depth -= 1
+        elif char in "+-" and depth == 0:
+            term = rhs[start:i].strip()
+            if term:
+                terms.append((sign, term))
+            sign, start = char, i + 1
+    term = rhs[start:].strip()
+    if term:
+        terms.append((sign, term))
+    return terms
+
+
+def _normalize_term(term: str) -> str:
+    """Whitespace-free form of *term*, so ``(1 | g)`` matches ``(1|g)``."""
+    return re.sub(r"\s+", "", term)
+
+
+def update_formula(old: str, template: str) -> str:
+    """Apply an R ``update.formula``-style *template* to *old*.
+
+    ``.`` on the left stands for the old response and ``.`` on the right for
+    the old right-hand side. ``+ term`` adds a term (once) and ``- term``
+    removes it; ``- 1`` or ``+ 0`` drops the intercept. A template without
+    ``.`` replaces *old* outright.
+
+    Args:
+        old: Current formula, e.g. ``"y ~ x1 + x2 + (1|group)"``.
+        template: Update template, e.g. ``". ~ . + x3 - x1"``.
+
+    Returns:
+        The updated formula, validated by ``parse_formula()``.
+
+    Raises:
+        FormulaError: If *template* has no ``"~"``, or the result has no
+            response or contains a term that is not a bare column identifier.
+    """
+    if "~" not in template:
+        raise FormulaError(
+            "Formula update template must contain '~', e.g. '. ~ . + x3'.",
+            formula=template,
+        )
+    old_lhs, old_rhs = old.split("~", 1)
+    new_lhs, new_rhs = template.split("~", 1)
+    lhs = old_lhs.strip() if new_lhs.strip() == "." else new_lhs.strip()
+
+    operations: list[tuple[str, str]] = []
+    for sign, term in _split_terms(new_rhs):
+        operations.extend(_split_terms(old_rhs) if term == "." else [(sign, term)])
+
+    kept: list[str] = []
+    intercept = True
+    for sign, term in operations:
+        if term in ("0", "1"):
+            # "+ 0" and "- 1" drop the intercept; "+ 1" restores it.
+            intercept = (term == "1") == (sign == "+")
+            continue
+        key = _normalize_term(term)
+        if sign == "+":
+            if all(_normalize_term(k) != key for k in kept):
+                kept.append(term)
+        else:
+            kept = [k for k in kept if _normalize_term(k) != key]
+
+    rhs_terms = kept if intercept else ["0", *kept]
+    formula = f"{lhs} ~ {' + '.join(rhs_terms) or '1'}"
+    parse_formula(formula)  # raises FormulaError on an invalid result
+    return formula

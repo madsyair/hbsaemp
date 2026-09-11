@@ -6,6 +6,7 @@ which would re-add sampling variance and destroy the shrinkage estimate.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -19,6 +20,13 @@ logger = get_logger(__name__)
 __all__: list[str] = ["AreaEstimatesResult", "estimate_areas", "hbsae"]
 
 
+def _fmt(value: float | None, spec: str) -> str:
+    """Format *value* with *spec*, or `"n/a"` when it is missing or NaN."""
+    if value is None or not math.isfinite(value):
+        return "n/a"
+    return format(value, spec)
+
+
 @dataclass
 class AreaEstimatesResult:
     """Per-area SAE results.
@@ -27,7 +35,8 @@ class AreaEstimatesResult:
         result_table: DataFrame with columns `mean`, `sd`, `ci_lower`,
             `ci_upper`, `rse_pct`, `mse`, `rmse`. An optional `group` column
             is prepended when the source model has grouping info.
-        mean_rse: Mean RSE (%) across all areas.
+        mean_rse: Mean RSE (%) across areas. Areas whose `rse_pct` is NaN
+            (posterior mean exactly 0) are excluded from the average.
         mean_mse: Mean MSE across all areas.
     """
 
@@ -38,12 +47,15 @@ class AreaEstimatesResult:
     def summary(self) -> str:
         """One-screen text summary."""
         if self.result_table.empty:
-            return "AreaEstimatesResult [stub — call estimate_areas() with a fitted model]"
+            return (
+                "AreaEstimatesResult [empty — not fitted; "
+                "call estimate_areas() on a fitted model]"
+            )
         return (
             f"AreaEstimatesResult\n"
             f"  Areas     : {len(self.result_table)}\n"
-            f"  Mean RSE% : {self.mean_rse:.2f}\n"
-            f"  Mean MSE  : {self.mean_mse:.4f}\n"
+            f"  Mean RSE% : {_fmt(self.mean_rse, '.2f')}\n"
+            f"  Mean MSE  : {_fmt(self.mean_mse, '.4f')}\n"
             f"  Columns   : {list(self.result_table.columns)}"
         )
 
@@ -69,20 +81,38 @@ def estimate_areas(
     `mean`, `sd`, `ci_lower`/`ci_upper` (HDI at `ci_prob`), `rse_pct =
     sd / |mean| * 100`, `mse` (posterior variance), `rmse`.
 
-    A `group` column is prepended when the model was fitted with grouping.
+    Each row is one area (area-level data). Unit-level rows are summarised
+    per observation, not aggregated per area; a warning is logged when group
+    labels repeat. A `group` column is prepended when the model was fitted
+    with grouping.
+
+    Out-of-sample rows need only the predictor and group columns: the
+    response and the survey-design columns (`sampling_var`, `n`/`deff`,
+    `trials`) do not enter the mean parameter. A row whose group label was
+    not seen during fitting is a non-sampled area. At each posterior draw its
+    area effect is taken from a randomly chosen fitted area (Bambi
+    `sample_new_groups=True`, equivalent to brms
+    `sample_new_levels="uncertainty"`), so its interval is wider than a
+    sampled area's. These draws are seeded by `config.random_seed`.
 
     Args:
         model: Fitted `BaseModel`.
         new_data: Optional out-of-sample DataFrame. `None` uses training data.
-        ci_prob: HDI probability (default 0.95).
+        ci_prob: HDI probability in (0, 1) (default 0.95).
 
     Raises:
+        ValueError: If `ci_prob` is not in (0, 1).
         ModelNotFittedError: If `model` has not been fitted.
         ImportError: If `arviz` is not installed.
+        DataValidationError: If `new_data` lacks a predictor or group column,
+            or no row is complete in those columns.
         EstimationError: If the posterior draws, the HDI, or the result table
-            cannot be computed — e.g. `new_data` is missing a predictor column
-            or has a shape the fitted design matrix cannot accept.
+            cannot be computed.
     """
+    # NaN fails both comparisons, so it is rejected here too.
+    if not 0.0 < ci_prob < 1.0:
+        raise ValueError(f"ci_prob must be in (0, 1); got {ci_prob!r}.")
+
     try:
         import arviz as az
     except ImportError as exc:
@@ -115,23 +145,26 @@ def estimate_areas(
     # "this model/data combination cannot be estimated" from the guards above:
     # ModelNotFittedError (wrong call order) and ImportError (missing dep).
     try:
-        draws: np.ndarray = model.predict(new_data=new_data, kind="response_params")
+        draws: np.ndarray = model.predict(
+            new_data=new_data, kind="response_params", sample_new_groups=True
+        )
         n_obs: int = draws.shape[1]
 
-        # group labels
-        # Group labels must be positionally aligned with the draws array columns.
-        # result.data is already NaN-dropped (preprocessed during fit()).
-        # new_data is raw — it must be preprocessed to drop the same NaN rows that
-        # predict() drops internally, otherwise labels and draws are misaligned when
-        # new_data contains missing values.
-        group_labels: pd.Series | None = None
-        if group_col is not None:
-            if new_data is not None:
-                source_for_labels: pd.DataFrame = model._preprocess_new_data(new_data)
-            else:
-                source_for_labels = result.data
-            if group_col in source_for_labels.columns:
-                group_labels = source_for_labels[group_col].reset_index(drop=True)
+        # Group labels must be positionally aligned with the draws columns.
+        # In-sample, predict() reads result.data (the NaN-dropped fit frame).
+        # For new_data, predict() runs _prepare_mean_data(); it is
+        # deterministic, so re-running it here yields the same rows in the
+        # same order. The length check turns any future drift into an error
+        # instead of silently shifted labels.
+        label_source: pd.DataFrame = (
+            result.data if new_data is None else model._prepare_mean_data(new_data)
+        )
+        if len(label_source) != n_obs:
+            raise EstimationError(
+                f"estimate_areas(): {len(label_source)} label row(s) but "
+                f"{n_obs} draw column(s); area labels cannot be aligned.",
+                context={"n_labels": len(label_source), "n_obs": n_obs},
+            )
 
         # per-area statistics (vectorised over axis=0 = sample dim)
         means = draws.mean(axis=0)
@@ -145,8 +178,9 @@ def estimate_areas(
                 np.nan,
             )
 
-        # HDI per area. Loop is the safe path: az.hdi has no vectorised 2-D
-        # variant in ArviZ 1.1 (calling with axis= aggregates incorrectly).
+        # HDI per area. az.hdi on a bare ndarray reduces over the LAST axis,
+        # so passing the (draws, areas) matrix would summarise across areas
+        # for each draw. The per-area loop keeps the reduction axis explicit.
         # `prob` is the canonical kwarg since ArviZ ≥0.20 (was `hdi_prob` before);
         # lower-bound ≥1.1 makes runtime detection unnecessary.
         hdi_arr = np.empty((n_obs, 2), dtype=float)
@@ -164,12 +198,19 @@ def estimate_areas(
         })
 
         # Prepend group column when available
-        if group_labels is not None:
-            df_result.insert(0, group_col, group_labels.values[:n_obs])
+        if group_col is not None and group_col in label_source.columns:
+            labels = label_source[group_col]
+            df_result.insert(0, group_col, labels.to_numpy())
+            if labels.duplicated().any():
+                logger.warning(
+                    "estimate_areas(): labels in %r repeat — rows are "
+                    "summarised per observation, not aggregated per area.",
+                    group_col,
+                )
 
     except HBSAEError:
         # Package errors already carry their own contract (e.g. the
-        # DataValidationError _preprocess_new_data raises). Do not reclassify.
+        # DataValidationError _prepare_mean_data raises). Do not reclassify.
         raise
     except Exception as exc:
         raise EstimationError(
@@ -182,6 +223,14 @@ def estimate_areas(
         "estimate_areas(): produced %d rows, columns=%s",
         len(df_result), list(df_result.columns),
     )
+
+    n_nan_rse = int(df_result["rse_pct"].isna().sum())
+    if n_nan_rse:
+        logger.warning(
+            "estimate_areas(): %d area(s) have posterior mean 0, so rse_pct "
+            "is NaN; they are excluded from mean_rse.",
+            n_nan_rse,
+        )
 
     mean_rse = float(df_result["rse_pct"].mean())
     mean_mse = float(df_result["mse"].mean())
