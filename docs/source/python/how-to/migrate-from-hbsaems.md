@@ -38,6 +38,25 @@ True True True
 | `hbsae(...)` | `hbsae(...)` or `estimate_areas(...)` |
 | `update_hbm(...)` | `update_hbm(...)` or `update_model(...)` |
 
+The arguments of `update_hbm()` map onto Python names. Both refit from scratch rather than
+continuing the previous chains — `brms::update()` reruns `brm()` too:
+
+| R `update_hbm(...)` | Python `update_model(...)` |
+| --- | --- |
+| `object` | `model` |
+| `newdata = df` | `new_data=df` |
+| `formula. = . ~ . + x2` | `formula=". ~ . + x2"` |
+| `prior = ...` (through `...`) | `priors={...}` — merged into the current priors, new entries win |
+| `iter = 4000, warmup = 2000` | `draws=2000, tune=2000` — `iter` counts warmup, `draws` does not |
+| `chains`, `cores` | `chains`, `cores` |
+| `control = list(adapt_delta = 0.99)` | `target_accept=0.99` |
+| `control = list(max_treedepth = 12)` | `max_treedepth=12` |
+| `seed = 1` (through `...`) | `random_seed=1` |
+
+One difference is in the result: R returns a new `hbmfit` and leaves the original
+untouched, while `update_model()` updates the model in place and returns its new
+`ModelResult`.
+
 The dataset names carry over unchanged — `data_fhnorm`, `data_betalogitnorm`,
 `data_binlogitnorm`, `data_lnln` — and so do the column names inside them:
 

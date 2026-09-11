@@ -182,6 +182,50 @@ class TestEstimateAreasOutOfSample:
 
 
 # ---------------------------------------------------------------------------
+# estimate_areas() — non-sampled areas (unseen group labels)
+# ---------------------------------------------------------------------------
+
+def _new_areas(df: pd.DataFrame, n: int = 5) -> pd.DataFrame:
+    """Last *n* rows as non-sampled areas: unseen groups, no response/design cols."""
+    out = df.tail(n).drop(columns=["y", "n", "deff"]).reset_index(drop=True)
+    out["group"] = np.arange(9001, 9001 + n)
+    return out
+
+
+class TestEstimateAreasNewAreas:
+
+    def test_new_areas_estimated(self, beta_fitted, data_beta):
+        new_data = _new_areas(data_beta)
+        df = hb.estimate_areas(beta_fitted, new_data=new_data).result_table
+        assert len(df) == 5
+        assert df["group"].tolist() == new_data["group"].tolist()
+        assert ((df["mean"] > 0) & (df["mean"] < 1)).all()
+        assert (df["sd"] > 0).all()
+        assert (df["ci_lower"] <= df["mean"]).all()
+        assert (df["mean"] <= df["ci_upper"]).all()
+
+    def test_sampled_area_via_new_data_matches_in_sample(self, beta_fitted, data_beta):
+        """Dropping y and the design columns (dummy log_phi) must not move mu."""
+        in_sample = hb.estimate_areas(beta_fitted).result_table.head(3)
+        new_data = data_beta.head(3).drop(columns=["y", "n", "deff"]).reset_index(drop=True)
+        oos = hb.estimate_areas(beta_fitted, new_data=new_data).result_table
+        np.testing.assert_allclose(oos["mean"].values, in_sample["mean"].values, rtol=1e-6)
+        np.testing.assert_allclose(oos["sd"].values, in_sample["sd"].values, rtol=1e-6)
+
+    def test_new_areas_reproducible(self, beta_fitted, data_beta):
+        """New-group draws are seeded by config.random_seed."""
+        new_data = _new_areas(data_beta)
+        first = hb.estimate_areas(beta_fitted, new_data=new_data).result_table
+        second = hb.estimate_areas(beta_fitted, new_data=new_data).result_table
+        pd.testing.assert_frame_equal(first, second)
+
+    def test_missing_group_column_raises(self, beta_fitted, data_beta):
+        bad = _new_areas(data_beta).drop(columns=["group"])
+        with pytest.raises(hb.DataValidationError, match="group"):
+            hb.estimate_areas(beta_fitted, new_data=bad)
+
+
+# ---------------------------------------------------------------------------
 # estimate_areas() — ModelNotFittedError guard
 # ---------------------------------------------------------------------------
 
@@ -415,3 +459,28 @@ class TestUpdateModelChained:
         # model.result must reflect the LATEST fit (in-place sync contract).
         assert beta_fitted.result is second
         assert beta_fitted._config.draws == 100
+
+
+class TestUpdateModelFormulaPriors:
+    """Real refit through Bambi: formula template, prior merge, removed-term prior."""
+
+    def test_update_formula_and_priors(self, data_gaussian):
+        cfg = hb.ModelConfig(draws=80, tune=80, chains=2, cores=1,
+                             target_accept=0.9, random_seed=42)
+        m = hb.create_model(
+            "y ~ x1 + x2 + (1|group)", family="gaussian", data=data_gaussian,
+            config=cfg, priors={"x1": hb.Prior("Normal", mu=0, sigma=1)},
+        )
+        m.fit()
+        # The x1 prior must be dropped with x1 — Bambi would raise KeyError.
+        result = hb.update_model(
+            m, formula=". ~ . + x3 - x1",
+            priors={"x3": hb.Prior("Normal", mu=0, sigma=1)},
+        )
+        posterior_vars = set(result.idata.posterior.data_vars)
+        assert "x3" in posterior_vars
+        assert "x1" not in posterior_vars
+        assert m.formula == "y ~ x2 + (1|group) + x3"
+        assert set(m._priors) == {"x3"}
+        # predict()/estimate_areas() must read the updated formula.
+        assert len(hb.estimate_areas(m).result_table) == len(m.result.data)

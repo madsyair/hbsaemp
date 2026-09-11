@@ -40,7 +40,14 @@ The per-area table is `result_table`; `mean_rse` and `mean_mse` on the same obje
 the averages across areas at a glance.
 
 The R-style alias `hbsae` is the same function. To estimate for areas that were not in
-the fitting data, pass `new_data=`; the frame must carry the same auxiliary columns.
+the fitting data, pass `new_data=`. The frame needs only the predictor columns and the
+group column: the response and the survey-design columns (`sampling_var`, `n`/`deff`,
+`trials`) do not enter the area mean and may be absent. A row whose group label was not
+seen during fitting is a non-sampled area. At each posterior draw its area effect is
+taken from a randomly chosen fitted area — the approach brms calls
+`sample_new_levels = "uncertainty"` — so its interval is wider than a sampled area's, as
+it should be: no survey data speaks for it. Those draws are seeded by the model's
+`random_seed`, so repeated calls agree.
 
 Change the interval width with `ci_prob`, which defaults to 0.95:
 
@@ -58,6 +65,9 @@ One row per area, with these columns:
 | `mse`, `rmse` | Posterior variance and its square root |
 | `rse_pct` | Relative standard error, `sd / \|mean\| × 100` |
 | `ci_lower`, `ci_upper` | Highest-density interval at `ci_prob` |
+
+Each input row is one area. If a group label repeats, the model was fitted on unit-level
+rows: the table is then per observation, not per area, and a warning is logged.
 
 The check that matters is **shrinkage**. Compare `mean` against the direct estimate in
 your data: model-based estimates should sit between the direct estimate and the pattern
@@ -80,11 +90,16 @@ predictive distribution. That is deliberate and is not a tuning choice — see
 
 **The model has not been fitted.** Shown above; the message names the call you skipped.
 
+**`DataValidationError` naming a column.** `new_data` lacks a predictor or the group
+column, or every row has a missing value in one of them. Those are the only columns the
+area mean needs; add the named column.
+
 **`EstimationError` with a shape in the message.** Something about this model and this
 data cannot be estimated. The error carries the family, the shape of `new_data` and the
-requested `ci_prob`, which between them usually identify the problem — most often
-`new_data` missing an auxiliary column, or carrying rows whose auxiliary values are all
-missing and get dropped.
+requested `ci_prob`, which between them usually identify the problem.
+
+**`ValueError` about `ci_prob`.** The interval probability must lie strictly between 0
+and 1.
 
 Note that a wrong-order mistake is kept distinguishable from a genuine estimation
 failure: calling before `fit()` raises `ModelNotFittedError`, and that is deliberately
@@ -93,7 +108,8 @@ failure: calling before `fit()` raises `ModelNotFittedError`, and that is delibe
 **Row counts do not line up with your input.** Rows with missing values are dropped by
 the pipeline before estimation, and the area labels are taken from the processed frame
 rather than the raw one, so the labels always match the numbers. Compare against
-`model.check_data()` rather than against your original DataFrame.
+`model.check_data()` rather than against your original DataFrame. For `new_data`, only a
+missing predictor or group value drops a row.
 
 ## Related
 
