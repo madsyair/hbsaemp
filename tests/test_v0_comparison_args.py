@@ -1,19 +1,23 @@
 """compare_models() argument validation — fast, no Bambi/ArviZ/MCMC.
 
-Locks the P1-4 contract: compare_models() must fail fast on advertised-but-
-unsupported arguments instead of silently ignoring them. These tests target the
-pure-Python helpers ``_validate_compare_args`` and ``_require_log_likelihood``
-directly, so they run in the default (non-slow) lane without a fitted model.
+Locks the P1-4 contract: compare_models() must fail fast on unsupported or
+inconsistent arguments instead of silently ignoring them. These tests target
+the pure-Python helpers ``_validate_compare_args``, ``_require_log_likelihood``
+and ``_check_same_observations`` directly, so they run in the default
+(non-slow) lane without a fitted model.
 
 Run with:
     pytest tests/test_v0_comparison_args.py
 """
 from __future__ import annotations
 
+import numpy as np
 import pytest
+import xarray as xr
 
 from hbsaemp.diagnostics.comparison import (
     _SUPPORTED_METRICS,
+    _check_same_observations,
     _require_log_likelihood,
     _validate_compare_args,
 )
@@ -46,8 +50,12 @@ class TestValidateMetrics:
         assert _validate(metrics=["LOO"]) == ("loo",)
         assert _validate(metrics="Loo") == ("loo",)
 
-    def test_loo_is_the_only_supported_metric(self):
-        assert _SUPPORTED_METRICS == frozenset({"loo"})
+    def test_supported_metrics(self):
+        assert _SUPPORTED_METRICS == frozenset({"loo", "bf"})
+
+    def test_bf_accepted(self):
+        assert _validate(metrics="bf") == ("bf",)
+        assert _validate(metrics=["loo", "BF"]) == ("loo", "bf")
 
     def test_empty_list_rejected(self):
         with pytest.raises(ValueError, match="at least one metric"):
@@ -101,20 +109,22 @@ class TestValidateNDrawsPpc:
 
 class TestValidatePriorSensitivity:
 
-    def test_run_prior_sensitivity_true_rejected(self):
-        with pytest.raises(NotImplementedError, match="prior sensitivity"):
-            _validate(run_prior_sensitivity=True)
+    def test_run_prior_sensitivity_true_accepted(self):
+        assert _validate(run_prior_sensitivity=True) == ("loo",)
 
     def test_run_prior_sensitivity_false_accepted(self):
         _validate(run_prior_sensitivity=False)
 
-    def test_sensitivity_vars_rejected(self):
-        with pytest.raises(NotImplementedError, match="prior sensitivity"):
+    def test_sensitivity_vars_with_run_accepted(self):
+        _validate(run_prior_sensitivity=True, sensitivity_vars=["x1", "x2"])
+
+    def test_sensitivity_vars_without_run_rejected(self):
+        with pytest.raises(ValueError, match="run_prior_sensitivity"):
             _validate(sensitivity_vars=["x1", "x2"])
 
-    def test_sensitivity_vars_empty_list_still_rejected(self):
+    def test_sensitivity_vars_empty_list_without_run_rejected(self):
         # The contract is "any non-None value", not "any non-empty value".
-        with pytest.raises(NotImplementedError):
+        with pytest.raises(ValueError):
             _validate(sensitivity_vars=[])
 
     def test_sensitivity_vars_none_accepted(self):
@@ -160,3 +170,29 @@ class TestRequireLogLikelihood:
     def test_legacy_callable_groups_handled(self):
         idata = FakeIdata(["posterior", "log_likelihood"], callable_groups=True)
         _require_log_likelihood(idata, model_name="model_0")  # no raise
+
+
+def _observed(y) -> FakeIdata:
+    """FakeIdata carrying an ``observed_data`` Dataset with response *y*."""
+    idata = FakeIdata(["/posterior", "/observed_data"])
+    idata.observed_data = xr.Dataset({"y": ("__obs__", np.asarray(y, dtype=float))})
+    return idata
+
+
+class TestCheckSameObservations:
+
+    def test_identical_observations_pass(self):
+        _check_same_observations([_observed([1, 2, 3]), _observed([1, 2, 3])])
+
+    def test_same_length_different_values_rejected(self):
+        # az.compare only checks the count; equal-length datasets must still fail.
+        with pytest.raises(ValueError, match="model_1"):
+            _check_same_observations([_observed([1, 2, 3]), _observed([1, 2, 4])])
+
+    def test_different_length_rejected(self):
+        with pytest.raises(ValueError, match="different observations"):
+            _check_same_observations([_observed([1, 2, 3]), _observed([1, 2])])
+
+    def test_missing_observed_data_rejected(self):
+        with pytest.raises(ValueError, match="observed_data"):
+            _check_same_observations([_observed([1, 2]), FakeIdata(["posterior"])])

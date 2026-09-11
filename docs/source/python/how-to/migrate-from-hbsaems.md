@@ -91,6 +91,11 @@ rather than producing a model that quietly is not the one you meant.
 **WAIC is gone.** Model comparison uses PSIS-LOO-CV only; asking for WAIC raises. See
 {doc}`04-compare-models`.
 
+**The Bayes factor answers a different question.** In R, `comparison_metrics = "bf"`
+compares two whole models by bridge sampling. Here `metrics=["bf"]` gives a
+Savage-Dickey Bayes factor for each coefficient of one model against zero. To weigh two
+nested specifications, read the Bayes factor of the coefficient that separates them.
+
 ## Related
 
 Why the Python package offers three ways to build the same model, when R offers one, and
