@@ -190,6 +190,24 @@ class TestCheckConvergence:
         assert "energy" in conv.plots
         assert isinstance(conv.plots["energy"], matplotlib.figure.Figure)
 
+    def test_ess_threshold_scales_with_chains(self, beta_model):
+        """ESS floor follows arviz.diagnose: 100 per chain (fixture uses 2)."""
+        conv = hb.check_convergence(beta_model, plot_types=[])
+        assert conv.ess_threshold == 200
+
+    def test_sampler_checks_populated(self, beta_model):
+        """NUTS records diverging / reached_max_treedepth / energy, so all three
+        sampler checks must be reported."""
+        conv = hb.check_convergence(beta_model, plot_types=[])
+        assert conv.diagnose is not None
+        assert {"divergent", "treedepth", "bfmi"} <= conv.diagnose.keys()
+
+    def test_rhat_ess_is_numeric(self, beta_model):
+        """Unrounded floats — auto-rounded strings hid R-hat breaches."""
+        conv = hb.check_convergence(beta_model, plot_types=[])
+        for col in ("mean", "sd", "r_hat", "ess_bulk", "ess_tail"):
+            assert pd.api.types.is_float_dtype(conv.rhat_ess[col]), col
+
 
 # ===========================================================================
 # compare_models() — single model

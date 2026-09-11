@@ -628,6 +628,10 @@ class TestDataLayer:
 def test_result_dataclasses_constructable():
     cr = hb.ConvergenceResult()
     assert cr.rhat_ess is None and cr.plots == {}
+    assert cr.diagnose is None and cr.ess_threshold is None
+    # Geweke / Heidelberger-Welch / Raftery-Lewis are not provided by ArviZ.
+    for legacy in ("geweke", "heidel", "raftery"):
+        assert not hasattr(cr, legacy)
 
     pr = hb.PriorCheckResult()
     assert pr.prior_predictive_plot is None

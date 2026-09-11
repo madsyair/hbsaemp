@@ -59,7 +59,8 @@ Which call raises what
      - Per-area estimation fails for a reason that is not one of the above
      - ``estimate_areas()``
    * - :class:`ConvergenceWarning`
-     - R-hat above 1.01, or bulk/tail ESS below 400
+     - R-hat above 1.01, bulk/tail ESS below 100 × chains, divergent
+       transitions, maximum tree depth hits, or E-BFMI below 0.3
      - ``check_convergence()``
 
 Two of these are worth reading twice. :class:`FormulaError` is raised rather
