@@ -40,7 +40,9 @@ print(diag.summary())
 The R-style alias `hbcc` is the same function.
 
 By default this computes the diagnostics and renders trace, density, autocorrelation,
-R-hat, ESS and energy plots. The pair plot is opt-in because it is slow:
+R-hat, ESS and energy plots. The R-hat plot shows the distribution of R-hat values across
+all parameters, group effects included, against the 1.01 reference line. The pair plot, which
+highlights divergent transitions, is opt-in because it is slow:
 
 ```python
 diag = check_convergence(model, plot_types=["dens", "rhat", "energy", "pair"])

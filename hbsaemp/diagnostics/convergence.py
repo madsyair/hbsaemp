@@ -16,8 +16,7 @@ import pandas as pd
 from hbsaemp._exceptions import ConvergenceWarning
 from hbsaemp._logging import get_logger
 from hbsaemp.diagnostics._plot_utils import (
-    _CONVERGENCE_PLOT_CANDIDATES,
-    _NO_VAR_NAMES_PLOTS,
+    _CONVERGENCE_PLOTS,
     _diagnostic_var_names,
     _ensure_headless_matplotlib,
     _fig_from_axes,
@@ -128,7 +127,8 @@ class ConvergenceResult:
         rhat_ess: DataFrame with ``mean``, ``sd``, ``r_hat``, ``ess_bulk``,
             ``ess_tail`` per parameter (ArviZ summary, unrounded floats).
         plots: Dict of ``matplotlib.Figure`` keyed by plot-type name.
-            Keys from ``["trace", "dens", "acf", "rhat", "neff", "energy"]``.
+            Keys from ``["trace", "dens", "acf", "rhat", "neff", "energy"]``
+            plus ``"pair"`` when requested.
         plot_errors: Dict keyed by plot-type name → error message, for plots
             that failed to render (surfaced rather than silently swallowed).
         diagnose: Detailed results of ``arviz.diagnose`` keyed
@@ -234,15 +234,18 @@ def check_convergence(
     * ``"trace"``  — trace plots
     * ``"dens"``   — marginal posterior densities (``plot_dist``)
     * ``"acf"``    — autocorrelation plots
-    * ``"rhat"``   — R-hat forest plot
+    * ``"rhat"``   — distribution of R-hat values across scalar and
+      group-level parameters (``plot_convergence_dist``)
     * ``"neff"``   — effective sample size plot
     * ``"energy"`` — NUTS energy / BFMI diagnostic
+    * ``"pair"``   — pairwise posterior scatter with divergent draws
+      highlighted; opt-in (not in the default set) because it is slow
 
     Args:
         model: A fitted :class:`~hbsaemp.models._base.BaseModel`.
         diag_tests: Checks allowed to emit warnings.  Default: all five listed
             above.  Every check is still computed and stored.
-        plot_types: Plots to generate.  Default: all six listed above.
+        plot_types: Plots to generate.  Default: all except ``"pair"``.
             Pass ``[]`` to skip plotting.
 
     Returns:
@@ -321,39 +324,27 @@ def check_convergence(
         _emit_convergence_warning(message)
 
     # 4. Generate plots
-    # ``_CONVERGENCE_PLOT_CANDIDATES`` (in ``_plot_utils``) lists fallback
-    # ArviZ function names per plot type; the first callable on the installed
-    # ArviZ wins.  ``_fig_from_axes`` then turns whatever the plot fn returns
-    # (Axes / ndarray / Figure / tuple / PlotCollection) into a Figure or None.
-    # Plots use ``scalar_only`` — one subplot per variable, so group effects
-    # (and per-obs params) would blow past max_subplots=40 at large n_area.
+    # ``_CONVERGENCE_PLOTS`` (in ``_plot_utils``) maps each plot type to its
+    # ArviZ function, kwargs and variable policy; ``_fig_from_axes`` extracts
+    # the Figure from the returned PlotCollection. Per-variable plots use
+    # ``scalar_only`` — one subplot per variable, so group effects (and per-obs
+    # params) would blow past max_subplots=40 at large n_area.
     # Failures land in ``plot_errors`` instead of being swallowed to the log.
-    plot_vars = _diagnostic_var_names(idata.posterior, policy="scalar_only")
+    var_names_by_policy = {
+        "scalar_only": _diagnostic_var_names(idata.posterior, policy="scalar_only"),
+        "scalar_and_group": summary_vars,
+    }
     plots: dict[str, Any] = {}
     plot_errors: dict[str, str] = {}
     for ptype in resolved_plots:
-        if ptype not in _CONVERGENCE_PLOT_CANDIDATES:
+        if ptype not in _CONVERGENCE_PLOTS:
             logger.debug("check_convergence: unknown plot_type %r — skipped.", ptype)
             continue
-        fn = next(
-            (
-                (getattr(az, name), kwargs)
-                for name, kwargs in _CONVERGENCE_PLOT_CANDIDATES[ptype]
-                if callable(getattr(az, name, None))
-            ),
-            None,
-        )
-        if fn is None:
-            logger.warning(
-                "check_convergence: no compatible ArviZ function for plot %r.", ptype
-            )
-            continue
-        plot_fn, kwargs = fn
-        # plot_energy reads sample_stats, not posterior vars, so it rejects
-        # var_names; inject var_names only for the posterior-based plots.
+        name, kwargs, policy = _CONVERGENCE_PLOTS[ptype]
+        plot_fn = getattr(az, name)
         call_kwargs = dict(kwargs)
-        if ptype not in _NO_VAR_NAMES_PLOTS:
-            call_kwargs["var_names"] = plot_vars
+        if policy is not None:
+            call_kwargs["var_names"] = var_names_by_policy[policy]
         try:
             fig = _fig_from_axes(plot_fn(idata, **call_kwargs))
         except Exception as exc:  # noqa: BLE001
@@ -365,9 +356,7 @@ def check_convergence(
         # A None here means the plot ran but the Figure could not be extracted
         # from the ArviZ return value — record it instead of storing None silently.
         if fig is None:
-            plot_errors[ptype] = (
-                f"could not extract a Figure from {plot_fn.__name__}() return value."
-            )
+            plot_errors[ptype] = f"could not extract a Figure from {name}() return value."
             logger.warning(
                 "check_convergence: %r plot produced no extractable Figure.", ptype
             )

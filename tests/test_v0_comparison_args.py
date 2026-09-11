@@ -132,18 +132,10 @@ class TestValidatePriorSensitivity:
 
 
 class FakeIdata:
-    """Minimal stand-in exposing ``.groups`` like an ArviZ idata.
+    """Minimal stand-in exposing ``.groups`` like an ArviZ 1.1 DataTree idata."""
 
-    ArviZ 1.1 maps idata to a DataTree where ``.groups`` is a tuple property;
-    older InferenceData exposed ``.groups()`` as a method. ``callable_groups``
-    switches between the two shapes so both code paths are exercised.
-    """
-
-    def __init__(self, groups, *, callable_groups=False):
-        if callable_groups:
-            self.groups = lambda: tuple(groups)
-        else:
-            self.groups = tuple(groups)
+    def __init__(self, groups):
+        self.groups = tuple(groups)
 
 
 class TestRequireLogLikelihood:
@@ -165,10 +157,6 @@ class TestRequireLogLikelihood:
     def test_slash_prefixed_groups_handled(self):
         # ArviZ 1.1 DataTree paths are slash-prefixed; _idata_groups strips them.
         idata = FakeIdata(["/posterior", "/log_likelihood"])
-        _require_log_likelihood(idata, model_name="model_0")  # no raise
-
-    def test_legacy_callable_groups_handled(self):
-        idata = FakeIdata(["posterior", "log_likelihood"], callable_groups=True)
         _require_log_likelihood(idata, model_name="model_0")  # no raise
 
 

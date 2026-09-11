@@ -6,13 +6,16 @@ fitted model.
 """
 from __future__ import annotations
 
+import os
+import subprocess
+import sys
 import types
+from pathlib import Path
 
 import pytest
 
 from hbsaemp.diagnostics._plot_utils import (
-    _CONVERGENCE_PLOT_CANDIDATES,
-    _NO_VAR_NAMES_PLOTS,
+    _CONVERGENCE_PLOTS,
     _diagnostic_var_names,
     _fig_from_axes,
     _idata_groups,
@@ -57,7 +60,7 @@ def test_diagnostic_var_names_scalar_and_group():
     assert "1|group" in names
 
 
-# _fig_from_axes — figure extraction across ArviZ return shapes
+# _fig_from_axes — Figure extraction from ArviZ 1.1 PlotCollection
 
 
 class _FakeDataArray:
@@ -84,18 +87,10 @@ class _FakeViz:
 
 
 def test_fig_from_axes_extracts_plotcollection_figure():
-    """ArviZ ≥1.1: figure is viz["figure"].item(), not an attribute (the bug)."""
+    """ArviZ ≥1.1: figure is viz["figure"].item(), not an attribute."""
     mfig = pytest.importorskip("matplotlib.figure")
     fig = mfig.Figure()
     pc = types.SimpleNamespace(viz=_FakeViz({"figure": _FakeDataArray(fig)}))
-    assert _fig_from_axes(pc) is fig
-
-
-def test_fig_from_axes_legacy_attribute_still_works():
-    """Older arviz-plots exposed the figure as viz.figure — must still resolve."""
-    mfig = pytest.importorskip("matplotlib.figure")
-    fig = mfig.Figure()
-    pc = types.SimpleNamespace(viz=types.SimpleNamespace(figure=fig))
     assert _fig_from_axes(pc) is fig
 
 
@@ -105,7 +100,12 @@ def test_fig_from_axes_returns_none_when_absent():
     assert _fig_from_axes(pc) is None
 
 
-# _idata_groups — robust to ArviZ 1.1 DataTree (.groups attribute) vs legacy method
+def test_fig_from_axes_returns_none_without_viz():
+    pytest.importorskip("matplotlib.figure")
+    assert _fig_from_axes(object()) is None
+
+
+# _idata_groups — ArviZ 1.1 DataTree
 
 
 def test_idata_groups_datatree_attribute_tuple():
@@ -119,28 +119,67 @@ def test_idata_groups_datatree_attribute_tuple():
     assert "posterior" in names
 
 
-def test_idata_groups_legacy_method():
-    """Older InferenceData exposed `.groups()` as a method — still resolved."""
-    idata = types.SimpleNamespace(groups=lambda: ["posterior", "posterior_predictive"])
-    names = _idata_groups(idata)
-    assert names == ("posterior", "posterior_predictive")
+# _CONVERGENCE_PLOTS — ArviZ 1.1 function per plot type (no MCMC)
 
 
-# _CONVERGENCE_PLOT_CANDIDATES — ArviZ 1.1 function names (no MCMC)
+def test_every_convergence_plot_function_exists():
+    az = pytest.importorskip("arviz")
+    for ptype, (name, _, _) in _CONVERGENCE_PLOTS.items():
+        assert callable(getattr(az, name, None)), f"{ptype}: arviz.{name} is missing"
 
 
-def test_dens_candidate_uses_plot_dist():
+def test_dens_uses_plot_dist():
     """ArviZ 1.1 removed plot_density/plot_posterior/plot_kde; plot_dist is the
-    canonical marginal-density plot. A stale name here silently degrades 'dens'
-    to a trace plot (the bug this test guards)."""
-    assert _CONVERGENCE_PLOT_CANDIDATES["dens"][0][0] == "plot_dist"
-    flat = [name for cands in _CONVERGENCE_PLOT_CANDIDATES.values() for name, _ in cands]
-    assert "plot_density" not in flat
-    assert "plot_kde" not in flat
+    canonical marginal-density plot."""
+    assert _CONVERGENCE_PLOTS["dens"][0] == "plot_dist"
 
 
-def test_energy_candidate_present_and_var_names_exempt():
-    """Energy/BFMI plot is wired and exempt from the var_names injection
-    (plot_energy reads sample_stats, not posterior vars, and rejects var_names)."""
-    assert _CONVERGENCE_PLOT_CANDIDATES["energy"] == (("plot_energy", {}),)
-    assert "energy" in _NO_VAR_NAMES_PLOTS
+def test_rhat_plots_rhat_values():
+    """plot_forest cannot show R-hat in ArviZ 1.1 — the rhat plot must be the
+    R-hat distribution, over scalar and group-level parameters."""
+    name, kwargs, policy = _CONVERGENCE_PLOTS["rhat"]
+    assert name == "plot_convergence_dist"
+    assert kwargs == {"diagnostics": ["rhat_rank"]}
+    assert policy == "scalar_and_group"
+
+
+def test_pair_highlights_divergences_via_visuals():
+    """ArviZ 1.1 rejects the old ``divergences=True`` keyword."""
+    name, kwargs, _ = _CONVERGENCE_PLOTS["pair"]
+    assert name == "plot_pair"
+    assert kwargs == {"visuals": {"divergence": True}}
+
+
+def test_energy_takes_no_var_names():
+    """plot_energy reads sample_stats and rejects var_names."""
+    assert _CONVERGENCE_PLOTS["energy"] == ("plot_energy", {}, None)
+
+
+# _ensure_headless_matplotlib — the backend is process-global state, so each
+# case runs in a fresh interpreter.
+
+
+def _backend_after_helper(setup: str) -> str:
+    pytest.importorskip("matplotlib")
+    code = (
+        "import matplotlib\n"
+        f"{setup}\n"
+        "from hbsaemp.diagnostics._plot_utils import _ensure_headless_matplotlib\n"
+        "_ensure_headless_matplotlib()\n"
+        "print(matplotlib.get_backend())\n"
+    )
+    env = {k: v for k, v in os.environ.items() if k != "MPLBACKEND"}
+    out = subprocess.run(
+        [sys.executable, "-c", code],
+        capture_output=True, text=True, check=True, env=env,
+        cwd=Path(__file__).resolve().parents[1],
+    )
+    return out.stdout.strip().lower()
+
+
+def test_headless_backend_selected_when_none_chosen():
+    assert _backend_after_helper("") == "agg"
+
+
+def test_user_backend_is_left_untouched():
+    assert _backend_after_helper('matplotlib.use("svg")') == "svg"
