@@ -1,24 +1,19 @@
 """Shared private helpers for diagnostic plotting.
 
-Centralises matplotlib backend hygiene, the ArviZ figure-extraction helper,
-and the convergence-plot fallback chains used by
-:mod:`hbsaemp.diagnostics.convergence` and
+Centralises matplotlib backend hygiene, Figure extraction from ArviZ plot
+return values, diagnostic variable selection, and the convergence-plot table
+used by :mod:`hbsaemp.diagnostics.convergence` and
 :mod:`hbsaemp.diagnostics.comparison`.
 
 This module is **internal** — names are not part of the public ``hbsaemp``
-API.  Keeping the helpers here avoids the previous verbatim duplication of
-``_fig_from_axes`` across the two diagnostic modules and removes the
-private cross-import ``comparison.py → convergence.py``.
+API.
 """
 from __future__ import annotations
 
 from typing import Any, Literal
 
-import numpy as np
-
 __all__: list[str] = [
-    "_CONVERGENCE_PLOT_CANDIDATES",
-    "_NO_VAR_NAMES_PLOTS",
+    "_CONVERGENCE_PLOTS",
     "_ensure_headless_matplotlib",
     "_fig_from_axes",
     "_diagnostic_var_names",
@@ -27,20 +22,13 @@ __all__: list[str] = [
 
 
 def _idata_groups(idata: Any) -> tuple[str, ...]:
-    """Group names from an idata, robust to the ArviZ 1.1 DataTree change.
+    """Group names of an ArviZ 1.1 idata (an xarray ``DataTree``).
 
-    In ArviZ 1.1 ``InferenceData`` maps to xarray's ``DataTree``, where
-    ``groups`` is a **property** returning a tuple of paths
-    (``("/posterior", "/log_likelihood", ...)``) — not a method. Older
-    ``InferenceData`` exposed ``groups()`` as a method. Calling ``.groups()``
-    on the new object raises ``TypeError: 'tuple' object is not callable``.
-
-    Resolves either shape and normalises leading slashes
-    (``"/posterior"`` → ``"posterior"``) so membership tests work uniformly.
+    ``DataTree.groups`` is a property returning slash-prefixed paths
+    (``("/", "/posterior", ...)``); the leading slash is stripped so
+    membership tests read ``"posterior" in _idata_groups(idata)``.
     """
-    g = idata.groups
-    names = g() if callable(g) else g
-    return tuple(str(n).strip("/") for n in names)
+    return tuple(str(n).strip("/") for n in idata.groups)
 
 # Bambi's per-observation dim, attached to the response params (mu/p/kappa)
 # when they are materialised via predict(kind="response_params"). Stable across
@@ -89,91 +77,61 @@ def _diagnostic_var_names(
     return names
 
 
-# Convergence-plot fallback chains.  Each plot type lists the candidate
-# ArviZ function names in preference order; the first one resolving to a
-# callable on the installed ArviZ is used.  Keeps the diagnostic alive
-# across the ArviZ → arviz-plots split: ArviZ 1.1 removed ``plot_density`` /
-# ``plot_posterior`` / ``plot_kde`` from the namespace — ``plot_dist`` is the
-# canonical marginal-density replacement (``plot_forest`` also lost the legacy
-# ``r_hat`` kwarg, hence ``plot_rank`` as fallback).
-_CONVERGENCE_PLOT_CANDIDATES: dict[str, tuple[tuple[str, dict[str, Any]], ...]] = {
-    "trace":  (("plot_trace", {}),),
-    "dens":   (("plot_dist", {}), ("plot_trace", {})),
-    "acf":    (("plot_autocorr", {}),),
-    "rhat":   (("plot_forest", {}), ("plot_rank", {})),
-    "neff":   (("plot_ess", {}),),
-    "pair":   (("plot_pair", {"divergences": True}),),
-    "energy": (("plot_energy", {}),),
+# Convergence plots: plot type -> (ArviZ function, kwargs, variable policy).
+# The policy selects ``var_names`` through ``_diagnostic_var_names``; ``None``
+# means the function takes no ``var_names`` (``plot_energy`` reads
+# ``sample_stats`` and rejects it).
+# * ``rhat`` plots the distribution of rank-normalised R-hat values against
+#   the 1.01 reference line — one aggregated panel, so group effects fit.
+#   ``plot_forest`` cannot show R-hat in ArviZ 1.1.
+# * ``pair`` highlights divergent draws; ArviZ 1.1 enables them through
+#   ``visuals`` and rejects the old ``divergences`` keyword.
+# * ``energy`` overlays BFMI itself (``show_bfmi=True, threshold=0.3``).
+_CONVERGENCE_PLOTS: dict[str, tuple[str, dict[str, Any], DiagnosticVarPolicy | None]] = {
+    "trace":  ("plot_trace", {}, "scalar_only"),
+    "dens":   ("plot_dist", {}, "scalar_only"),
+    "acf":    ("plot_autocorr", {}, "scalar_only"),
+    "rhat":   ("plot_convergence_dist", {"diagnostics": ["rhat_rank"]}, "scalar_and_group"),
+    "neff":   ("plot_ess", {}, "scalar_only"),
+    "pair":   ("plot_pair", {"visuals": {"divergence": True}}, "scalar_only"),
+    "energy": ("plot_energy", {}, None),
 }
-
-# Plot types whose ArviZ function reads ``sample_stats`` (not posterior vars)
-# and therefore rejects the ``var_names=`` kwarg the convergence loop injects
-# for every other candidate.  ``plot_energy`` overlays BFMI itself
-# (``show_bfmi=True, threshold=0.3``) — so energy + BFMI is a single call.
-_NO_VAR_NAMES_PLOTS: frozenset[str] = frozenset({"energy"})
 
 
 def _ensure_headless_matplotlib() -> None:
-    """Force matplotlib to the non-interactive ``Agg`` backend if unset.
+    """Select the non-interactive ``Agg`` backend when none has been chosen.
 
-    Calling ArviZ/arviz-plots will lazy-import a GUI backend (Qt5/Tk) on
-    Windows, which can crash with ``WinError 0xc0000139`` if the Qt
-    runtime is broken or Tcl/Tk is misconfigured.  We avoid the GUI path
-    entirely for diagnostics; ``force=False`` defers to any explicit
-    user choice (e.g. set by the Panel app).
+    Otherwise the first ArviZ plot lets matplotlib resolve its default
+    backend, which lazy-imports a GUI toolkit (Qt5/Tk) and can crash on
+    Windows with ``WinError 0xc0000139`` when that runtime is broken. A
+    backend already selected — explicitly, via ``MPLBACKEND``, or by Jupyter's
+    inline backend — is left untouched.
     """
+    import matplotlib
+
     try:
-        import matplotlib
-        matplotlib.use("Agg", force=False)
-    except Exception:  # noqa: BLE001
-        # Backend already initialised or matplotlib unavailable — proceed:
-        # the worst case is the same crash we were trying to avoid, which
-        # is already surfaced by the user's environment.
-        pass
+        chosen = matplotlib.get_backend(auto_select=False)  # matplotlib >= 3.10
+    except TypeError:
+        # matplotlib < 3.10 has no auto_select; this private accessor performs
+        # the same check without triggering backend resolution.
+        chosen = matplotlib.rcParams._get_backend_or_none()
+    if chosen is None:
+        matplotlib.use("Agg")
 
 
 def _fig_from_axes(obj: Any) -> Any:
     """Extract the matplotlib Figure from an ArviZ plot return value.
 
-    Handles every shape ArviZ has shipped: a single ``Figure``, an ``Axes``,
-    an ndarray of ``Axes``, a ``(fig, axes)`` tuple, or an arviz-plots
-    ``PlotCollection`` (ArviZ ≥0.21).  Returns ``None`` when no Figure can
-    be located instead of raising — plot capture is best-effort and the
-    caller already treats missing plots as a logged warning.
+    ArviZ 1.1 plot functions return an arviz-plots ``PlotCollection`` (or
+    ``PlotMatrix``) whose ``viz`` DataTree stores the Figure as a 0-d object
+    variable. Returns ``None`` when no Figure can be located, so callers can
+    record the failure instead of storing ``None`` silently.
     """
     import matplotlib.figure as mfig
-    if isinstance(obj, mfig.Figure):
-        return obj
-    if isinstance(obj, tuple) and obj:
-        return _fig_from_axes(obj[0])
-    # Axes-like with a direct ``.figure`` handle (classic ArviZ).
-    fig = getattr(obj, "figure", None)
-    if isinstance(fig, mfig.Figure):
-        return fig
-    # arviz-plots PlotCollection: figure lives in ``viz``. Older releases
-    # exposed it as an attribute; arviz-plots ≥1.1 stores it as an xarray
-    # data variable on a DataTree — a 0-d object array retrieved by item
-    # access and unwrapped via ``.item()`` (cf. PlotCollection._display_).
+
     viz = getattr(obj, "viz", None)
-    if viz is not None:
-        for attr in ("figure", "fig", "_fig"):
-            candidate = getattr(viz, attr, None)
-            if isinstance(candidate, mfig.Figure):
-                return candidate
-        try:
-            if "figure" in viz:
-                candidate = viz["figure"]
-                candidate = candidate.item() if hasattr(candidate, "item") else candidate
-                if isinstance(candidate, mfig.Figure):
-                    return candidate
-        except (TypeError, KeyError):  # viz not a container in some versions
-            pass
-    # Last resort: ndarray of Axes.
-    try:
-        axes = np.atleast_1d(obj).ravel()
-        first_fig = getattr(axes[0], "figure", None)
-        if isinstance(first_fig, mfig.Figure):
-            return first_fig
-    except Exception:  # noqa: BLE001
-        pass
-    return None
+    if viz is None or "figure" not in viz:
+        return None
+    candidate = viz["figure"]
+    candidate = candidate.item() if hasattr(candidate, "item") else candidate
+    return candidate if isinstance(candidate, mfig.Figure) else None

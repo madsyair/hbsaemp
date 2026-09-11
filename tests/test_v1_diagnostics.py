@@ -193,7 +193,8 @@ class TestCheckConvergence:
 
     def test_convergence_energy_plot_no_crash(self, beta_model):
         """plot_energy reads sample_stats and rejects var_names — the loop must
-        exempt it (``_NO_VAR_NAMES_PLOTS``) and still render the energy/BFMI plot."""
+        exempt it (variable policy ``None`` in ``_CONVERGENCE_PLOTS``) and still
+        render the energy/BFMI plot."""
         import matplotlib.figure
 
         conv = hb.check_convergence(beta_model, plot_types=["energy"])
@@ -202,6 +203,24 @@ class TestCheckConvergence:
         assert "var_names" not in conv.plot_errors.get("energy", "")
         assert "energy" in conv.plots
         assert isinstance(conv.plots["energy"], matplotlib.figure.Figure)
+
+    def test_convergence_rhat_plot_shows_rhat(self, beta_model):
+        """The rhat plot is the R-hat distribution, not a credible-interval forest."""
+        import matplotlib.figure
+
+        conv = hb.check_convergence(beta_model, plot_types=["rhat"])
+        assert conv.plot_errors == {}
+        fig = conv.plots["rhat"]
+        assert isinstance(fig, matplotlib.figure.Figure)
+        assert any("rhat" in ax.get_title() for ax in fig.axes)
+
+    def test_convergence_pair_plot_renders(self, beta_model):
+        """ArviZ 1.1 rejects divergences=True; divergences go through visuals."""
+        import matplotlib.figure
+
+        conv = hb.check_convergence(beta_model, plot_types=["pair"])
+        assert conv.plot_errors == {}
+        assert isinstance(conv.plots["pair"], matplotlib.figure.Figure)
 
     def test_ess_threshold_scales_with_chains(self, beta_model):
         """ESS floor follows arviz.diagnose: 100 per chain (fixture uses 2)."""

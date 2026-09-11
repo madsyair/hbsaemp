@@ -353,13 +353,13 @@ def compare_models(
     For the **first** (or only) model:
 
     * Generates a **posterior predictive check** plot via
-      ``arviz_plots.plot_ppc_dist()`` (``az.plot_ppc`` was removed in ArviZ
-      1.1).  When ``posterior_predictive`` is missing it is built on a
-      temporary idata via the public ``model.predictive_idata()``
-      (``inplace=False``) — the stored ``result.idata`` is never mutated.
-    * Generates a **marginal posterior** plot via ``az.plot_dist`` — the
-      ArviZ 1.1 replacement for the removed ``plot_posterior`` / ``plot_density``
-      — falling back to ``plot_trace``.
+      ``arviz.plot_ppc_dist()`` (``az.plot_ppc`` was removed in ArviZ 1.1).
+      When ``posterior_predictive`` is missing it is built on a temporary
+      idata via the public ``model.predictive_idata()`` (``inplace=False``) —
+      the stored ``result.idata`` is never mutated.
+    * Generates a **marginal posterior** plot via ``arviz.plot_dist`` — the
+      ArviZ 1.1 replacement for the removed ``plot_posterior`` /
+      ``plot_density``.
 
     Plots are best-effort: a failure is recorded in ``plot_errors``.
 
@@ -489,80 +489,51 @@ def compare_models(
         logger.warning("compare_models: %s plot failed: %s", name, message)
 
     # 7. Posterior predictive check (first model)
-    # az.plot_ppc was removed in ArviZ 1.1; PPC plotting moved to the separate
-    # ``arviz_plots`` package. ``plot_ppc_dist`` is the closest analogue (KDE/
-    # dist overlay of observed vs Y_rep). Lazy + guarded import: arviz_plots is a
-    # declared dep (pyproject [bambi]) and also transitive via bambi+arviz>=1.1,
-    # but the callable() gate still protects minimal/partial installs.
+    # az.plot_ppc was removed in ArviZ 1.1; ``plot_ppc_dist`` (KDE/dist overlay
+    # of observed vs Y_rep) is the closest analogue.
     pp_check_plot: Any = None
     first_model = model_list[0]
     first_idata = idatas[0]
-
     try:
-        import arviz_plots as azp
-    except ImportError:
-        azp = None
-    plot_ppc_fn = getattr(azp, "plot_ppc_dist", None) if azp is not None else None
-    if not callable(plot_ppc_fn):
-        _plot_failed("pp_check", "arviz_plots.plot_ppc_dist is not available.")
-    else:
-        try:
-            # Ensure posterior_predictive is populated (lazy pattern) WITHOUT
-            # mutating the stored idata: predictive_idata() (inplace=False)
-            # returns a fresh idata carrying the Y_rep group; predict() no
-            # longer mutates result.idata, so we plot from that.
-            # _idata_groups() is used instead of `.groups()` because in ArviZ
-            # 1.1 idata is a DataTree where `.groups` is a property (tuple),
-            # not a method — `.groups()` would raise TypeError.
-            if "posterior_predictive" not in _idata_groups(first_idata):
-                ppc_idata = first_model.predictive_idata()
-            else:
-                ppc_idata = first_idata
-            pp_check_plot = _fig_from_axes(
-                plot_ppc_fn(ppc_idata, num_samples=n_draws_ppc)  # was num_pp_samples
-            )
-            if pp_check_plot is None:
-                _plot_failed("pp_check", "could not extract a Figure from plot_ppc_dist().")
-            else:
-                logger.debug("compare_models: pp_check plot generated.")
-        except Exception as exc:  # noqa: BLE001
-            _plot_failed("pp_check", str(exc))
+        # Ensure posterior_predictive is populated (lazy pattern) WITHOUT
+        # mutating the stored idata: predictive_idata() (inplace=False)
+        # returns a fresh idata carrying the Y_rep group; predict() no
+        # longer mutates result.idata, so we plot from that.
+        if "posterior_predictive" not in _idata_groups(first_idata):
+            ppc_idata = first_model.predictive_idata()
+        else:
+            ppc_idata = first_idata
+        pp_check_plot = _fig_from_axes(
+            az.plot_ppc_dist(ppc_idata, num_samples=n_draws_ppc)  # was num_pp_samples
+        )
+        if pp_check_plot is None:
+            _plot_failed("pp_check", "could not extract a Figure from plot_ppc_dist().")
+        else:
+            logger.debug("compare_models: pp_check plot generated.")
+    except Exception as exc:  # noqa: BLE001
+        _plot_failed("pp_check", str(exc))
 
     # 8. Marginal posterior plot (first model)
     # ArviZ 1.1 removed ``plot_posterior`` / ``plot_density`` from the namespace;
-    # ``plot_dist`` is the canonical marginal-density plot, with ``plot_trace``
-    # as a last-resort fallback.
+    # ``plot_dist`` is the canonical marginal-density plot.
     params_plot: Any = None
-    plot_fn = next(
-        (
-            getattr(az, name)
-            for name in ("plot_dist", "plot_trace")
-            if callable(getattr(az, name, None))
-        ),
-        None,
-    )
-    if plot_fn is None:
-        _plot_failed("params", "no compatible ArviZ marginal-posterior plot function.")
-    else:
-        try:
-            # Keep only scalar params. Per-area random effects (`1|group`) and
-            # per-obs params (mu/kappa) carry extra dims and would explode the
-            # subplot count past matplotlib's `rcParams["plot.max_subplots"]=40`
-            # cap. `scalar_only` is the shared helper used by convergence plots.
-            common_vars = _diagnostic_var_names(first_idata.posterior, policy="scalar_only")
-            kwargs = {"var_names": common_vars} if common_vars else {}
-            params_plot = _fig_from_axes(plot_fn(first_idata, **kwargs))
-            if params_plot is None:
-                _plot_failed(
-                    "params", f"could not extract a Figure from {plot_fn.__name__}()."
-                )
-            else:
-                logger.debug(
-                    "compare_models: params_plot generated via %s (%d vars).",
-                    plot_fn.__name__, len(common_vars) or len(first_idata.posterior.data_vars),
-                )
-        except Exception as exc:  # noqa: BLE001
-            _plot_failed("params", str(exc))
+    try:
+        # Keep only scalar params. Per-area random effects (`1|group`) and
+        # per-obs params (mu/kappa) carry extra dims and would explode the
+        # subplot count past matplotlib's `rcParams["plot.max_subplots"]=40`
+        # cap. `scalar_only` is the shared helper used by convergence plots.
+        common_vars = _diagnostic_var_names(first_idata.posterior, policy="scalar_only")
+        kwargs = {"var_names": common_vars} if common_vars else {}
+        params_plot = _fig_from_axes(az.plot_dist(first_idata, **kwargs))
+        if params_plot is None:
+            _plot_failed("params", "could not extract a Figure from plot_dist().")
+        else:
+            logger.debug(
+                "compare_models: params_plot generated (%d vars).",
+                len(common_vars) or len(first_idata.posterior.data_vars),
+            )
+    except Exception as exc:  # noqa: BLE001
+        _plot_failed("params", str(exc))
 
     # 9. Comparison table + plot (multi-model LOO only). az.compare reuses the
     # already-computed ELPDData objects (no second LOO pass) and defaults to LOO
@@ -575,18 +546,14 @@ def compare_models(
         comparison_table = az.compare(loo_results)
         logger.debug("compare_models: comparison table computed.")
         # Visualise the LOO ranking (ELPD ± SE per model) from the table.
-        plot_compare_fn = getattr(az, "plot_compare", None)
-        if not callable(plot_compare_fn):
-            _plot_failed("compare", "arviz.plot_compare is not available.")
-        else:
-            try:
-                compare_plot = _fig_from_axes(plot_compare_fn(comparison_table))
-                if compare_plot is None:
-                    _plot_failed("compare", "could not extract a Figure from plot_compare().")
-                else:
-                    logger.debug("compare_models: compare plot generated.")
-            except Exception as exc:  # noqa: BLE001
-                _plot_failed("compare", str(exc))
+        try:
+            compare_plot = _fig_from_axes(az.plot_compare(comparison_table))
+            if compare_plot is None:
+                _plot_failed("compare", "could not extract a Figure from plot_compare().")
+            else:
+                logger.debug("compare_models: compare plot generated.")
+        except Exception as exc:  # noqa: BLE001
+            _plot_failed("compare", str(exc))
 
     logger.info(
         "compare_models(): complete — loo=%s, bf=%s, prior_sensitivity=%s, "
