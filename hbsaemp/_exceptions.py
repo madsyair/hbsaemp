@@ -152,5 +152,6 @@ class EstimationError(HBSAEError):
 class ConvergenceWarning(UserWarning):
     """MCMC convergence diagnostics indicate potential problems.
 
-    Typical triggers: r-hat > 1.01, bulk ESS < 400.
+    Typical triggers: r-hat > 1.01, bulk or tail ESS < 100 × n_chains,
+    divergent transitions, maximum tree depth hits, E-BFMI < 0.3.
     """

@@ -1,8 +1,9 @@
 """Convergence diagnostics for fitted HBSAE models.
 
-`check_convergence()` (alias `hbcc`) computes r-hat / ESS via ArviZ, emits
-`ConvergenceWarning` when thresholds are breached, and renders trace / dens /
-acf / rhat / neff / energy plots.
+`check_convergence()` (alias `hbcc`) applies the ArviZ convergence checks —
+rank-normalised split R-hat, bulk / tail ESS, divergences, maximum tree depth
+and E-BFMI — emits `ConvergenceWarning` when a check fails, and renders
+trace / dens / acf / rhat / neff / energy plots.
 """
 from __future__ import annotations
 
@@ -27,52 +28,96 @@ logger = get_logger(__name__)
 __all__: list[str] = ["ConvergenceResult", "check_convergence", "hbcc"]
 
 # Default diagnostic settings
-_DEFAULT_DIAG_TESTS: list[str] = ["rhat", "ess"]
+_DEFAULT_DIAG_TESTS: list[str] = ["rhat", "ess", "divergences", "treedepth", "bfmi"]
 _DEFAULT_PLOT_TYPES: list[str] = ["trace", "dens", "acf", "rhat", "neff", "energy"]
 
-# Convergence thresholds
+# Convergence thresholds — the ``arviz.diagnose`` defaults (Vehtari et al.
+# 2021; Betancourt 2016). The ESS floor scales with the chain count.
 _RHAT_THRESHOLD: float = 1.01
-_ESS_THRESHOLD: int = 400
+_ESS_PER_CHAIN: int = 100
+_BFMI_THRESHOLD: float = 0.3
 
-# Spec-driven warning emission: each tuple is
-#   (diag_test_key, summary_column, threshold, op, label, suffix)
+# Per-parameter checks on the summary table: each tuple is
+#   (diag_test_key, summary_column, op, label, suffix)
 # ``op`` is "gt" (col > threshold) for Rhat and "lt" (col < threshold) for ESS.
-# ``label`` is rendered in the warning text; ``suffix`` is appended verbatim
-# (used only by Tail ESS to mention credible-interval reliability).
-_WARN_SPECS: tuple[tuple[str, str, float, str, str, str], ...] = (
-    ("rhat", "r_hat",    _RHAT_THRESHOLD, "gt", "Rhat",     ""),
-    ("ess",  "ess_bulk", _ESS_THRESHOLD,  "lt", "Bulk ESS", ""),
-    ("ess",  "ess_tail", _ESS_THRESHOLD,  "lt", "Tail ESS",
+# The threshold is looked up by ``diag_test_key`` at call time because the ESS
+# floor depends on the chain count. ``suffix`` is appended verbatim (used only
+# by Tail ESS to mention credible-interval reliability).
+_WARN_SPECS: tuple[tuple[str, str, str, str, str], ...] = (
+    ("rhat", "r_hat",    "gt", "Rhat",     ""),
+    ("ess",  "ess_bulk", "lt", "Bulk ESS", ""),
+    ("ess",  "ess_tail", "lt", "Tail ESS",
      " — credible intervals may be unreliable."),
 )
 
 
-def _emit_convergence_warning(
-    label: str,
-    threshold: float,
-    bad: pd.DataFrame,
-    *,
-    op: str,
-    suffix: str = "",
-) -> None:
-    """Emit one ``ConvergenceWarning`` and a logger entry for a diagnostic.
+def _emit_convergence_warning(message: str) -> None:
+    """Emit one ``ConvergenceWarning`` and a matching logger entry.
 
     ``stacklevel=3`` attributes the warning to the caller of
     :func:`check_convergence`: frames are warn (1) ← this helper (2) ←
     ``check_convergence`` (3) ← user.
     """
-    params = ", ".join(bad.index.tolist()[:5])
-    symbol = ">" if op == "gt" else "<"
-    warnings.warn(
-        f"{label} {symbol} {threshold} for {len(bad)} parameter(s): "
-        f"{params}{'...' if len(bad) > 5 else ''}{suffix}",
-        ConvergenceWarning,
-        stacklevel=3,
-    )
-    logger.warning(
-        "check_convergence: %s %s %s for %d param(s).",
-        label, symbol, threshold, len(bad),
-    )
+    warnings.warn(message, ConvergenceWarning, stacklevel=3)
+    logger.warning("check_convergence: %s", message)
+
+
+def _table_issues(
+    rhat_ess: pd.DataFrame,
+    tests: list[str],
+    thresholds: dict[str, float],
+) -> list[str]:
+    """Describe per-parameter R-hat / ESS breaches in the summary table."""
+    issues: list[str] = []
+    for test, col, op, label, suffix in _WARN_SPECS:
+        if test not in tests or col not in rhat_ess.columns:
+            continue
+        thr = thresholds[test]
+        bad = (
+            rhat_ess[rhat_ess[col] > thr] if op == "gt"
+            else rhat_ess[rhat_ess[col] < thr]
+        )
+        if bad.empty:
+            continue
+        params = ", ".join(bad.index.tolist()[:5])
+        symbol = ">" if op == "gt" else "<"
+        issues.append(
+            f"{label} {symbol} {thr} for {len(bad)} parameter(s): "
+            f"{params}{'...' if len(bad) > 5 else ''}{suffix}"
+        )
+    return issues
+
+
+def _sampler_issues(diag: dict[str, Any], tests: list[str]) -> list[str]:
+    """Describe NUTS sampler problems reported by ``arviz.diagnose``.
+
+    The R-hat and ESS entries of *diag* are not re-reported: the summary table
+    already carries the same R-hat (ArviZ's ``rank`` method is the maximum of
+    the bulk and folded variants) and per-parameter bulk / tail ESS, and the
+    ``ESS / N < 0.001`` ratio check is covered by the ``100 × n_chains`` floor
+    for any run under 100 000 draws per chain.
+    """
+    issues: list[str] = []
+    div = diag.get("divergent")
+    if "divergences" in tests and div and div["n_divergent"] > 0:
+        issues.append(
+            f"{div['n_divergent']} of {div['total_samples']} ({div['pct']:.2f}%) "
+            "transitions diverged — raise target_accept or reparameterise the model."
+        )
+    depth = diag.get("treedepth")
+    if "treedepth" in tests and depth and depth["n_max"] > 0:
+        issues.append(
+            f"{depth['n_max']} of {depth['total_samples']} ({depth['pct']:.2f}%) "
+            "transitions hit the maximum tree depth — exploration may be inefficient."
+        )
+    bfmi = diag.get("bfmi")
+    if "bfmi" in tests and bfmi and bfmi["failed_chains"]:
+        issues.append(
+            f"E-BFMI < {bfmi['threshold']} in chain(s) {bfmi['failed_chains']} "
+            f"(min {float(bfmi['bfmi_values'].min()):.3f}) — the sampler may "
+            "struggle to explore the posterior."
+        )
+    return issues
 
 
 @dataclass
@@ -81,22 +126,23 @@ class ConvergenceResult:
 
     Attributes:
         rhat_ess: DataFrame with ``mean``, ``sd``, ``r_hat``, ``ess_bulk``,
-            ``ess_tail`` per parameter (ArviZ summary).
+            ``ess_tail`` per parameter (ArviZ summary, unrounded floats).
         plots: Dict of ``matplotlib.Figure`` keyed by plot-type name.
             Keys from ``["trace", "dens", "acf", "rhat", "neff", "energy"]``.
         plot_errors: Dict keyed by plot-type name → error message, for plots
             that failed to render (surfaced rather than silently swallowed).
-        geweke: Geweke Z-scores (v2+, ``None`` in v1).
-        heidel: Heidelberger-Welch results (v2+, ``None`` in v1).
-        raftery: Raftery-Lewis results (v2+, ``None`` in v1).
+        diagnose: Detailed results of ``arviz.diagnose`` keyed
+            ``"divergent"``, ``"treedepth"``, ``"bfmi"``, ``"ess"`` and
+            ``"rhat"``. The first three are absent when the sampler did not
+            record the underlying statistic.
+        ess_threshold: Bulk / tail ESS floor applied — ``100 × n_chains``.
     """
 
     rhat_ess: Any = None
     plots: dict[str, Any] = field(default_factory=dict)
     plot_errors: dict[str, str] = field(default_factory=dict)
-    geweke: Any = None
-    heidel: Any = None
-    raftery: Any = None
+    diagnose: dict[str, Any] | None = None
+    ess_threshold: int | None = None
 
     def summary(self) -> str:
         """Human-readable convergence summary."""
@@ -104,35 +150,53 @@ class ConvergenceResult:
             return "ConvergenceResult [not computed — call check_convergence()]"
 
         def _extreme(col: str, fn: str) -> float | None:
-            # Returns ``None`` for missing columns AND all-NaN aggregates
-            # (the latter happens after ArviZ writes "—" / "NA" strings that
-            # ``pd.to_numeric(errors="coerce")`` turned into NaN).
+            # ``None`` for a missing column or an all-NaN aggregate.
             if col not in self.rhat_ess.columns:
                 return None
             val = getattr(self.rhat_ess[col], fn)()
             return float(val) if pd.notna(val) else None
 
+        def _fmt(val: float | None, spec: str) -> str:
+            return format(val, spec) if val is not None else "N/A"
+
         max_rhat     = _extreme("r_hat",    "max")
         min_ess      = _extreme("ess_bulk", "min")
         min_ess_tail = _extreme("ess_tail", "min")
 
-        status = "OK"
-        if max_rhat is not None and max_rhat > _RHAT_THRESHOLD:
-            status = f"WARNING: max Rhat={max_rhat:.4f} > {_RHAT_THRESHOLD}"
-        elif min_ess is not None and min_ess < _ESS_THRESHOLD:
-            status = f"WARNING: min Bulk ESS={min_ess:.0f} < {_ESS_THRESHOLD}"
-        elif min_ess_tail is not None and min_ess_tail < _ESS_THRESHOLD:
-            status = f"WARNING: min Tail ESS={min_ess_tail:.0f} < {_ESS_THRESHOLD}"
+        diag  = self.diagnose or {}
+        div   = diag.get("divergent")
+        depth = diag.get("treedepth")
+        bfmi  = diag.get("bfmi")
+        min_bfmi = float(bfmi["bfmi_values"].min()) if bfmi else None
 
-        max_rhat_str     = f"{max_rhat:.4f}"     if max_rhat     is not None else "N/A"
-        min_ess_str      = f"{min_ess:.0f}"      if min_ess      is not None else "N/A"
-        min_ess_tail_str = f"{min_ess_tail:.0f}" if min_ess_tail is not None else "N/A"
+        issues: list[str] = []
+        if max_rhat is not None and max_rhat > _RHAT_THRESHOLD:
+            issues.append(f"max Rhat={max_rhat:.4f} > {_RHAT_THRESHOLD}")
+        if self.ess_threshold is not None:
+            if min_ess is not None and min_ess < self.ess_threshold:
+                issues.append(f"min Bulk ESS={min_ess:.0f} < {self.ess_threshold}")
+            if min_ess_tail is not None and min_ess_tail < self.ess_threshold:
+                issues.append(f"min Tail ESS={min_ess_tail:.0f} < {self.ess_threshold}")
+        if div and div["n_divergent"] > 0:
+            issues.append(f"{div['n_divergent']} divergent transition(s)")
+        if depth and depth["n_max"] > 0:
+            issues.append(f"{depth['n_max']} max tree depth hit(s)")
+        if bfmi and bfmi["failed_chains"]:
+            issues.append(f"min E-BFMI={min_bfmi:.3f} < {bfmi['threshold']}")
+        status = ("WARNING: " + "; ".join(issues)) if issues else "OK"
+
+        div_str   = f"{div['n_divergent']} ({div['pct']:.2f}%)"  if div   else "N/A"
+        depth_str = f"{depth['n_max']} ({depth['pct']:.2f}%)"    if depth else "N/A"
         return (
             f"ConvergenceResult\n"
             f"  Parameters   : {len(self.rhat_ess)}\n"
-            f"  Max Rhat     : {max_rhat_str}\n"
-            f"  Min ESS bulk : {min_ess_str}\n"
-            f"  Min ESS tail : {min_ess_tail_str}\n"
+            f"  Max Rhat     : {_fmt(max_rhat, '.4f')}\n"
+            f"  Min ESS bulk : {_fmt(min_ess, '.0f')}\n"
+            f"  Min ESS tail : {_fmt(min_ess_tail, '.0f')}\n"
+            f"  ESS threshold: {self.ess_threshold if self.ess_threshold is not None else 'N/A'}\n"
+            f"  Divergences  : {div_str}\n"
+            f"  Tree depth   : {depth_str}\n"
+            f"  Min E-BFMI   : {_fmt(min_bfmi, '.3f')}\n"
             f"  Plots        : {list(self.plots.keys())}\n"
             + (f"  Plot errors  : {len(self.plot_errors)}\n" if self.plot_errors else "")
             + f"  Status       : {status}"
@@ -153,12 +217,17 @@ def check_convergence(
 
     Python equivalent of ``hbcc()`` in R hbsaems.
 
-    Computes:
+    Applies the ArviZ convergence checks (``arviz.summary`` and
+    ``arviz.diagnose``); each failing check emits a
+    :class:`~hbsaemp._exceptions.ConvergenceWarning`:
 
-    * **Rhat** (:math:`\hat{R}`) — potential scale reduction factor per
-      parameter.  Values > 1.01 trigger a :class:`~hbsaemp._exceptions.ConvergenceWarning`.
-    * **ESS** (bulk / tail) — effective sample size.
-      Values < 400 trigger a warning.
+    * ``"rhat"`` — rank-normalised split :math:`\hat{R}` (maximum of the bulk
+      and folded variants) above 1.01 for any parameter.
+    * ``"ess"`` — bulk or tail effective sample size below
+      :math:`100 \times` the number of chains.
+    * ``"divergences"`` — any divergent NUTS transition.
+    * ``"treedepth"`` — any transition that hit the maximum tree depth.
+    * ``"bfmi"`` — E-BFMI below 0.3 in any chain.
 
     Generates diagnostic plots (each stored as a ``matplotlib.Figure``):
 
@@ -171,13 +240,14 @@ def check_convergence(
 
     Args:
         model: A fitted :class:`~hbsaemp.models._base.BaseModel`.
-        diag_tests: Diagnostic tests to run.  Default ``["rhat", "ess"]``.
-        plot_types: Plots to generate.  Default: all five listed above.
+        diag_tests: Checks allowed to emit warnings.  Default: all five listed
+            above.  Every check is still computed and stored.
+        plot_types: Plots to generate.  Default: all six listed above.
             Pass ``[]`` to skip plotting.
 
     Returns:
-        :class:`ConvergenceResult` with ``rhat_ess`` DataFrame and ``plots``
-        dict.
+        :class:`ConvergenceResult` with the ``rhat_ess`` table, the
+        ``diagnose`` sampler checks and the ``plots`` dict.
 
     Raises:
         ModelNotFittedError: If *model* has not been fitted.
@@ -214,35 +284,43 @@ def check_convergence(
     # TypeError, var_names=None processes ALL rows — both reintroduce the bug.
     summary_vars = _diagnostic_var_names(idata.posterior, policy="scalar_and_group")
     if summary_vars:
-        summary_df = az.summary(idata, var_names=summary_vars)
+        # round_to="none": the default "auto" rounds R-hat to two decimals and
+        # returns strings, so an R-hat of 1.0147 reads as "1.01" and slips past
+        # the > 1.01 check.
+        summary_df = az.summary(idata, var_names=summary_vars, round_to="none")
     else:
         summary_df = pd.DataFrame()  # no scalar params (defensive; never in practice)
     keep_cols = ["mean", "sd", "r_hat", "ess_bulk", "ess_tail"]
     available = [c for c in keep_cols if c in summary_df.columns]
     rhat_ess = summary_df[available].copy()
-    # ArviZ ≥0.20 returns ``r_hat`` / ``ess_bulk`` / ``ess_tail`` as ``object``
-    # dtype when any value renders as a string (e.g. "—" for diverged params).
-    # Coerce upfront so threshold comparisons below and ``.max()`` / ``.min()``
-    # in ``ConvergenceResult.summary()`` see plain floats (NaN where unparseable).
-    for col in ("r_hat", "ess_bulk", "ess_tail"):
-        if col in rhat_ess.columns:
-            rhat_ess[col] = pd.to_numeric(rhat_ess[col], errors="coerce")
 
-    # 2. Issue warnings
-    # Spec-driven loop over ``_WARN_SPECS`` keeps the three Rhat/Bulk/Tail
-    # branches in sync — same message shape, same logger call, single
-    # ``stacklevel=3`` attribution to the caller of ``check_convergence``.
-    for test, col, thr, op, label, suffix in _WARN_SPECS:
-        if test not in resolved_tests or col not in rhat_ess.columns:
-            continue
-        bad = (
-            rhat_ess[rhat_ess[col] > thr] if op == "gt"
-            else rhat_ess[rhat_ess[col] < thr]
+    # 2. Sampler-level checks via ArviZ diagnose
+    # Divergences, tree depth and E-BFMI live in ``sample_stats`` and have no
+    # per-parameter row in the summary table.
+    ess_threshold = _ESS_PER_CHAIN * int(idata.posterior.sizes["chain"])
+    diag: dict[str, Any] | None = None
+    if summary_vars:
+        _, diag = az.diagnose(
+            idata,
+            var_names=summary_vars,
+            rhat_max=_RHAT_THRESHOLD,
+            ess_threshold=ess_threshold,
+            bfmi_threshold=_BFMI_THRESHOLD,
+            show_diagnostics=False,
+            return_diagnostics=True,
         )
-        if not bad.empty:
-            _emit_convergence_warning(label, thr, bad, op=op, suffix=suffix)
 
-    # 3. Generate plots
+    # 3. Issue warnings
+    # Pure helpers collect the messages; emitting them from here keeps every
+    # warning's ``stacklevel=3`` attribution pointing at the caller.
+    thresholds = {"rhat": _RHAT_THRESHOLD, "ess": ess_threshold}
+    issues = _table_issues(rhat_ess, resolved_tests, thresholds)
+    if diag is not None:
+        issues += _sampler_issues(diag, resolved_tests)
+    for message in issues:
+        _emit_convergence_warning(message)
+
+    # 4. Generate plots
     # ``_CONVERGENCE_PLOT_CANDIDATES`` (in ``_plot_utils``) lists fallback
     # ArviZ function names per plot type; the first callable on the installed
     # ArviZ wins.  ``_fig_from_axes`` then turns whatever the plot fn returns
@@ -302,7 +380,13 @@ def check_convergence(
         len(rhat_ess), len(plots),
     )
 
-    return ConvergenceResult(rhat_ess=rhat_ess, plots=plots, plot_errors=plot_errors)
+    return ConvergenceResult(
+        rhat_ess=rhat_ess,
+        plots=plots,
+        plot_errors=plot_errors,
+        diagnose=diag,
+        ess_threshold=ess_threshold,
+    )
 
 
 #: R-style alias — ``hbcc(model)`` is equivalent to ``check_convergence(model)``.

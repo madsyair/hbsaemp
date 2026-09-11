@@ -39,8 +39,8 @@ print(diag.summary())
 
 The R-style alias `hbcc` is the same function.
 
-By default this computes the diagnostics and renders density, rank and energy plots. The
-pair plot is opt-in because it is slow:
+By default this computes the diagnostics and renders trace, density, autocorrelation,
+R-hat, ESS and energy plots. The pair plot is opt-in because it is slow:
 
 ```python
 diag = check_convergence(model, plot_types=["dens", "rhat", "energy", "pair"])
@@ -48,17 +48,24 @@ diag = check_convergence(model, plot_types=["dens", "rhat", "energy", "pair"])
 
 ## Check it worked
 
-Three numbers decide the verdict. Any one of them out of range triggers a
-`ConvergenceWarning`.
+The checks follow ArviZ's `summary()` and `diagnose()`. Any one of them out of range
+triggers a `ConvergenceWarning`.
 
 | Diagnostic | Acceptable | What it means when it is not |
 | --- | --- | --- |
 | R-hat | ≤ 1.01 | Chains disagree; they explored different regions |
-| Bulk ESS | ≥ 400 | Too few effective draws for the posterior centre |
-| Tail ESS | ≥ 400 | Credible intervals are unreliable, even if the mean looks fine |
+| Bulk ESS | ≥ 100 × chains (400 with the default 4) | Too few effective draws for the posterior centre |
+| Tail ESS | ≥ 100 × chains | Credible intervals are unreliable, even if the mean looks fine |
+| Divergences | 0 | The sampler could not follow the posterior somewhere; draws near there are biased |
+| Tree depth hits | 0 | Trajectories were cut short, so exploration is slow |
+| E-BFMI | ≥ 0.3 in every chain | The sampler struggles to move between energy levels |
 
-Read all three. A good R-hat with a poor tail ESS is a common and dangerous
+Read all of them. A good R-hat with a poor tail ESS is a common and dangerous
 combination: the point estimate looks settled while the interval around it is noise.
+
+The per-parameter numbers are in `diag.rhat_ess`, the sampler-level counts in
+`diag.diagnose` (the detailed output of `arviz.diagnose`), and the ESS floor that was
+applied in `diag.ess_threshold`.
 
 `ConvergenceWarning` is a warning, not an error, which has a practical consequence:
 
