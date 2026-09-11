@@ -639,6 +639,8 @@ def test_result_dataclasses_constructable():
     comp = hb.ComparisonResult()
     assert comp.loo is None
     assert comp.compare_plot is None
+    assert comp.bayes_factor is None and comp.prior_sensitivity is None
+    assert comp.plot_errors == {}
 
     ae = hb.AreaEstimatesResult()
     assert ae.result_table.empty

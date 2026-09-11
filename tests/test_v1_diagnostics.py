@@ -46,6 +46,19 @@ def gaussian_model(data_gaussian: pd.DataFrame) -> hb.BaseModel:
     return m
 
 
+@pytest.fixture(scope="module")
+def beta_model_small(data_beta: pd.DataFrame) -> hb.BaseModel:
+    """Nested competitor of ``beta_model`` on the same data (drops ``x2``)."""
+    cfg = hb.ModelConfig(draws=200, tune=200, chains=2, cores=1,
+                         target_accept=0.9, random_seed=42)
+    m = hb.create_model(
+        "y ~ x1 + (1|group)",
+        family="beta", data=data_beta, n="n", deff="deff", config=cfg,
+    )
+    m.fit()
+    return m
+
+
 # ===========================================================================
 # check_convergence()
 # ===========================================================================
@@ -301,6 +314,74 @@ class TestCompareModelsSingle:
         r = repr(result)
         assert "ComparisonResult" in r
 
+    def test_summary_reports_pareto_k(self, beta_model):
+        s = hb.compare_models(beta_model).summary()
+        assert "Pareto k" in s
+
+    def test_plot_errors_empty_on_success(self, beta_model):
+        result = hb.compare_models(beta_model)
+        assert result.plot_errors == {}
+
+
+# ===========================================================================
+# compare_models() — Bayes factors and prior sensitivity
+# ===========================================================================
+
+class TestCompareModelsBayesFactor:
+
+    def test_bf_table_per_coefficient(self, beta_model):
+        result = hb.compare_models(beta_model, metrics=["loo", "bf"])
+        bf = result.bayes_factor
+        assert isinstance(bf, pd.DataFrame)
+        assert set(bf.index) == {"x1", "x2"}  # intercept excluded
+        assert list(bf.columns) == ["BF10", "BF01"]
+        assert (bf["BF10"] > 0).all()
+        assert ((bf["BF10"] * bf["BF01"]) - 1).abs().max() < 1e-9
+
+    def test_bf_only_skips_loo(self, beta_model):
+        result = hb.compare_models(beta_model, metrics="bf")
+        assert result.loo is None
+        assert result.bayes_factor is not None
+        assert "BF10" in result.summary()
+
+    def test_bf_list_input_is_dict(self, beta_model):
+        result = hb.compare_models([beta_model], metrics=["bf"])
+        assert isinstance(result.bayes_factor, dict)
+        assert "model_0" in result.bayes_factor
+
+    def test_bf_does_not_mutate_idata(self, beta_model):
+        groups0 = tuple(beta_model.result.idata.groups)
+        hb.compare_models(beta_model, metrics=["bf"])
+        assert tuple(beta_model.result.idata.groups) == groups0
+
+
+class TestCompareModelsPriorSensitivity:
+
+    def test_psense_table(self, beta_model):
+        result = hb.compare_models(beta_model, run_prior_sensitivity=True)
+        ps = result.prior_sensitivity
+        assert isinstance(ps, pd.DataFrame)
+        assert {"prior", "likelihood", "diagnosis"} <= set(ps.columns)
+        assert pd.api.types.is_float_dtype(ps["prior"])
+
+    def test_sensitivity_vars_restrict_rows(self, beta_model):
+        result = hb.compare_models(
+            beta_model, run_prior_sensitivity=True, sensitivity_vars=["x1"]
+        )
+        assert len(result.prior_sensitivity) == 1
+
+    def test_does_not_mutate_idata(self, beta_model):
+        """log_prior and the rebuilt offsets live on a copy only."""
+        groups0 = tuple(beta_model.result.idata.groups)
+        hb.compare_models(beta_model, run_prior_sensitivity=True)
+        assert tuple(beta_model.result.idata.groups) == groups0
+        posterior_vars = beta_model.result.idata.posterior.data_vars
+        assert not any(str(v).endswith("_offset") for v in posterior_vars)
+
+    def test_summary_reports_prior_sensitivity(self, beta_model):
+        s = hb.compare_models(beta_model, run_prior_sensitivity=True).summary()
+        assert "Prior sensitivity" in s
+
 
 # ===========================================================================
 # compare_models() — multiple models
@@ -308,30 +389,35 @@ class TestCompareModelsSingle:
 
 class TestCompareModelsMulti:
 
-    def test_comparison_table_exists(self, beta_model, gaussian_model):
+    def test_comparison_table_exists(self, beta_model, beta_model_small):
         """Multi-model comparison should produce a comparison table."""
-        result = hb.compare_models([beta_model, gaussian_model])
+        result = hb.compare_models([beta_model, beta_model_small])
         assert result.comparison_table is not None
 
-    def test_comparison_table_is_dataframe(self, beta_model, gaussian_model):
-        result = hb.compare_models([beta_model, gaussian_model])
-        if result.comparison_table is not None:
-            assert isinstance(result.comparison_table, pd.DataFrame)
+    def test_comparison_table_is_dataframe(self, beta_model, beta_model_small):
+        result = hb.compare_models([beta_model, beta_model_small])
+        assert isinstance(result.comparison_table, pd.DataFrame)
 
-    def test_loo_is_dict_for_multi(self, beta_model, gaussian_model):
-        models = [beta_model, gaussian_model]
+    def test_loo_is_dict_for_multi(self, beta_model, beta_model_small):
+        models = [beta_model, beta_model_small]
         result = hb.compare_models(models)
         assert isinstance(result.loo, dict)
         # Keys follow the documented "model_<i>" convention (see comparison.py).
         for i in range(len(models)):
             assert f"model_{i}" in result.loo
 
-    def test_compare_plot_for_multi(self, beta_model, gaussian_model):
-        """≥2 models → az.plot_compare summary (best-effort: Figure or None)."""
+    def test_compare_plot_for_multi(self, beta_model, beta_model_small):
+        """≥2 models → az.plot_compare summary; failures land in plot_errors."""
         import matplotlib.figure
-        result = hb.compare_models([beta_model, gaussian_model])
-        if result.compare_plot is not None:
-            assert isinstance(result.compare_plot, matplotlib.figure.Figure)
+        result = hb.compare_models([beta_model, beta_model_small])
+        assert "compare" not in result.plot_errors
+        assert isinstance(result.compare_plot, matplotlib.figure.Figure)
+
+    def test_rejects_models_fitted_to_different_data(self, beta_model, gaussian_model):
+        """Equal row counts (100 each) but different responses — az.compare
+        alone would accept this; the guard must not."""
+        with pytest.raises(ValueError, match="different observations"):
+            hb.compare_models([beta_model, gaussian_model])
 
 
 # ===========================================================================
@@ -339,7 +425,7 @@ class TestCompareModelsMulti:
 # ===========================================================================
 # The pure-logic contract lives in tests/test_v0_comparison_args.py (fast, no
 # Bambi). These confirm the validator is actually wired into compare_models on a
-# real fitted model — advertised-but-unsupported args must raise, not be ignored.
+# real fitted model — unsupported args must raise, not be ignored.
 
 class TestCompareModelsArgValidation:
 
@@ -351,12 +437,8 @@ class TestCompareModelsArgValidation:
         with pytest.raises(ValueError):
             hb.compare_models(beta_model, metrics=[])
 
-    def test_rejects_prior_sensitivity(self, beta_model):
-        with pytest.raises(NotImplementedError):
-            hb.compare_models(beta_model, run_prior_sensitivity=True)
-
-    def test_rejects_sensitivity_vars(self, beta_model):
-        with pytest.raises(NotImplementedError):
+    def test_rejects_sensitivity_vars_without_run(self, beta_model):
+        with pytest.raises(ValueError, match="run_prior_sensitivity"):
             hb.compare_models(beta_model, sensitivity_vars=["x1"])
 
     def test_rejects_invalid_ppc_draws(self, beta_model):
@@ -378,14 +460,14 @@ class TestCompareModelsUsesPrecomputedLoo:
     """Multi-model az.compare must receive the precomputed ELPDData dict (no
     second LOO pass), keyed ``model_<i>``."""
 
-    def test_compare_receives_elpd_dict(self, beta_model, gaussian_model):
+    def test_compare_receives_elpd_dict(self, beta_model, beta_model_small):
         import unittest.mock as mock
 
         import arviz as az
 
         original_compare = az.compare
         with mock.patch("arviz.compare", wraps=original_compare) as spy:
-            hb.compare_models([beta_model, gaussian_model])
+            hb.compare_models([beta_model, beta_model_small])
 
         assert spy.call_count == 1
         compare_arg = spy.call_args.args[0]
