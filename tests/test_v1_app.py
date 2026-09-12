@@ -426,7 +426,7 @@ def test_to_code_uses_result_table_not_estimates(data_gaussian: pd.DataFrame):
 
 
 # ---------------------------------------------------------------------------
-# matplotlib.use("Agg") scoping (diagnostics-frontend.md S5)
+# matplotlib.use("Agg")
 # ---------------------------------------------------------------------------
 
 def test_matplotlib_use_agg_not_at_tab_import_time():
@@ -442,7 +442,7 @@ def test_matplotlib_use_agg_not_at_tab_import_time():
 
 
 # ---------------------------------------------------------------------------
-# Save Model + Model Comparison (new architecture)
+# Save Model + Model Comparison 
 # ---------------------------------------------------------------------------
 
 def test_save_button_disabled_until_fit(data_gaussian: pd.DataFrame):
@@ -604,7 +604,7 @@ def test_use_model_button_sets_independent_copy(data_gaussian: pd.DataFrame):
 
 
 # ---------------------------------------------------------------------------
-# ResultsTab: stale-result clearing, ci_prob, error mapping (estimation-frontend.md)
+# ResultsTab: stale-result clearing, ci_prob, error mapping 
 # ---------------------------------------------------------------------------
 
 def test_results_clear_on_model_change():
@@ -664,7 +664,7 @@ def test_sae_blocking_passes_ci_prob_and_new_data(data_gaussian: pd.DataFrame, m
 
 
 # ---------------------------------------------------------------------------
-# Convergence plot titles (diagnostics-frontend.md S4)
+# Convergence plot titles 
 # ---------------------------------------------------------------------------
 
 def test_rhat_plot_title_is_distribution_not_forest():
@@ -718,9 +718,10 @@ def test_comparison_table_uses_saved_names_not_generic_labels(data_gaussian: pd.
 
 
 def test_bayes_factor_option_defaults_off():
-    """The crash this guards against only fires when metrics includes
-    "bf" — off by default, so the ordinary LOO-only path (safe on every
-    tested ArviZ version) is what happens unless the user opts in."""
+    """Off by default — not because it's crash-prone (the backend's
+    _bf_frame() correctly handles arviz>=1.2.0's xarray.Dataset shape now),
+    but because it's an extra statistic most comparisons don't need, and
+    it costs another prior_predictive_idata() sampling pass per model."""
     state = AppState()
     rt = ResultsTab(state=state)
     assert rt._compare_bf_cb.value is False
@@ -728,12 +729,12 @@ def test_bayes_factor_option_defaults_off():
 
 @pytest.mark.slow
 def test_bayes_factor_rendered_with_saved_names_when_enabled(data_gaussian: pd.DataFrame):
-    """`metrics=["loo", "bf"]` requires ArviZ's `bayes_factor()` to return
-    the plain-dict shape (ArviZ <= 1.1.x) — see the accompanying bug
-    report for versions where it instead returns an xarray.Dataset and
-    crashes `_bayes_factor_table()`. This test exercises the opt-in path
-    itself; it isn't a substitute for pinning/fixing that ArviZ-version
-    dependency."""
+    """`metrics=["loo", "bf"]` exercises the backend's `_bf_frame()`, which
+    reshapes `az.bayes_factor()`'s `xarray.Dataset` return (arviz-stats
+    >= 1.2.0, this project's pinned floor) into a BF10/BF01 table. This
+    test checks the GUI's rendering (saved names, not "model_0"/"model_1")
+    on top of that — it isn't a substitute for the backend's own tests of
+    `_bf_frame()` itself."""
     import asyncio
 
     state = AppState()
@@ -780,7 +781,6 @@ def test_bayes_factor_rendered_with_saved_names_when_enabled(data_gaussian: pd.D
 
 # ---------------------------------------------------------------------------
 # Update Model: max_treedepth, formula template, UserWarning capture
-# (estimation-frontend.md S5, S6, S7)
 # ---------------------------------------------------------------------------
 
 def test_update_tab_has_treedepth_override():

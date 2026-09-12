@@ -1,12 +1,4 @@
 """Tab 5 — Update Model: refit an already-fitted model.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny                          Panel v1 equivalent
-    ────────────────────────────────  ──────────────────────────────────
-    actionButton("update_model", …)  pn.widgets.Button
-    withProgress(…)                  async handler + button.loading
 """
 
 from __future__ import annotations

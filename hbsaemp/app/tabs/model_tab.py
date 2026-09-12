@@ -1,17 +1,4 @@
 """Tab 3 — Model specification and fitting.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny                             Panel v1 equivalent
-    ───────────────────────────────────  ──────────────────────────────────
-    selectInput("response_var", …)      pn.widgets.Select
-    pickerInput("auxiliary_vars", …)    PredictorCheckboxes (pn.FlexBox of Checkbox)
-    selectInput("group_var", …)         pn.widgets.Select
-    selectInput("distribution_type", …) pn.widgets.Select (list_families())
-    selectInput("hb_link", …)           pn.widgets.Select (spec.supported_links)
-    actionButton("fit_model", …)        pn.widgets.Button
-    withProgress(…)                     async handler + button.loading
 """
 
 from __future__ import annotations
@@ -241,7 +228,7 @@ class ModelTab(param.Parameterized):
         super().__init__(state=state, **params)
 
         # The single model draft threaded through Preview -> Build ->
-        # Prior Check -> Fit (task #10). `None` whenever the current widget
+        # Prior Check -> Fit. `None` whenever the current widget
         # selection cannot build a model; the exception message *is* the
         # validation message (no separate `_validate_build()`).
         self._model_draft: BaseModel | None = None
@@ -260,7 +247,7 @@ class ModelTab(param.Parameterized):
         )
         self._intercept_cb = pn.widgets.Checkbox(name="Include intercept", value=True)
 
-        # --- Family / link (registry-driven — task #7) --------------------------
+        # --- Family / link (registry-driven) --------------------------
         families = list_families()
         default_family = "gaussian" if "gaussian" in families else families[0]
         self._family_sel = pn.widgets.Select(
@@ -273,7 +260,7 @@ class ModelTab(param.Parameterized):
         self._refresh_extra_params(default_family)
         self._family_sel.param.watch(self._on_family_change, "value")
 
-        # --- Sampler configuration (task #9) -------------------------------------
+        # --- Sampler configuration -------------------------------------
         self._draws_in = pn.widgets.IntInput(name="draws", value=1000, start=1, max_width=140)
         self._tune_in  = pn.widgets.IntInput(name="tune",  value=1000, start=0, max_width=140)
         self._chains_in = pn.widgets.IntInput(name="chains", value=4, start=1, max_width=140)
@@ -581,7 +568,7 @@ class ModelTab(param.Parameterized):
             msg += f"<br><br>{n_dropped} row(s) with missing values were dropped before modeling."
         self._build_status.object = _success_box(msg)
 
-    # Prior Predictive Check (task #12) — check_prior() only, no raw Bambi/hand-rolled plots
+    # Prior Predictive Check — check_prior() only, no raw Bambi/hand-rolled plots
 
     async def _on_prior_check(self, event: Any) -> None:
         if self._prior_run_btn.loading:
