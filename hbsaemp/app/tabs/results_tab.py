@@ -523,7 +523,7 @@ class ResultsTab(param.Parameterized):
         self._use_model_btn.disabled = False
         self._compare_status.object = _success_box(
             f"Compared {len(names)} model(s): {', '.join(names)}. "
-            "Pick one below and click <b>Use Selected Model</b> to make it active."
+            "Select a model below and click <b>Use Selected Model</b> to use it for estimation."
         )
 
     def _on_use_model_click(self, event: Any) -> None:
@@ -714,7 +714,7 @@ class ResultsTab(param.Parameterized):
                 self._compare_result_pane,
                 pn.layout.Divider(),
                 pn.pane.Markdown("**Select a model to use:**", margin=(4, 0, 4, 0)),
-                pn.Row(self._use_model_sel, self._use_model_btn),
+                pn.Column(self._use_model_sel, self._use_model_btn),
                 self._use_model_status,
             ),
             title="Model Comparison",
