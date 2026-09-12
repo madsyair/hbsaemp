@@ -1,5 +1,4 @@
 """Tab 4 — Results: diagnostics, model comparison, refit, and export.
-
 Sub-tabs (in workflow order — convergence is checked before anything
 built on top of the posterior is trusted, per standard Bayesian workflow):
 
@@ -13,17 +12,6 @@ built on top of the posterior is trusted, per standard Bayesian workflow):
    :class:`~hbsaemp.app.tabs.update_tab.UpdateModelTab`.
 4. **SAE Estimation** — small-area estimates from `estimate_areas()`,
    including out-of-sample prediction for unsampled areas.
-
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny output                          Panel v1 equivalent
-    ─────────────────────────────────────── ──────────────────────────────────
-    verbatimTextOutput("diag_numerical")    pn.widgets.Tabulator (rhat_ess)
-    plotOutput("diag_plots")                pn.pane.Matplotlib (ConvergenceResult.plots)
-    DT::dataTableOutput("sae_table")        pn.widgets.Tabulator (AreaEstimatesResult.result_table)
-    downloadButton("download_estimates")    pn.widgets.FileDownload
 """
 
 from __future__ import annotations
@@ -442,11 +430,14 @@ class ResultsTab(param.Parameterized):
     def _compare_blocking(models: list[Any], with_bf: bool = False) -> ComparisonResult:
         """Synchronous, Panel-free — runs in the executor thread.
 
-        ``metrics=["loo", "bf"]`` requires ArviZ's ``bayes_factor()`` to
-        return the plain-``dict`` shape it had through 1.1.x — a later
-        ArviZ switched to returning an ``xarray.Dataset`` instead, which
-        breaks ``_bayes_factor_table()`` (backend team is tracking this;
-        see the accompanying bug report). Only opt into it explicitly.
+        ``metrics=["loo", "bf"]`` is opt-in (checkbox default off) rather
+        than always-on. Not because it's unsafe now — the backend's
+        ``_bf_frame()`` correctly handles the ``xarray.Dataset`` shape
+        ``az.bayes_factor()`` returns since arviz-stats 1.2.0, which is
+        this project's pinned floor (``arviz>=1.2.0`` in pyproject.toml) —
+        but because it's an extra statistic most comparisons don't need,
+        and it costs another `prior_predictive_idata()` sampling pass per
+        model on top of LOO.
         """
         metrics = ["loo", "bf"] if with_bf else None
         return compare_models(models, metrics=metrics)
@@ -713,10 +704,7 @@ class ResultsTab(param.Parameterized):
         modelcomparison_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "Compare models saved from the <b>Modeling</b> tab's <i>Save "
-                    "Model</i> button, via `compare_models()` (LOO/ELPD ranking). "
-                    "Only models that had already converged when saved can be "
-                    "selected — check them above before running Fit Model again.",
+                    "Only models that had already converged when saved can be selected.",
                     margin=(4, 0, 8, 0),
                 ),
                 self._compare_table,
@@ -725,7 +713,7 @@ class ResultsTab(param.Parameterized):
                 self._compare_status,
                 self._compare_result_pane,
                 pn.layout.Divider(),
-                pn.pane.Markdown("**Pick a winner:**", margin=(4, 0, 4, 0)),
+                pn.pane.Markdown("**Select a model to use:**", margin=(4, 0, 4, 0)),
                 pn.Row(self._use_model_sel, self._use_model_btn),
                 self._use_model_status,
             ),
