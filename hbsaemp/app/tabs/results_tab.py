@@ -345,7 +345,7 @@ class ResultsTab(param.Parameterized):
         )
         self._compare_status = pn.pane.HTML("")
         self._compare_result_pane = pn.Column()
-        self._use_model_sel = pn.widgets.Select(name="Use this model:", options=[], max_width=220)
+        self._use_model_sel = pn.widgets.Select(name="Use this model", options=[], max_width=220)
         self._use_model_btn = pn.widgets.Button(
             name="Use Selected Model", button_type="success", max_width=220, disabled=True,
         )
@@ -523,7 +523,7 @@ class ResultsTab(param.Parameterized):
         self._use_model_btn.disabled = False
         self._compare_status.object = _success_box(
             f"Compared {len(names)} model(s): {', '.join(names)}. "
-            "Select a model below and click <b>Use Selected Model</b> to use it for estimation."
+            "Pick one below and click <b>Use Selected Model</b> to make it active."
         )
 
     def _on_use_model_click(self, event: Any) -> None:
@@ -542,7 +542,8 @@ class ResultsTab(param.Parameterized):
         self.state.model = copy.copy(saved[name].model)
         self.state.param.trigger("model")
         self._use_model_status.object = _success_box(
-            f"<b>{name}</b> is now has been selected."
+            f"<b>{name}</b> is now the active model. Check Convergence Evaluation, "
+            "Update Model, or SAE Estimation above/below."
         )
 
     # SAE Estimation
