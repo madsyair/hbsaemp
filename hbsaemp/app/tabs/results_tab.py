@@ -306,11 +306,16 @@ class ResultsTab(param.Parameterized):
 
     def _build_comparison_widgets(self) -> None:
         self._compare_table = pn.widgets.Tabulator(
-            pd.DataFrame(columns=["Model"]),
-            show_index=False,
-            selectable="checkbox",
-            disabled=True,  # read-only cells; only row selection is interactive
-        )
+        # `columns=["Model"]` alone gives an empty column typed float64
+        # (pandas' default for an empty column), which makes Tabulator.js
+        # treat it as a numeric column — a later string value then
+        # renders as NaN instead of the model's name. Force the dtype
+        # explicitly so it's a text column from the start.
+        pd.DataFrame({"Model": pd.Series(dtype="object")}),
+        show_index=False,
+        selectable="checkbox",
+        disabled=True,
+)
         self._compare_bf_cb = pn.widgets.Checkbox(
             name="Include Bayes Factor (Savage-Dickey, per coefficient)", value=False,
         )
@@ -335,7 +340,12 @@ class ResultsTab(param.Parameterized):
 
     def _refresh_saved_models_table(self) -> None:
         saved = self.state.saved_models or {}
-        self._compare_table.value = pd.DataFrame({"Model": list(saved.keys())})
+        # dtype="object" for the same reason as the initial construction —
+        # pd.DataFrame({"Model": []}) on an empty dict would default to
+        # float64 and make Tabulator.js render later names as NaN.
+        self._compare_table.value = pd.DataFrame(
+        {"Model": pd.Series(list(saved.keys()), dtype="object")}
+        )
         self._use_model_sel.options = [None, *saved.keys()]
 
     async def _on_compare_click(self, event: Any) -> None:
