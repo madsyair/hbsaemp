@@ -639,8 +639,7 @@ class ModelTab(param.Parameterized):
 
         self.state.model = fitted
         self._fit_status.object = _success_box(
-            "The MCMC sampling has completed. See the <b>Results</b> tab for "
-            "diagnostics and SAE estimates."
+            "The MCMC sampling has completed."
         )
         self._save_btn.disabled = self._save_name_in.disabled = False
         if not self._save_name_in.value:
@@ -709,8 +708,7 @@ class ModelTab(param.Parameterized):
             "will not let you select it for comparison until it converges.</b>"
         )
         self._save_status.object = status(
-            f"Saved as <b>{name}</b>. Open <b>Results → Model Comparison</b> to "
-            f"compare it against other saved models.{note}"
+            f"Saved as <b>{name}</b>.{note}"
         )
         self._save_name_in.value = f"Model {len(self.state.saved_models) + 1}"
 
@@ -817,7 +815,7 @@ class ModelTab(param.Parameterized):
                     "A prior predictive check assesses the plausibility of the prior before fitting the model",
                     margin=(4, 0, 8, 0),
                 ),
-                pn.Row(self._prior_run_btn, self._prior_n_draws),
+                pn.Column(self._prior_run_btn, self._prior_n_draws),
                 self._prior_status,
                 pn.layout.Divider(),
                 pn.pane.Markdown("#### Prior Summary"),
@@ -845,7 +843,7 @@ class ModelTab(param.Parameterized):
                     "in <b>Results → Model Comparison</b>.",
                     margin=(4, 0, 4, 0),
                 ),
-                pn.Row(self._save_name_in, self._save_btn),
+                pn.Column(self._save_name_in, self._save_btn),
                 self._save_status,
             ),
             title="Fit Model",
