@@ -296,9 +296,8 @@ def test_end_to_end_fit_and_sae(data_gaussian: pd.DataFrame):
         "mean", "sd", "ci_lower", "ci_upper", "rse_pct", "mse", "rmse",
     }
 
-    conv, warnings_ = rt._convergence_blocking(state.model)
+    conv = rt._convergence_blocking(state.model)
     assert conv.rhat_ess is not None
-    assert isinstance(warnings_, list)
 
 
 # ---------------------------------------------------------------------------
@@ -515,61 +514,20 @@ def test_model_comparison_table_reflects_saved_models():
     assert rt._compare_table.value.empty
 
     state.saved_models = {
-        "Model A": SavedModel(model=object(), converged=True, warnings=[]),
-        "Model B": SavedModel(model=object(), converged=False, warnings=["Rhat too high"]),
+        "Model A": SavedModel(model=object()),
+        "Model B": SavedModel(model=object()),
     }
     table = rt._compare_table.value
     assert list(table["Model"]) == ["Model A", "Model B"]
-    assert list(table["Converged"]) == ["✓", "⚠"]
-    assert rt._compare_selectable_rows(table) == [0]  # only the converged row
+    assert "Converged" not in table.columns  # no verdict — user reads Convergence Evaluation themselves
     assert rt._use_model_sel.options == [None, "Model A", "Model B"]
-
-
-@pytest.mark.slow
-def test_compare_rejects_unconverged_model_even_if_selected(data_gaussian: pd.DataFrame):
-    """Defense in depth: `selectable_rows` stops the *widget* from letting
-    a user check an unconverged row (Panel's Tabulator validates this on
-    assignment). The handler re-validates against `state.saved_models`
-    too, for the case where the *table's* selection goes stale relative
-    to it — e.g. rendered while a row still looked converged, then the
-    backing entry changed before the click was handled."""
-    import asyncio
-
-    from hbsaemp.app._app import SavedModel
-
-    state = AppState()
-    state.data = data_gaussian
-    mt = ModelTab(state=state)
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1", "x2"]
-    mt._draws_in.value = 200
-    mt._tune_in.value = 200
-    mt._chains_in.value = 2
-    mt._cores_in.value = 1
-    asyncio.run(mt._on_fit_model(None))
-    good_model = mt.state.model
-
-    rt = ResultsTab(state=AppState())
-    rt.state.data = data_gaussian
-    # Table momentarily shows both rows as converged (so both are
-    # selectable), and the user checks both...
-    rt._compare_table.value = pd.DataFrame({"Model": ["Good", "Bad"], "Converged": ["✓", "✓"]})
-    rt._compare_table.selection = [0, 1]
-    # ...then the backing state is what the handler actually trusts, and it
-    # says "Bad" never converged.
-    rt.state.saved_models = {
-        "Good": SavedModel(model=good_model, converged=True, warnings=[]),
-        "Bad": SavedModel(model=good_model, converged=False, warnings=["fake"]),
-    }
-    asyncio.run(rt._on_compare_click(None))
-    assert "cannot compare" in rt._compare_status.object.lower()
 
 
 def test_compare_requires_at_least_two_models():
     from hbsaemp.app._app import SavedModel
 
     state = AppState()
-    state.saved_models = {"Solo": SavedModel(model=object(), converged=True, warnings=[])}
+    state.saved_models = {"Solo": SavedModel(model=object())}
     rt = ResultsTab(state=state)
     rt._compare_table.selection = [0]
     import asyncio
@@ -594,7 +552,7 @@ def test_use_model_button_sets_independent_copy(data_gaussian: pd.DataFrame):
     mt._cores_in.value = 1
     asyncio.run(mt._on_fit_model(None))
 
-    state.saved_models = {"A": SavedModel(model=mt.state.model, converged=True, warnings=[])}
+    state.saved_models = {"A": SavedModel(model=mt.state.model)}
     rt = ResultsTab(state=state)
     rt._use_model_sel.value = "A"
     rt._on_use_model_click(None)
@@ -701,9 +659,6 @@ def test_comparison_table_uses_saved_names_not_generic_labels(data_gaussian: pd.
     asyncio.run(mt._on_fit_model(None))
     mt._save_name_in.value = "Model 3"
     asyncio.run(mt._on_save_model(None))
-
-    assert state.saved_models["Model 2"].converged, state.saved_models["Model 2"].warnings
-    assert state.saved_models["Model 3"].converged, state.saved_models["Model 3"].warnings
 
     rt._compare_table.selection = [0, 1]
     asyncio.run(rt._on_compare_click(None))
