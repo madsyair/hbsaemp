@@ -1,15 +1,4 @@
 """Main application class for the hbsaemp web dashboard.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny structure                  Panel v1 equivalent
-    ─────────────────────────────────  ────────────────────────────────────
-    dashboardPage(header, sidebar, …)  pn.template.FastListTemplate(...)
-    dashboardSidebar(sidebarMenu(…))   sidebar= parameter of template
-    dashboardBody(tabItems(…))         main= parameter of template
-    reactiveValues(data=NULL, …)       AppState(param.Parameterized)
-    observe({ if model_fit… })         pn.param.watch callback
 """
 
 from __future__ import annotations
@@ -104,7 +93,8 @@ class App:
         return self._state
 
     def view(self) -> pn.template.FastListTemplate:
-        """Assemble and return the Panel dashboard object 
+        """Assemble and return the Panel dashboard object.
+
         Returns:
             A ``panel.template.FastListTemplate`` instance.
         """
@@ -152,6 +142,14 @@ class App:
         return self.view()
 
     def serve(self) -> None:
+        """Start the Panel web server and block until it is stopped.
+
+        Calls :meth:`view` on each request rather than serving a single
+        pre-built object, so every browser tab that connects gets its own
+        independent :class:`AppState` (its own uploaded data and fitted
+        model), matching what :func:`~hbsaemp.app.launch_app` documents as
+        the entry point most users call instead of this method directly.
+        """
         pn.serve(
             self.view,
             port=self._config.port,

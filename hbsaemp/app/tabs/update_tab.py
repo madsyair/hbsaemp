@@ -1,12 +1,4 @@
 """Tab 5 — Update Model: refit an already-fitted model.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny                          Panel v1 equivalent
-    ────────────────────────────────  ──────────────────────────────────
-    actionButton("update_model", …)  pn.widgets.Button
-    withProgress(…)                  async handler + button.loading
 """
 
 from __future__ import annotations
@@ -295,6 +287,13 @@ class UpdateModelTab(param.Parameterized):
         return model
 
     def panel(self) -> pn.Column:
+        """Return the Panel layout for this tab.
+
+        Returns:
+            A ``panel.Column`` with the current fitted model's summary,
+            optional sampler overrides, an optional replacement-data
+            picker, and the **Update Model** button.
+        """
         overview = pn.pane.Markdown(
             "Refit the current model with updated MCMC settings without changing the model specification. The formula, family, link, and grouping remain unchanged. Adjust the available sampler settings as needed, then refit the model and update the results."
         )

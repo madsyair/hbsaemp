@@ -1,14 +1,4 @@
 """Tab 4 — Results: diagnostics, SAE estimates, and export.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny output                          Panel v1 equivalent
-    ─────────────────────────────────────── ──────────────────────────────────
-    verbatimTextOutput("diag_numerical")    pn.widgets.Tabulator (rhat_ess)
-    plotOutput("diag_plots")                pn.pane.Matplotlib (ConvergenceResult.plots)
-    DT::dataTableOutput("sae_table")        pn.widgets.Tabulator (AreaEstimatesResult.result_table)
-    downloadButton("download_estimates")    pn.widgets.FileDownload
 """
 
 from __future__ import annotations
@@ -206,7 +196,7 @@ class ResultsTab(param.Parameterized):
 
         ``ConvergenceWarning`` is a real warning from ``check_convergence()``
         (R-hat/ESS out of threshold) and must reach the UI, not be silently
-        dropped — caught here (task #22) and returned alongside the result.
+        dropped — caught here and returned alongside the result.
         """
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always", ConvergenceWarning)
@@ -306,6 +296,13 @@ class ResultsTab(param.Parameterized):
         return buf
 
     def panel(self) -> pn.Tabs:
+        """Return the Panel layout for this tab.
+
+        Returns:
+            A ``panel.Tabs`` with two sub-tabs: Convergence Evaluation
+            (R-hat/ESS table and diagnostic plots) and SAE Estimation
+            (the small-area estimates table and its CSV download).
+        """
         convergenceevaluation_card = pn.Card(
             pn.Column(
                 self._conv_run_btn,

@@ -1,17 +1,4 @@
 """Tab 3 — Model specification and fitting.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny                             Panel v1 equivalent
-    ───────────────────────────────────  ──────────────────────────────────
-    selectInput("response_var", …)      pn.widgets.Select
-    pickerInput("auxiliary_vars", …)    PredictorCheckboxes (pn.FlexBox of Checkbox)
-    selectInput("group_var", …)         pn.widgets.Select
-    selectInput("distribution_type", …) pn.widgets.Select (list_families())
-    selectInput("hb_link", …)           pn.widgets.Select (spec.supported_links)
-    actionButton("fit_model", …)        pn.widgets.Button
-    withProgress(…)                     async handler + button.loading
 """
 
 from __future__ import annotations
@@ -171,6 +158,18 @@ def _describe_error(exc: Exception) -> tuple[str, str]:
 
 
 class PredictorCheckboxes(param.Parameterized):
+    """A checkbox-per-column widget for picking auxiliary/predictor variables.
+
+    Mirrors the R Shiny ``pickerInput`` used for the same purpose: setting
+    :attr:`options` rebuilds the checkboxes (e.g. when a new dataset is
+    loaded), and :attr:`value` always reflects exactly the columns whose
+    checkbox is currently ticked, kept in sync in both directions.
+
+    Attributes:
+        value: The currently selected column names.
+        options: The full list of column names to offer as checkboxes.
+    """
+
     value   = param.List(default=[])
     options = param.List(default=[])
 
@@ -211,6 +210,12 @@ class PredictorCheckboxes(param.Parameterized):
             self._syncing = False
 
     def panel(self) -> pn.FlexBox:
+        """Return the checkbox row as a Panel layout.
+
+        Returns:
+            A ``panel.FlexBox`` containing one checkbox per entry in
+            :attr:`options`.
+        """
         return self._box
 
 
@@ -233,7 +238,7 @@ class ModelTab(param.Parameterized):
         super().__init__(state=state, **params)
 
         # The single model draft threaded through Preview -> Build ->
-        # Prior Check -> Fit (task #10). `None` whenever the current widget
+        # Prior Check -> Fit. `None` whenever the current widget
         # selection cannot build a model; the exception message *is* the
         # validation message (no separate `_validate_build()`).
         self._model_draft: BaseModel | None = None
@@ -252,7 +257,7 @@ class ModelTab(param.Parameterized):
         )
         self._intercept_cb = pn.widgets.Checkbox(name="Include intercept", value=True)
 
-        # --- Family / link (registry-driven — task #7) --------------------------
+        # --- Family / link (registry-driven ) --------------------------
         families = list_families()
         default_family = "gaussian" if "gaussian" in families else families[0]
         self._family_sel = pn.widgets.Select(
@@ -265,7 +270,7 @@ class ModelTab(param.Parameterized):
         self._refresh_extra_params(default_family)
         self._family_sel.param.watch(self._on_family_change, "value")
 
-        # --- Sampler configuration (task #9) -------------------------------------
+        # --- Sampler configuration -------------------------------------
         self._draws_in = pn.widgets.IntInput(name="draws", value=1000, start=1, max_width=140)
         self._tune_in  = pn.widgets.IntInput(name="tune",  value=1000, start=0, max_width=140)
         self._chains_in = pn.widgets.IntInput(name="chains", value=4, start=1, max_width=140)
@@ -687,6 +692,13 @@ class ModelTab(param.Parameterized):
         self._postpc_status.object = _success_box("Posterior predictive check complete.")
 
     def panel(self) -> pn.Tabs:
+        """Return the Panel layout for this tab.
+
+        Returns:
+            A ``panel.Tabs`` with five sub-tabs: Overview, Model Building,
+            Prior Predictive Check, Fit Model, and Posterior Predictive
+            Check.
+        """
         overview = pn.pane.Markdown("""
                                     This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.
                                     - **Response Variable:** The outcome variable being modeled.
@@ -793,6 +805,13 @@ class ModelTab(param.Parameterized):
         )
 
     def get_fitted_model(self) -> BaseModel | None:
+        """Return the fitted model, if one exists.
+
+        Returns:
+            ``state.model`` if it is set and
+            :attr:`~hbsaemp.models._base.BaseModel.is_fitted` is ``True``,
+            otherwise ``None``.
+        """
         model = getattr(self.state, "model", None)
         return model if (model is not None and model.is_fitted) else None
 

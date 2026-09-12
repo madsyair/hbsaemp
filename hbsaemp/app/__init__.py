@@ -14,13 +14,17 @@ def launch_app(
     open_browser: bool = True,
     app_config: AppConfig | None = None,
 ) -> None:
-    """Launch the hbsaemp web dashboard (= run_sae_app() in R hbsaems).
+    """Launch the hbsaemp web dashboard
 
     Args:
         port: Web server port. Default 8080.
         title: Browser tab title.
         open_browser: Open browser on launch. Default True.
         app_config: Full :class:`AppConfig` — overrides other kwargs.
+
+    Raises:
+        ValueError: If the resulting :class:`AppConfig` is invalid — see
+            :class:`AppConfig` for the specific checks.
 
     Examples:
         >>> import hbsaemp
