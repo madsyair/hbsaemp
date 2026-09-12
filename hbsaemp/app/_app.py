@@ -1,31 +1,23 @@
 """Main application class for the hbsaemp web dashboard.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny structure                  Panel v1 equivalent
-    ─────────────────────────────────  ────────────────────────────────────
-    dashboardPage(header, sidebar, …)  pn.template.FastListTemplate(...)
-    dashboardSidebar(sidebarMenu(…))   sidebar= parameter of template
-    dashboardBody(tabItems(…))         main= parameter of template
-    reactiveValues(data=NULL, …)       AppState(param.Parameterized)
-    observe({ if model_fit… })         pn.param.watch callback
 """
 
 from __future__ import annotations
+
+from dataclasses import dataclass, field
+from typing import Any
 
 import panel as pn
 import param
 
 from hbsaemp._logging import configure_logging, get_logger
 from hbsaemp.app._config import DEFAULT_APP_CONFIG, AppConfig
-from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab, UpdateModelTab
+from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab
 
 logger = get_logger(__name__)
 
 pn.extension("tabulator", sizing_mode="stretch_width")
 
-__all__: list[str] = ["App", "AppState"]
+__all__: list[str] = ["App", "AppState", "SavedModel"]
 
 _THEME_MAP: dict[str, type] = {}
 
@@ -36,6 +28,31 @@ def _resolve_theme(name: str) -> type:
     if not _THEME_MAP:
         _THEME_MAP.update({"dark": DarkTheme, "bootstrap": DefaultTheme})
     return _THEME_MAP.get(name, DefaultTheme)
+
+
+@dataclass
+class SavedModel:
+    """A frozen snapshot of a fitted model, for the "Model Comparison" tab.
+
+    GUI-only bookkeeping — not a backend type. ``model`` is a shallow
+    ``copy.copy()`` taken at save time, not the live ``state.model``
+    reference: ``update_model()`` replaces (rather than mutates) the
+    attributes it touches (``_result``, ``_config``, ...), so a shallow
+    copy is enough to keep a saved entry from silently changing under a
+    later refit of the *active* model. A deep copy isn't an option here —
+    a fitted ``BaseModel`` holds a reference to the ``bambi`` module,
+    which isn't deep-copyable.
+
+    Attributes:
+        model: The frozen model snapshot.
+        converged: Whether :func:`~hbsaemp.check_convergence` raised no
+            :class:`~hbsaemp.ConvergenceWarning` when this was saved.
+        warnings: The convergence warning messages, if any (empty when
+            ``converged`` is ``True``).
+    """
+    model: Any
+    converged: bool
+    warnings: list[str] = field(default_factory=list)
 
 
 class AppState(param.Parameterized):
@@ -55,10 +72,19 @@ class AppState(param.Parameterized):
             tells :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` whether
             results are ready; ``model.result`` raises
             :class:`~hbsaemp._exceptions.ModelNotFittedError` otherwise.
+            Mutated in place by
+            :class:`~hbsaemp.app.tabs.update_tab.UpdateModelTab`.
+        saved_models: Named, frozen :class:`SavedModel` snapshots written by
+            :class:`~hbsaemp.app.tabs.model_tab.ModelTab`'s "Save Model"
+            button, read by the Results tab's "Model Comparison" sub-tab.
+            Independent of ``model`` — saving does not affect the active
+            model, and refitting the active model does not affect a saved
+            snapshot.
     """
 
     data:  object | None = param.Parameter(default=None)
     model: object | None = param.Parameter(default=None)
+    saved_models: dict[str, SavedModel] = param.Dict(default={})
 
 
 class App:
@@ -87,7 +113,6 @@ class App:
         self._explore_tab = ExploreTab(state=self._state)
         self._model_tab   = ModelTab(state=self._state)
         self._results_tab = ResultsTab(state=self._state)
-        self._update_tab  = UpdateModelTab(state=self._state)
 
         logger.debug(
             "App created: title=%r, port=%d", self._config.title, self._config.port
@@ -113,7 +138,6 @@ class App:
             ("Data Exploration", self._explore_tab.panel()),
             ("Modeling",         self._model_tab.panel()),
             ("Results",          self._results_tab.panel()),
-            ("Update Model",     self._update_tab.panel()),
             sizing_mode="stretch_width",
         )
         sidebar = [
@@ -130,10 +154,8 @@ class App:
                     "dataset.\n"
                     "2. **Data Exploration**: View summary stats, "
                     "distributions, and correlations.\n"
-                    "3. **Modeling**: Select variables, choose the model family, check priors, fit the model, and check posterior predictions.\n"
-                    "4. **Results**: Review convergence diagnostics and download the SAE estimates.\n"
-                    "5. **Update Model**: Refit with different sampler "
-                    "settings or replacement data, without starting over."
+                    "3. **Modeling**: Select variables, choose the model family, check priors, fit the model, check posterior predictions, and save promising fits for comparison.\n"
+                    "4. **Results**: Check convergence, compare saved models, refit if needed, and review the SAE estimates."
                 ),
                 sizing_mode="stretch_width",
             )
@@ -152,6 +174,19 @@ class App:
         return self.view()
 
     def serve(self) -> None:
+        """Build and serve the dashboard.
+
+        ``matplotlib.use("Agg")`` is set here — right before the server
+        starts — rather than at the top of ``model_tab.py``/``explore_tab.py``.
+        Setting it at import time would silently switch the matplotlib
+        backend for *any* process that imports those modules, including a
+        notebook that just wants ``hbsaemp.app`` for something unrelated.
+        Scoping it to ``serve()`` means only an actually-running dashboard
+        forces headless rendering.
+        """
+        import matplotlib
+
+        matplotlib.use("Agg")
         pn.serve(
             self.view,
             port=self._config.port,

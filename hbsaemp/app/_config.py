@@ -34,6 +34,12 @@ class AppConfig:
             Default ``"WARNING"``.
         accent: Accent color (hex) used by the ``FastListTemplate``
             dashboard header/highlights. Default ``"#A01346"``.
+
+    Raises:
+        ValueError: If ``port`` is outside 1-65535, ``max_upload_mb`` is
+            less than 1, ``log_level`` is not one of the standard logging
+            level names, or ``theme`` is not ``"bootstrap"`` or ``"dark"``.
+            Checked once, at construction time.
     """
 
     title: str = "HBSAEMP APP"

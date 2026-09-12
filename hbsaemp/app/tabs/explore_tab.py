@@ -1,27 +1,10 @@
 """Tab 2 — Data exploration and EDA.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny                         Panel v1 equivalent
-    ─────────────────────────────── ──────────────────────────────
-    selectInput("explore_var_…")    pn.widgets.Select
-    verbatimTextOutput("numeric_…") pn.widgets.Tabulator (describe())
-    plotOutput("histogram_plot")    pn.pane.Matplotlib
-    plotOutput("boxplot_plot")      pn.pane.Matplotlib
-    plotOutput("scatter_plot")      pn.pane.Matplotlib
-    renderUI("correlation_results") pn.widgets.Tabulator (formatted table)
-    XICOR::xicor                    scipy.stats.chatterjeexi
-    energy::dcor.test               dcor package
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-import matplotlib
-
-matplotlib.use("Agg")
 import dcor
 import matplotlib.pyplot as plt
 import numpy as np

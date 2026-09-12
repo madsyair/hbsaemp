@@ -1,14 +1,4 @@
 """Tab 1 — Data upload and preview.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny widget / output         Panel v1 equivalent
-    ─────────────────────────────── ──────────────────────────────
-    fileInput("data_file", …)       pn.widgets.FileInput
-    selectInput("builtin_data", …)  pn.widgets.Select + load_dataset()
-    DT::DTOutput("data_preview")    pn.widgets.Tabulator
-    verbatimTextOutput("na_report") pn.pane.Markdown
 """
 
 from __future__ import annotations
@@ -46,6 +36,25 @@ def _error_box(title: str, body: str = "") -> str:
 
 
 class DataTab(param.Parameterized):
+    """Data upload and preview tab.
+
+    The entry point of the workflow. Lets the user bring in a
+    :class:`pandas.DataFrame` either by uploading a CSV file or by picking
+    one of the datasets from :data:`~hbsaemp.data.datasets.AVAILABLE_DATASETS`,
+    then shows a summary, the column list, and a paginated preview.
+
+    Args:
+        state: Shared :class:`~hbsaemp.app._app.AppState` instance. Writes
+            ``state.data`` after a successful upload or built-in dataset
+            load, which :class:`~hbsaemp.app.tabs.explore_tab.ExploreTab`
+            and :class:`~hbsaemp.app.tabs.model_tab.ModelTab` watch to
+            refresh their own variable lists.
+        app_config: Optional :class:`~hbsaemp.app._config.AppConfig`. Only
+            ``max_upload_mb`` is read, to reject an uploaded file that
+            exceeds the configured size limit before it is parsed. If
+            ``None``, no upload size limit is enforced.
+    """
+
     state: AppState = param.Parameter()
 
     def __init__(

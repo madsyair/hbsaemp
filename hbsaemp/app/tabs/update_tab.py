@@ -1,18 +1,11 @@
 """Tab 5 — Update Model: refit an already-fitted model.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny                          Panel v1 equivalent
-    ────────────────────────────────  ──────────────────────────────────
-    actionButton("update_model", …)  pn.widgets.Button
-    withProgress(…)                  async handler + button.loading
 """
 
 from __future__ import annotations
 
 import asyncio
 import io
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import pandas as pd
@@ -27,6 +20,7 @@ from hbsaemp import (
     ModelNotFittedError,
     ModelRegistryError,
     PriorSpecError,
+    update_formula,
     update_model,
 )
 from hbsaemp._logging import get_logger
@@ -135,9 +129,21 @@ class UpdateModelTab(param.Parameterized):
             "target_accept",
             pn.widgets.FloatInput(value=0.9, start=0.01, end=0.99, step=0.01, max_width=160),
         )
+        self._treedepth_cb, self._treedepth_in = self._override_row(
+            "max_treedepth", pn.widgets.IntInput(value=10, start=1, max_width=140)
+        )
         self._seed_cb, self._seed_in = self._override_row(
             "random_seed", pn.widgets.IntInput(value=42, start=0, max_width=140)
         )
+
+        # Formula template (optional) — e.g. ". ~ . + x3 - x1". Preview only
+        # rewrites the formula string; whether the new column(s) actually
+        # exist is checked by the backend at refit time (DataValidationError).
+        self._formula_tpl = pn.widgets.TextInput(
+            name="Formula update (optional)", placeholder=". ~ . + x3 - x1", max_width=280,
+        )
+        self._formula_preview = pn.pane.HTML("")
+        self._formula_tpl.param.watch(self._on_formula_tpl, "value")
 
         # Replacement data — optional.
         self._new_data_cb = pn.widgets.Checkbox(
@@ -174,6 +180,21 @@ class UpdateModelTab(param.Parameterized):
     def _on_toggle_new_data(self, event: param.parameterized.Event) -> None:
         self._new_data_file.disabled = not event.new
         self._new_data_dataset_sel.disabled = not event.new
+
+    def _on_formula_tpl(self, event: param.parameterized.Event) -> None:
+        model = self.state.model
+        if not event.new or model is None:
+            self._formula_preview.object = ""
+            return
+        try:
+            new_formula = update_formula(model.formula, event.new)
+            self._formula_preview.object = (
+                f'<div style="background:#f4f4f4;border-left:4px solid #0072B2;'
+                f'padding:8px 14px;border-radius:6px;font-family:monospace;'
+                f'font-size:0.9em">{new_formula}</div>'
+            )
+        except FormulaError as exc:
+            self._formula_preview.object = _error_box("Invalid formula template", str(exc))
 
     def _on_model_change(self, event: param.parameterized.Event) -> None:
         self._refresh_current_info()
@@ -215,8 +236,12 @@ class UpdateModelTab(param.Parameterized):
             overrides["cores"] = int(self._cores_in.value)
         if self._target_accept_cb.value:
             overrides["target_accept"] = float(self._target_accept_in.value)
+        if self._treedepth_cb.value:
+            overrides["max_treedepth"] = int(self._treedepth_in.value)
         if self._seed_cb.value:
             overrides["random_seed"] = int(self._seed_in.value)
+        if self._formula_tpl.value:
+            overrides["formula"] = self._formula_tpl.value
         return overrides
 
     def _resolve_new_data(self) -> pd.DataFrame | None:
@@ -261,7 +286,7 @@ class UpdateModelTab(param.Parameterized):
         self._update_status.object = _info_box("Refitting model…")
         try:
             loop = asyncio.get_running_loop()
-            fitted = await loop.run_in_executor(
+            fitted, refit_notes = await loop.run_in_executor(
                 None, self._update_blocking, model, new_data, overrides
             )
         except Exception as exc:
@@ -277,26 +302,41 @@ class UpdateModelTab(param.Parameterized):
         if new_data is not None:
             self.state.data = new_data
 
+        note = (
+            "<br><br>" + "<br>".join(f"• {n}" for n in refit_notes) if refit_notes else ""
+        )
         self._update_status.object = _success_box(
             "Model refit complete. Open the <b>Results</b> tab again to see the "
-            "updated convergence diagnostics and SAE estimates."
+            f"updated convergence diagnostics and SAE estimates.{note}"
         )
 
     @staticmethod
     def _update_blocking(
         model: BaseModel, new_data: pd.DataFrame | None, overrides: dict[str, Any],
-    ) -> BaseModel:
+    ) -> tuple[BaseModel, list[str]]:
         """Synchronous, Panel-free — runs in the executor thread.
 
         The single tier-3-adjacent entry point for this tab: always
         `update_model()`, never a fresh `hbm_<family>()` build.
+
+        `update_model()` warns (rather than errors) when replacement data
+        is missing a design column (`D`/`n`/`deff`) but has the same row
+        count as the original — it copies that column over and proceeds.
+        That warning is real information the user should see, not
+        something to let through to stderr unseen.
         """
-        update_model(model, new_data=new_data, **overrides)
-        return model
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", UserWarning)
+            update_model(model, new_data=new_data, **overrides)
+        notes = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        return model, notes
 
     def panel(self) -> pn.Column:
         overview = pn.pane.Markdown(
-            "Refit the current model with updated MCMC settings without changing the model specification. The formula, family, link, and grouping remain unchanged. Adjust the available sampler settings as needed, then refit the model and update the results."
+            "Refit the current model with updated MCMC settings, and optionally a "
+            "modified formula (add/remove predictors) or replacement data. Family, "
+            "link, and group stay unchanged unless you edit the formula below. "
+            "Adjust the available settings as needed, then refit."
         )
 
         sampler_card = pn.Card(
@@ -307,9 +347,26 @@ class UpdateModelTab(param.Parameterized):
                 pn.FlexBox(self._chains_cb, self._chains_in),
                 pn.FlexBox(self._cores_cb, self._cores_in),
                 pn.FlexBox(self._target_accept_cb, self._target_accept_in),
+                pn.FlexBox(self._treedepth_cb, self._treedepth_in),
                 pn.FlexBox(self._seed_cb, self._seed_in),
             ),
             title="Sampler Settings",
+            margin=10,
+        )
+
+        formula_card = pn.Card(
+            pn.Column(
+                pn.pane.Markdown(
+                    "Optional. A template like `. ~ . + x3 - x1` adds `x3` and removes "
+                    "`x1`, keeping everything else the same — see `update_formula()`. "
+                    "Whether the new column actually exists in the data is checked "
+                    "when you click Update Model, not here.",
+                    margin=(4, 0, 8, 0),
+                ),
+                self._formula_tpl,
+                self._formula_preview,
+            ),
+            title="Formula Update",
             margin=10,
         )
 
@@ -326,6 +383,7 @@ class UpdateModelTab(param.Parameterized):
             pn.Card(overview, title="Overview", margin=10),
             pn.Card(self._current_info, title="Current Fitted Model", margin=10),
             sampler_card,
+            formula_card,
             data_card,
             pn.Row(self._update_btn),
             self._update_status,
