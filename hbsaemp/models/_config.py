@@ -49,20 +49,20 @@ class ModelConfig:
 
     def __post_init__(self) -> None:
         if self.draws < 1:
-            raise ValueError(f"`draws` must be ≥ 1, got {self.draws}")
+            raise ValueError(f"`draws` must be >= 1, got {self.draws}")
         if self.tune < 0:
-            raise ValueError(f"`tune` must be ≥ 0, got {self.tune}")
+            raise ValueError(f"`tune` must be >= 0, got {self.tune}")
         if self.chains < 1:
-            raise ValueError(f"`chains` must be ≥ 1, got {self.chains}")
+            raise ValueError(f"`chains` must be >= 1, got {self.chains}")
         if self.cores < 1:
-            raise ValueError(f"`cores` must be ≥ 1, got {self.cores}")
+            raise ValueError(f"`cores` must be >= 1, got {self.cores}")
         if not (0 < self.target_accept < 1):
             raise ValueError(
                 f"`target_accept` must be in (0, 1), got {self.target_accept}"
             )
         if self.max_treedepth is not None and self.max_treedepth < 1:
             raise ValueError(
-                f"`max_treedepth` must be ≥ 1, got {self.max_treedepth}"
+                f"`max_treedepth` must be >= 1, got {self.max_treedepth}"
             )
         if not isinstance(self.sampler_kwargs, dict):
             raise TypeError(
@@ -100,15 +100,6 @@ class ModelConfig:
             )
         base.update(self.sampler_kwargs)
         return base
-
-    def __repr__(self) -> str:
-        return (
-            f"ModelConfig(draws={self.draws}, tune={self.tune}, "
-            f"chains={self.chains}, cores={self.cores}, "
-            f"target_accept={self.target_accept}, "
-            f"max_treedepth={self.max_treedepth}, "
-            f"sampler_kwargs={self.sampler_kwargs!r})"
-        )
 
 
 # Default used when `config=None` is passed to `create_model()`.

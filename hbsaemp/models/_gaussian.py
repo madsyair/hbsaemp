@@ -23,20 +23,17 @@ class GaussianModel(BaseModel):
         sampling_var_col: Column with known D_i (optional). When set,
             enables the FH distributional formula `sigma ~ 1 + offset(log_sqrt_D)`
             (preprocessor adds the `log_sqrt_D` column).
-        link: Link for mu (default `"identity"`).
-        **kwargs: Forwarded to `BaseModel`.
+        **kwargs: Forwarded to `BaseModel` (including `link`).
     """
 
     def __init__(
         self,
         *args: Any,
         sampling_var_col: str | None = None,
-        link: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._sampling_var_col = sampling_var_col
-        self._link = link or self._default_link
 
     # hooks
 

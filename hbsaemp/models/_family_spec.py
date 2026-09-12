@@ -167,7 +167,7 @@ def _check_beta(df: pd.DataFrame, response: str, ctx: dict) -> None:
         if n_bad_phi:
             raise DataValidationError(
                 f"Beta precision phi = n/deff - 1 must be > 0. "
-                f"Found {n_bad_phi} row(s) where n/deff ≤ 1.",
+                f"Found {n_bad_phi} row(s) where n/deff <= 1.",
                 context={"n_invalid_phi": n_bad_phi},
             )
 
