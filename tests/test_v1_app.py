@@ -426,7 +426,7 @@ def test_to_code_uses_result_table_not_estimates(data_gaussian: pd.DataFrame):
 
 
 # ---------------------------------------------------------------------------
-# matplotlib.use("Agg") 
+# matplotlib.use("Agg") scoping (diagnostics-frontend.md S5)
 # ---------------------------------------------------------------------------
 
 def test_matplotlib_use_agg_not_at_tab_import_time():
@@ -442,7 +442,7 @@ def test_matplotlib_use_agg_not_at_tab_import_time():
 
 
 # ---------------------------------------------------------------------------
-# Save Model + Model Comparison 
+# Save Model + Model Comparison (new architecture)
 # ---------------------------------------------------------------------------
 
 def test_save_button_disabled_until_fit(data_gaussian: pd.DataFrame):
@@ -780,6 +780,7 @@ def test_bayes_factor_rendered_with_saved_names_when_enabled(data_gaussian: pd.D
 
 # ---------------------------------------------------------------------------
 # Update Model: max_treedepth, formula template, UserWarning capture
+# (estimation-frontend.md S5, S6, S7)
 # ---------------------------------------------------------------------------
 
 def test_update_tab_has_treedepth_override():
