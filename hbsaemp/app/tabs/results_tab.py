@@ -13,6 +13,17 @@ built on top of the posterior is trusted, per standard Bayesian workflow):
    :class:`~hbsaemp.app.tabs.update_tab.UpdateModelTab`.
 4. **SAE Estimation** — small-area estimates from `estimate_areas()`,
    including out-of-sample prediction for unsampled areas.
+
+Mapping from R hbsaems
+-----------------------
+.. code-block:: text
+
+    R Shiny output                          Panel v1 equivalent
+    ─────────────────────────────────────── ──────────────────────────────────
+    verbatimTextOutput("diag_numerical")    pn.widgets.Tabulator (rhat_ess)
+    plotOutput("diag_plots")                pn.pane.Matplotlib (ConvergenceResult.plots)
+    DT::dataTableOutput("sae_table")        pn.widgets.Tabulator (AreaEstimatesResult.result_table)
+    downloadButton("download_estimates")    pn.widgets.FileDownload
 """
 
 from __future__ import annotations

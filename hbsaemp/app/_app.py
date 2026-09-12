@@ -1,4 +1,15 @@
 """Main application class for the hbsaemp web dashboard.
+Mapping from R hbsaems
+-----------------------
+.. code-block:: text
+
+    R Shiny structure                  Panel v1 equivalent
+    ─────────────────────────────────  ────────────────────────────────────
+    dashboardPage(header, sidebar, …)  pn.template.FastListTemplate(...)
+    dashboardSidebar(sidebarMenu(…))   sidebar= parameter of template
+    dashboardBody(tabItems(…))         main= parameter of template
+    reactiveValues(data=NULL, …)       AppState(param.Parameterized)
+    observe({ if model_fit… })         pn.param.watch callback
 """
 
 from __future__ import annotations

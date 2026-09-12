@@ -1,4 +1,17 @@
 """Tab 3 — Model specification and fitting.
+Mapping from R hbsaems
+-----------------------
+.. code-block:: text
+
+    R Shiny                             Panel v1 equivalent
+    ───────────────────────────────────  ──────────────────────────────────
+    selectInput("response_var", …)      pn.widgets.Select
+    pickerInput("auxiliary_vars", …)    PredictorCheckboxes (pn.FlexBox of Checkbox)
+    selectInput("group_var", …)         pn.widgets.Select
+    selectInput("distribution_type", …) pn.widgets.Select (list_families())
+    selectInput("hb_link", …)           pn.widgets.Select (spec.supported_links)
+    actionButton("fit_model", …)        pn.widgets.Button
+    withProgress(…)                     async handler + button.loading
 """
 
 from __future__ import annotations
@@ -228,13 +241,13 @@ class ModelTab(param.Parameterized):
         super().__init__(state=state, **params)
 
         # The single model draft threaded through Preview -> Build ->
-        # Prior Check -> Fit. `None` whenever the current widget
+        # Prior Check -> Fit (task #10). `None` whenever the current widget
         # selection cannot build a model; the exception message *is* the
         # validation message (no separate `_validate_build()`).
         self._model_draft: BaseModel | None = None
         self._extra_widgets: dict[str, pn.widgets.Widget] = {}
 
-        # Variable selection 
+        # --- Variable selection ------------------------------------------------
         self._response_sel = pn.widgets.Select(
             name="Response Variable  (y)", options=[], max_width=280,
         )
@@ -247,7 +260,7 @@ class ModelTab(param.Parameterized):
         )
         self._intercept_cb = pn.widgets.Checkbox(name="Include intercept", value=True)
 
-        # Family / link (registry-driven) 
+        # --- Family / link (registry-driven — task #7) --------------------------
         families = list_families()
         default_family = "gaussian" if "gaussian" in families else families[0]
         self._family_sel = pn.widgets.Select(
@@ -260,7 +273,7 @@ class ModelTab(param.Parameterized):
         self._refresh_extra_params(default_family)
         self._family_sel.param.watch(self._on_family_change, "value")
 
-        # Sampler configuration  
+        # --- Sampler configuration (task #9) -------------------------------------
         self._draws_in = pn.widgets.IntInput(name="draws", value=1000, start=1, max_width=140)
         self._tune_in  = pn.widgets.IntInput(name="tune",  value=1000, start=0, max_width=140)
         self._chains_in = pn.widgets.IntInput(name="chains", value=4, start=1, max_width=140)
@@ -274,7 +287,7 @@ class ModelTab(param.Parameterized):
             lambda e: setattr(self._seed_in, "disabled", not e.new), "value"
         )
 
-        # Formula preview 
+        # --- Formula preview ------------------------------------------------
         self._formula_preview = pn.pane.HTML(_pending_box("select a response and at least one predictor."))
         for w in [self._response_sel, self._predictors_sel, self._group_sel,
                   self._family_sel, self._link_sel, self._intercept_cb,
@@ -282,7 +295,7 @@ class ModelTab(param.Parameterized):
                   self._target_accept_in, self._seed_cb, self._seed_in]:
             w.param.watch(self._update_preview, "value")
 
-        # Code export (save/preview equivalent hbsaemp CLI code)
+        # --- Code export (save/preview equivalent hbsaemp CLI code) --------
         self._code_view = pn.widgets.CodeEditor(
             value="", language="python", theme="monokai", readonly=True,
             height=320, sizing_mode="stretch_width",
@@ -296,12 +309,12 @@ class ModelTab(param.Parameterized):
             max_width=220,
         )
 
-        # Build Model
+        # --- Build Model -----------------------------------------------------
         self._build_btn = pn.widgets.Button(name="Build Model", button_type="primary", max_width=220)
         self._build_status = pn.pane.HTML("")
         self._build_btn.on_click(self._on_build)
 
-        # Prior Predictive Check
+        # --- Prior Predictive Check -------------------------------------------
         self._prior_run_btn = pn.widgets.Button(
             name="Run Prior Predictive Check", button_type="primary", max_width=260,
         )
@@ -311,12 +324,12 @@ class ModelTab(param.Parameterized):
         self._prior_plot_pane = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
         self._prior_run_btn.on_click(self._on_prior_check)
 
-        # Fit Model
+        # --- Fit Model ---------------------------------------------------------
         self._fit_btn = pn.widgets.Button(name="Fit Model", button_type="primary", max_width=220)
         self._fit_status = pn.pane.HTML("")
         self._fit_btn.on_click(self._on_fit_model)
 
-        # Save Model (for the Results tab's Model Comparison)
+        # --- Save Model (for the Results tab's Model Comparison) -----------------
         self._save_name_in = pn.widgets.TextInput(
             name="Model name", placeholder="e.g. Model 1", disabled=True, max_width=220,
         )
@@ -326,7 +339,7 @@ class ModelTab(param.Parameterized):
         self._save_status = pn.pane.HTML("")
         self._save_btn.on_click(self._on_save_model)
 
-        # Posterior Predictive Check
+        # --- Posterior Predictive Check ----------------------------------------
         self._postpc_run_btn = pn.widgets.Button(
             name="Run Posterior Predictive Check", button_type="primary", max_width=280,
         )
@@ -568,7 +581,7 @@ class ModelTab(param.Parameterized):
             msg += f"<br><br>{n_dropped} row(s) with missing values were dropped before modeling."
         self._build_status.object = _success_box(msg)
 
-    # Prior Predictive Check — check_prior() only, no raw Bambi/hand-rolled plots
+    # Prior Predictive Check (task #12) — check_prior() only, no raw Bambi/hand-rolled plots
 
     async def _on_prior_check(self, event: Any) -> None:
         if self._prior_run_btn.loading:

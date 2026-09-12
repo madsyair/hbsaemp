@@ -15,6 +15,7 @@ point:
 from __future__ import annotations
 
 import sys
+from typing import TYPE_CHECKING, Any
 
 __version__: str = "1.0.0"
 if sys.version_info < (3, 12):
@@ -29,18 +30,11 @@ from hbsaemp._exceptions import (
     HBSAEError as HBSAEError,
     ModelNotFittedError as ModelNotFittedError,
     ModelRegistryError as ModelRegistryError,
+    PriorSpecError as PriorSpecError,
     SpatialMatrixError as SpatialMatrixError,
     ValidationError as ValidationError,
 )
 from hbsaemp._logging import configure_logging as configure_logging
-
-# GUI (frontend)
-from hbsaemp.app import (
-    DEFAULT_APP_CONFIG as DEFAULT_APP_CONFIG,
-    App as App,
-    AppConfig as AppConfig,
-    launch_app as launch_app,
-)
 from hbsaemp.data._preprocessor import DataPreprocessor as DataPreprocessor
 
 # Data layer
@@ -95,13 +89,54 @@ from hbsaemp.models._shortcuts import (
     hbm_binomial as hbm_binomial,
     hbm_gaussian as hbm_gaussian,
 )
+from hbsaemp.utils._formula import update_formula as update_formula
+
+# GUI (frontend) — imported lazily.
+#
+# `app/` is owned by the frontend team (see docs/CLAUDE.md). Importing it
+# eagerly coupled the backend's importability to frontend code: a single
+# NameError in a tab module made `import hbsaemp` — and therefore the whole
+# backend test suite — fail. PEP 562 `__getattr__` defers that import until a
+# GUI symbol is actually touched, so `hbsaemp.create_model` keeps working even
+# when the dashboard is broken or Panel is not installed.
+if TYPE_CHECKING:
+    from hbsaemp.app import (
+        DEFAULT_APP_CONFIG as DEFAULT_APP_CONFIG,
+        App as App,
+        AppConfig as AppConfig,
+        launch_app as launch_app,
+    )
+
+#: Top-level GUI names -> attribute on `hbsaemp.app`.
+_LAZY_GUI: dict[str, str] = {
+    "App": "App",
+    "AppConfig": "AppConfig",
+    "DEFAULT_APP_CONFIG": "DEFAULT_APP_CONFIG",
+    "launch_app": "launch_app",
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve GUI symbols on first access (PEP 562)."""
+    if name in _LAZY_GUI:
+        import hbsaemp.app as _app_module
+
+        value = getattr(_app_module, _LAZY_GUI[name])
+        globals()[name] = value  # cache: subsequent lookups skip __getattr__
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(_LAZY_GUI))
+
 
 __all__: list[str] = [
     "__version__", "configure_logging",
     # Exceptions
     "HBSAEError", "ValidationError", "DataValidationError", "FormulaError",
     "SpatialMatrixError", "ModelRegistryError", "ModelNotFittedError",
-    "EstimationError", "ConvergenceWarning",
+    "EstimationError", "PriorSpecError", "ConvergenceWarning",
     # Model layer
     "ModelConfig", "DEFAULT_CONFIG", "BaseModel", "ModelResult",
     "create_model",          # primary Python name
@@ -121,6 +156,7 @@ __all__: list[str] = [
     # Estimation (Python names + R aliases)
     "AreaEstimatesResult", "estimate_areas", "hbsae",
     "update_model", "update_hbm",
+    "update_formula",        # R update.formula-style template for update_model(formula=...)
     # GUI
     "launch_app", "App", "AppConfig", "DEFAULT_APP_CONFIG",
 ]
