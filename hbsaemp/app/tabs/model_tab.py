@@ -4,15 +4,14 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import inspect
 import io
+import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 import arviz_plots as azp
-import matplotlib
-
-matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 import panel as pn
@@ -20,6 +19,7 @@ import param
 
 from hbsaemp import (
     BaseModel,
+    ConvergenceWarning,
     DataValidationError,
     EstimationError,
     FormulaError,
@@ -28,6 +28,7 @@ from hbsaemp import (
     ModelNotFittedError,
     ModelRegistryError,
     PriorSpecError,
+    check_convergence,
     get_family_spec,
     hbm_beta,
     hbm_binomial,
@@ -38,7 +39,7 @@ from hbsaemp._logging import get_logger
 from hbsaemp.diagnostics.prior_check import PriorCheckResult, check_prior
 
 if TYPE_CHECKING:
-    from hbsaemp.app._app import AppState
+    from hbsaemp.app._app import AppState, SavedModel
 
 logger = get_logger(__name__)
 
@@ -111,6 +112,13 @@ def _info_box(body: str) -> str:
     )
 
 
+def _warn_box(body: str) -> str:
+    return (
+        f'<div style="background:#f0ad4e;color:#3a2e00;padding:10px 16px;'
+        f'border-radius:8px;margin-top:8px">{body}</div>'
+    )
+
+
 def _formula_box(formula: str) -> str:
     return (
         f'<div style="background:#f4f4f4;border-left:4px solid #0072B2;'
@@ -158,18 +166,6 @@ def _describe_error(exc: Exception) -> tuple[str, str]:
 
 
 class PredictorCheckboxes(param.Parameterized):
-    """A checkbox-per-column widget for picking auxiliary/predictor variables.
-
-    Mirrors the R Shiny ``pickerInput`` used for the same purpose: setting
-    :attr:`options` rebuilds the checkboxes (e.g. when a new dataset is
-    loaded), and :attr:`value` always reflects exactly the columns whose
-    checkbox is currently ticked, kept in sync in both directions.
-
-    Attributes:
-        value: The currently selected column names.
-        options: The full list of column names to offer as checkboxes.
-    """
-
     value   = param.List(default=[])
     options = param.List(default=[])
 
@@ -210,12 +206,6 @@ class PredictorCheckboxes(param.Parameterized):
             self._syncing = False
 
     def panel(self) -> pn.FlexBox:
-        """Return the checkbox row as a Panel layout.
-
-        Returns:
-            A ``panel.FlexBox`` containing one checkbox per entry in
-            :attr:`options`.
-        """
         return self._box
 
 
@@ -244,7 +234,7 @@ class ModelTab(param.Parameterized):
         self._model_draft: BaseModel | None = None
         self._extra_widgets: dict[str, pn.widgets.Widget] = {}
 
-        # --- Variable selection ------------------------------------------------
+        # Variable selection 
         self._response_sel = pn.widgets.Select(
             name="Response Variable  (y)", options=[], max_width=280,
         )
@@ -257,7 +247,7 @@ class ModelTab(param.Parameterized):
         )
         self._intercept_cb = pn.widgets.Checkbox(name="Include intercept", value=True)
 
-        # --- Family / link (registry-driven ) --------------------------
+        # Family / link (registry-driven) 
         families = list_families()
         default_family = "gaussian" if "gaussian" in families else families[0]
         self._family_sel = pn.widgets.Select(
@@ -270,7 +260,7 @@ class ModelTab(param.Parameterized):
         self._refresh_extra_params(default_family)
         self._family_sel.param.watch(self._on_family_change, "value")
 
-        # --- Sampler configuration -------------------------------------
+        # Sampler configuration  
         self._draws_in = pn.widgets.IntInput(name="draws", value=1000, start=1, max_width=140)
         self._tune_in  = pn.widgets.IntInput(name="tune",  value=1000, start=0, max_width=140)
         self._chains_in = pn.widgets.IntInput(name="chains", value=4, start=1, max_width=140)
@@ -284,13 +274,15 @@ class ModelTab(param.Parameterized):
             lambda e: setattr(self._seed_in, "disabled", not e.new), "value"
         )
 
-        # --- Formula preview ------------------------------------------------
+        # Formula preview 
         self._formula_preview = pn.pane.HTML(_pending_box("select a response and at least one predictor."))
         for w in [self._response_sel, self._predictors_sel, self._group_sel,
-                  self._family_sel, self._link_sel, self._intercept_cb]:
+                  self._family_sel, self._link_sel, self._intercept_cb,
+                  self._draws_in, self._tune_in, self._chains_in, self._cores_in,
+                  self._target_accept_in, self._seed_cb, self._seed_in]:
             w.param.watch(self._update_preview, "value")
 
-        # --- Code export (save/preview equivalent hbsaemp CLI code) --------
+        # Code export (save/preview equivalent hbsaemp CLI code)
         self._code_view = pn.widgets.CodeEditor(
             value="", language="python", theme="monokai", readonly=True,
             height=320, sizing_mode="stretch_width",
@@ -304,12 +296,12 @@ class ModelTab(param.Parameterized):
             max_width=220,
         )
 
-        # --- Build Model -----------------------------------------------------
+        # Build Model
         self._build_btn = pn.widgets.Button(name="Build Model", button_type="primary", max_width=220)
         self._build_status = pn.pane.HTML("")
         self._build_btn.on_click(self._on_build)
 
-        # --- Prior Predictive Check -------------------------------------------
+        # Prior Predictive Check
         self._prior_run_btn = pn.widgets.Button(
             name="Run Prior Predictive Check", button_type="primary", max_width=260,
         )
@@ -319,12 +311,22 @@ class ModelTab(param.Parameterized):
         self._prior_plot_pane = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
         self._prior_run_btn.on_click(self._on_prior_check)
 
-        # --- Fit Model ---------------------------------------------------------
+        # Fit Model
         self._fit_btn = pn.widgets.Button(name="Fit Model", button_type="primary", max_width=220)
         self._fit_status = pn.pane.HTML("")
         self._fit_btn.on_click(self._on_fit_model)
 
-        # --- Posterior Predictive Check ----------------------------------------
+        # Save Model (for the Results tab's Model Comparison)
+        self._save_name_in = pn.widgets.TextInput(
+            name="Model name", placeholder="e.g. Model 1", disabled=True, max_width=220,
+        )
+        self._save_btn = pn.widgets.Button(
+            name="Save Model", button_type="success", max_width=160, disabled=True,
+        )
+        self._save_status = pn.pane.HTML("")
+        self._save_btn.on_click(self._on_save_model)
+
+        # Posterior Predictive Check
         self._postpc_run_btn = pn.widgets.Button(
             name="Run Posterior Predictive Check", button_type="primary", max_width=280,
         )
@@ -499,7 +501,7 @@ class ModelTab(param.Parameterized):
                 "model.fit()",
                 "",
                 "result = estimate_areas(model, ci_prob=0.95)",
-                "print(result.estimates)",
+                "print(result.result_table)",
             ]
         return "\n".join(lines)
 
@@ -566,7 +568,7 @@ class ModelTab(param.Parameterized):
             msg += f"<br><br>{n_dropped} row(s) with missing values were dropped before modeling."
         self._build_status.object = _success_box(msg)
 
-    # Prior Predictive Check (task #12) — check_prior() only, no raw Bambi/hand-rolled plots
+    # Prior Predictive Check — check_prior() only, no raw Bambi/hand-rolled plots
 
     async def _on_prior_check(self, event: Any) -> None:
         if self._prior_run_btn.loading:
@@ -640,11 +642,86 @@ class ModelTab(param.Parameterized):
             "The MCMC sampling has completed. See the <b>Results</b> tab for "
             "diagnostics and SAE estimates."
         )
+        self._save_btn.disabled = self._save_name_in.disabled = False
+        if not self._save_name_in.value:
+            self._save_name_in.value = f"Model {len(self.state.saved_models) + 1}"
 
     @staticmethod
     def _fit_blocking(model: BaseModel) -> BaseModel:
         model.fit()
         return model
+
+    async def _on_save_model(self, event: Any) -> None:
+        """Freeze the active model as a named snapshot for Model Comparison.
+
+        Runs `check_convergence()` at save time (the same function the
+        Results tab uses) so the saved snapshot carries its own
+        convergence status — Model Comparison can then refuse to compare
+        anything that hasn't converged, without re-running diagnostics
+        itself. Stores a `copy.copy()` of the model, not the live
+        `state.model` reference: `update_model()` replaces (rather than
+        mutates) the attributes it touches, so a shallow copy is enough to
+        stop a later refit of the *active* model from silently changing
+        an already-saved entry.
+        """
+        if self._save_btn.loading:  
+            return
+        model = getattr(self.state, "model", None)
+        if model is None or not model.is_fitted:
+            self._save_status.object = _error_box(
+                "No fitted model", "Fit a model first."
+            )
+            return
+        name = (self._save_name_in.value or "").strip()
+        if not name:
+            self._save_status.object = _error_box(
+                "Name required", "Give this model a name before saving."
+            )
+            return
+
+        self._save_btn.loading = self._save_btn.disabled = True
+        self._save_status.object = _info_box("Checking convergence before saving…")
+        try:
+            loop = asyncio.get_running_loop()
+            converged, warning_messages = await loop.run_in_executor(
+                None, self._convergence_check_blocking, model
+            )
+        except Exception as exc:
+            logger.exception("ModelTab save-model convergence check failed")
+            title, body = _describe_error(exc)
+            self._save_status.object = _error_box(title, body)
+            return
+        finally:
+            self._save_btn.loading = self._save_btn.disabled = False
+
+        from hbsaemp.app._app import SavedModel  # local: avoids a circular import
+
+        snapshot = SavedModel(
+            model=copy.copy(model), converged=converged, warnings=warning_messages,
+        )
+        # Reassign (not in-place mutation) so param.watch on "saved_models" fires.
+        self.state.saved_models = {**self.state.saved_models, name: snapshot}
+
+        status = _success_box if converged else _warn_box
+        note = "" if converged else (
+            "<br>" + "<br>".join(f"• {m}" for m in warning_messages)
+            + "<br><br><b>This model can still be saved, but Model Comparison "
+            "will not let you select it for comparison until it converges.</b>"
+        )
+        self._save_status.object = status(
+            f"Saved as <b>{name}</b>. Open <b>Results → Model Comparison</b> to "
+            f"compare it against other saved models.{note}"
+        )
+        self._save_name_in.value = f"Model {len(self.state.saved_models) + 1}"
+
+    @staticmethod
+    def _convergence_check_blocking(model: BaseModel) -> tuple[bool, list[str]]:
+        """Synchronous, Panel-free — runs in the executor thread."""
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always", ConvergenceWarning)
+            check_convergence(model)
+        messages = [str(w.message) for w in caught if issubclass(w.category, ConvergenceWarning)]
+        return not messages, messages
 
     async def _on_posterior_check(self, event: Any) -> None:
         if self._postpc_run_btn.loading:
@@ -692,13 +769,6 @@ class ModelTab(param.Parameterized):
         self._postpc_status.object = _success_box("Posterior predictive check complete.")
 
     def panel(self) -> pn.Tabs:
-        """Return the Panel layout for this tab.
-
-        Returns:
-            A ``panel.Tabs`` with five sub-tabs: Overview, Model Building,
-            Prior Predictive Check, Fit Model, and Posterior Predictive
-            Check.
-        """
         overview = pn.pane.Markdown("""
                                     This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.
                                     - **Response Variable:** The outcome variable being modeled.
@@ -769,6 +839,14 @@ class ModelTab(param.Parameterized):
                 ),
                 pn.Row(self._fit_btn),
                 self._fit_status,
+                pn.layout.Divider(),
+                pn.pane.Markdown(
+                    "**Save this fit** to compare it against other configurations later, "
+                    "in <b>Results → Model Comparison</b>.",
+                    margin=(4, 0, 4, 0),
+                ),
+                pn.Row(self._save_name_in, self._save_btn),
+                self._save_status,
             ),
             title="Fit Model",
             margin=10,
@@ -805,13 +883,6 @@ class ModelTab(param.Parameterized):
         )
 
     def get_fitted_model(self) -> BaseModel | None:
-        """Return the fitted model, if one exists.
-
-        Returns:
-            ``state.model`` if it is set and
-            :attr:`~hbsaemp.models._base.BaseModel.is_fitted` is ``True``,
-            otherwise ``None``.
-        """
         model = getattr(self.state, "model", None)
         return model if (model is not None and model.is_fitted) else None
 
