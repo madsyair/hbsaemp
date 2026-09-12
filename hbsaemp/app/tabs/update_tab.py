@@ -306,7 +306,8 @@ class UpdateModelTab(param.Parameterized):
             "<br><br>" + "<br>".join(f"• {n}" for n in refit_notes) if refit_notes else ""
         )
         self._update_status.object = _success_box(
-            "Model refit complete. Open the <b>Results</b> tab again to see the "
+            f"Model refit complete. Go to the <b>Modeling</b> tab to <b>Save Model</b> "
+            f"if you want to keep this version, or open <b>Results</b> again to see the "
             f"updated convergence diagnostics and SAE estimates.{note}"
         )
 

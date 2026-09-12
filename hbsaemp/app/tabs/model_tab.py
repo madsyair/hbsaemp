@@ -318,7 +318,7 @@ class ModelTab(param.Parameterized):
 
         # --- Save Model (for the Results tab's Model Comparison) -----------------
         self._save_name_in = pn.widgets.TextInput(
-            name="Model name", placeholder="e.g. Model 1", disabled=True, max_width=220,
+            name="Model name:", placeholder="e.g. Model 1", disabled=True, max_width=220,
         )
         self._save_btn = pn.widgets.Button(
             name="Save Model", button_type="success", max_width=160, disabled=True,
@@ -639,8 +639,7 @@ class ModelTab(param.Parameterized):
 
         self.state.model = fitted
         self._fit_status.object = _success_box(
-            "The MCMC sampling has completed. See the <b>Results</b> tab for "
-            "diagnostics and SAE estimates."
+            "The MCMC sampling has completed."
         )
         self._save_btn.disabled = self._save_name_in.disabled = False
         if not self._save_name_in.value:
@@ -709,8 +708,7 @@ class ModelTab(param.Parameterized):
             "will not let you select it for comparison until it converges.</b>"
         )
         self._save_status.object = status(
-            f"Saved as <b>{name}</b>. Open <b>Results → Model Comparison</b> to "
-            f"compare it against other saved models.{note}"
+            f"Saved as <b>{name}</b>.{note}"
         )
         self._save_name_in.value = f"Model {len(self.state.saved_models) + 1}"
 
@@ -842,10 +840,10 @@ class ModelTab(param.Parameterized):
                 pn.layout.Divider(),
                 pn.pane.Markdown(
                     "**Save this fit** to compare it against other configurations later, "
-                    "in <b>Results → Model Comparison</b>.",
+                    "in <b>Results Tab in Model Comparison Tab </b>.",
                     margin=(4, 0, 4, 0),
                 ),
-                pn.Row(self._save_name_in, self._save_btn),
+                pn.Column(self._save_name_in, self._save_btn),
                 self._save_status,
             ),
             title="Fit Model",
