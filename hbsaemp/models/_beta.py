@@ -22,12 +22,11 @@ class BetaModel(BaseModel):
         n_col, deff_col: Survey size and design effect columns. Both or
             neither. When both are given, the FH precision offset is enabled
             (preprocessor adds the `log_phi` column).
-        link: Link for mu (default `"logit"`).
         squeeze: Smithson-Verkuilen squeeze `(y*(n-1)+0.5)/n` applied before
             fit. Default False. Set True only for boundary `y=0` / `y=1`
             cases (requires `n_col`+`deff_col`). When True the validator
             relaxes the domain to `[0, 1]`.
-        **kwargs: Forwarded to `BaseModel`.
+        **kwargs: Forwarded to `BaseModel` (including `link`).
     """
 
     def __init__(
@@ -35,14 +34,12 @@ class BetaModel(BaseModel):
         *args: Any,
         n_col: str | None = None,
         deff_col: str | None = None,
-        link: str | None = None,
         squeeze: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._n_col = n_col
         self._deff_col = deff_col
-        self._link = link or self._default_link
         self._squeeze = squeeze
 
     # hooks

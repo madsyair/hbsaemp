@@ -89,6 +89,7 @@ def test_sampler_kwargs_uses_pymc_inference_method():
     ({"draws": 0}, ValueError),
     ({"tune": -1}, ValueError),
     ({"chains": 0}, ValueError),
+    ({"cores": 0}, ValueError),
     ({"target_accept": 1.5}, ValueError),
     ({"max_treedepth": 0}, ValueError),
     ({"sampler_kwargs": None}, TypeError),
@@ -96,6 +97,21 @@ def test_sampler_kwargs_uses_pymc_inference_method():
 def test_model_config_validation(bad, exc):
     with pytest.raises(exc):
         hb.ModelConfig(**bad)
+
+
+@pytest.mark.parametrize("bad", [
+    {"draws": 0}, {"tune": -1}, {"chains": 0}, {"cores": 0}, {"max_treedepth": 0},
+])
+def test_model_config_errors_are_printable_on_any_console(bad):
+    """Validation messages must survive a non-UTF-8 console.
+
+    They once used the U+2265 sign, which is absent from cp1252 (the Windows
+    default): `print(e)` then raised UnicodeEncodeError and destroyed the
+    message instead of showing it.
+    """
+    with pytest.raises(ValueError) as exc_info:
+        hb.ModelConfig(**bad)
+    str(exc_info.value).encode("cp1252")  # raises UnicodeEncodeError on regression
 
 
 @pytest.mark.parametrize("kwargs", [

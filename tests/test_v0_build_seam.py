@@ -40,6 +40,42 @@ def test_prior_spec_error_raised_by_prior():
         hb.Prior("Normal")  # no params
 
 
+@pytest.mark.parametrize("bad_dist", ["", "   ", 123, None])
+def test_prior_rejects_empty_or_non_string_dist(bad_dist):
+    """`dist` must be a non-empty string; anything else fails at construction."""
+    with pytest.raises(hb.PriorSpecError):
+        hb.Prior(bad_dist, mu=0)
+
+
+def test_prior_refuses_params_as_a_parameter_name():
+    """`params=` must be refused so `dataclasses.replace()` fails loudly.
+
+    `replace()` re-calls `__init__` with the *field* names, so its
+    `params={...}` would be swallowed by `**params` and nested one level
+    deep — producing a Prior that passes validation but that the backend
+    rejects much later.
+    """
+    with pytest.raises(hb.PriorSpecError, match="not a valid distribution parameter"):
+        hb.Prior("Normal", params={"mu": 0})
+
+    import dataclasses
+
+    with pytest.raises(hb.PriorSpecError):
+        dataclasses.replace(hb.Prior("Normal", mu=0, sigma=1), dist="HalfNormal")
+
+
+def test_prior_copy_replace_keeps_params_flat():
+    """`copy.replace()` (Python 3.13+) must not nest `params`."""
+    import copy
+
+    if not hasattr(copy, "replace"):
+        pytest.skip("copy.replace() requires Python 3.13+")
+    original = hb.Prior("Normal", mu=0, sigma=1)
+    replaced = copy.replace(original, dist="HalfNormal")
+    assert replaced.dist == "HalfNormal"
+    assert replaced.params == {"mu": 0, "sigma": 1}
+
+
 def test_gui_not_imported_eagerly():
     """`import hbsaemp` must not import `hbsaemp.app`.
 

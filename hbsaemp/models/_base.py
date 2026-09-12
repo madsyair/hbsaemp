@@ -19,7 +19,7 @@ import pandas as pd
 from hbsaemp._exceptions import DataValidationError, ModelNotFittedError
 from hbsaemp._logging import get_logger
 from hbsaemp._types import FamilyLiteral, FormulaStr, PriorDict
-from hbsaemp.models._family_spec import FAMILY_SPECS, FamilySpec
+from hbsaemp.models._family_spec import FamilySpec, get_family_spec
 
 if TYPE_CHECKING:
     from hbsaemp.models._config import ModelConfig
@@ -53,7 +53,7 @@ class ModelResult:
     formula: FormulaStr = ""
     family: FamilyLiteral = "gaussian"
     data: pd.DataFrame = field(default_factory=pd.DataFrame, repr=False)
-    config: Any = field(default=None)           # ModelConfig — avoids circular
+    config: ModelConfig | None = field(default=None)
     priors: PriorDict | None = field(default=None, repr=False)
     is_fitted: bool = False
     fitted_at: datetime | None = None
@@ -100,6 +100,8 @@ class BaseModel(abc.ABC):
         priors: Optional prior dict; `None` means Bambi auto-priors.
         group: Grouping column for random effects.
         handle_missing: Missing data strategy (`"deleted"` only in v1).
+        link: Link for the mean parameter. `None` takes the family default
+            from `FAMILY_SPECS[family].default_link`.
     """
 
     def __init__(
@@ -112,6 +114,7 @@ class BaseModel(abc.ABC):
         priors: PriorDict | None = None,
         group: str | None = None,
         handle_missing: str = "deleted",
+        link: str | None = None,
     ) -> None:
         self._formula = formula
         self._family = family
@@ -120,6 +123,8 @@ class BaseModel(abc.ABC):
         self._priors = priors
         self._group = group
         self._handle_missing = handle_missing
+        # After _family: the default is read from that family's spec.
+        self._link = link or self._default_link
         self._result: ModelResult | None = None
 
         logger.debug(
@@ -171,14 +176,12 @@ class BaseModel(abc.ABC):
 
     @property
     def _spec(self) -> FamilySpec:
-        """Immutable metadata for `self._family` (from `FAMILY_SPECS`)."""
-        try:
-            return FAMILY_SPECS[self._family]
-        except KeyError as exc:
-            raise ValueError(
-                f"No FamilySpec registered for family={self._family!r}. "
-                f"Known families: {sorted(FAMILY_SPECS)}."
-            ) from exc
+        """Immutable metadata for `self._family` (from `FAMILY_SPECS`).
+
+        Raises:
+            ModelRegistryError: If `self._family` is not registered.
+        """
+        return get_family_spec(self._family)
 
     @property
     def _mean_param_key(self) -> str:
@@ -312,7 +315,6 @@ class BaseModel(abc.ABC):
         param: str,
         offset_col: str | None,
         mu_link: str,
-        mu_key: str = "mu",
     ) -> tuple[Any, Any]:
         """Build a Bambi distributional formula for Fay-Herriot offset models.
 
@@ -331,7 +333,6 @@ class BaseModel(abc.ABC):
             offset_col: Pre-computed offset column (e.g. `"log_sqrt_D"`),
                 or None for plain regression.
             mu_link: Link function for the mean parameter.
-            mu_key: Mean-parameter key in the link dict (`"mu"` or `"p"`).
 
         Returns:
             `(formula, link)` ready for `bmb.Model`.
@@ -341,7 +342,7 @@ class BaseModel(abc.ABC):
                 main_formula, f"{param} ~ 1 + offset({offset_col})"
             )
             # Both keys required — partial dict raises KeyError in Bambi backend.
-            link: Any = {mu_key: mu_link, param: "log"}
+            link: Any = {self._mean_param_key: mu_link, param: "log"}
         else:
             formula = main_formula
             link = mu_link
@@ -506,7 +507,7 @@ class BaseModel(abc.ABC):
             raise ValueError(
                 f"kind={kind!r} was removed in Bambi 0.18+. "
                 f"Use 'response' (posterior predictive Y_rep) or "
-                f"'response_params' (posterior mean parameter µ/p/κ)."
+                f"'response_params' (posterior mean parameter mu/p/kappa)."
             )
 
         if kind in self._KIND_ALIASES:
@@ -525,7 +526,7 @@ class BaseModel(abc.ABC):
             raise ValueError(
                 f"Unsupported kind={kind!r}. "
                 f"Valid values: 'response' (posterior predictive Y_rep) or "
-                f"'response_params' (posterior mean parameter µ/p/κ)."
+                f"'response_params' (posterior mean parameter mu/p/kappa)."
             )
 
         return kind
@@ -869,6 +870,10 @@ class BaseModel(abc.ABC):
                 `sample_new_levels="uncertainty"`), seeded by
                 `config.random_seed`. `False` raises on unseen groups.
             n_samples: Number of posterior draws to return; `None` = all.
+                Draws are thinned at even spacing so every chain stays
+                represented — not taken as a leading slice, which would
+                return a single chain and discard the cross-chain check
+                that running several of them buys.
 
         Raises:
             ModelNotFittedError: If `fit()` has not been called.
@@ -909,8 +914,11 @@ class BaseModel(abc.ABC):
         # .T → (n_samples, n_obs) matching the documented return shape.
         flat: np.ndarray = draws_da.stack(sample=("chain", "draw")).values.T
 
-        if n_samples is not None:
-            flat = flat[:n_samples]
+        # Thin at even spacing, never `flat[:n_samples]`: stack() above is
+        # chain-major, so a leading slice would return draws from chain 0 only.
+        if n_samples is not None and n_samples < flat.shape[0]:
+            keep = np.linspace(0, flat.shape[0] - 1, n_samples, dtype=int)
+            flat = flat[keep]
 
         logger.debug(
             "%s.predict(): output shape=%s", type(self).__name__, flat.shape

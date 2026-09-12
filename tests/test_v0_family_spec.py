@@ -171,6 +171,69 @@ def test_response_check_rejects_non_integer_binomial():
         FAMILY_SPECS["binomial"].response_check(bad, "y", {"trials_col": None})
 
 
+# Survey-design domain guards.
+#
+# Each of these is the last thing standing between bad design columns and a
+# silently wrong offset: log(D) on a non-positive D, or log(n/deff - 1) on a
+# ratio <= 1, both yield NaN/-inf that only surfaces deep inside the sampler.
+
+
+@pytest.mark.parametrize("bad_d", [0.0, -0.5])
+def test_response_check_rejects_non_positive_sampling_variance(bad_d):
+    """Fay-Herriot needs D_i > 0 — `log_sqrt_D = 0.5*log(D)` is undefined otherwise."""
+    bad = pd.DataFrame({"y": [5.0, 6.0], "D": [0.25, bad_d]})
+    with pytest.raises(DataValidationError, match="must be positive"):
+        FAMILY_SPECS["gaussian"].response_check(bad, "y", {"sampling_var_col": "D"})
+
+
+@pytest.mark.parametrize("bad_n", [0.0, -10.0])
+def test_response_check_rejects_non_positive_sample_size(bad_n):
+    bad = pd.DataFrame({"y": [0.5, 0.5], "n": [100.0, bad_n], "deff": [1.5, 1.5]})
+    with pytest.raises(DataValidationError, match="sample sizes must be positive"):
+        FAMILY_SPECS["beta"].response_check(
+            bad, "y", {"n_col": "n", "deff_col": "deff", "squeeze": False}
+        )
+
+
+@pytest.mark.parametrize("bad_deff", [0.0, -1.0])
+def test_response_check_rejects_non_positive_design_effect(bad_deff):
+    bad = pd.DataFrame({"y": [0.5, 0.5], "n": [100.0, 100.0], "deff": [1.5, bad_deff]})
+    with pytest.raises(DataValidationError, match="design effects must be positive"):
+        FAMILY_SPECS["beta"].response_check(
+            bad, "y", {"n_col": "n", "deff_col": "deff", "squeeze": False}
+        )
+
+
+def test_response_check_rejects_non_positive_precision():
+    """phi = n/deff - 1 must exceed 0, so n/deff <= 1 is refused."""
+    bad = pd.DataFrame({"y": [0.5], "n": [2.0], "deff": [4.0]})  # n/deff = 0.5
+    with pytest.raises(DataValidationError, match="must be > 0") as exc_info:
+        FAMILY_SPECS["beta"].response_check(
+            bad, "y", {"n_col": "n", "deff_col": "deff", "squeeze": False}
+        )
+    str(exc_info.value).encode("cp1252")  # message must survive a cp1252 console
+
+
+def test_response_check_rejects_negative_successes():
+    bad = pd.DataFrame({"y": [5.0, -1.0]})
+    with pytest.raises(DataValidationError, match="must be non-negative"):
+        FAMILY_SPECS["binomial"].response_check(bad, "y", {"trials_col": None})
+
+
+@pytest.mark.parametrize("bad_trials", [0.0, -5.0, 10.5])
+def test_response_check_rejects_invalid_trial_counts(bad_trials):
+    """Trials must be positive integers — zero, negative, and fractional all fail."""
+    bad = pd.DataFrame({"y": [5.0, 5.0], "n": [25.0, bad_trials]})
+    with pytest.raises(DataValidationError, match="positive integers"):
+        FAMILY_SPECS["binomial"].response_check(bad, "y", {"trials_col": "n"})
+
+
+def test_response_check_rejects_successes_exceeding_trials():
+    bad = pd.DataFrame({"y": [5.0, 30.0], "n": [25.0, 25.0]})
+    with pytest.raises(DataValidationError, match="must not exceed"):
+        FAMILY_SPECS["binomial"].response_check(bad, "y", {"trials_col": "n"})
+
+
 def test_preprocess_beta_adds_log_phi():
     df = pd.DataFrame({"y": [0.2], "n": [100.0], "deff": [2.0]})
     out = FAMILY_SPECS["beta"].preprocess(

@@ -28,20 +28,17 @@ class BinomialModel(BaseModel):
     Args:
         *args: Forwarded to `BaseModel`.
         trials_col: Column with trial counts n_i (required).
-        link: Link for p (default `"logit"`).
-        **kwargs: Forwarded to `BaseModel`.
+        **kwargs: Forwarded to `BaseModel` (including `link`).
     """
 
     def __init__(
         self,
         *args: Any,
         trials_col: str | None = None,
-        link: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self._trials_col = trials_col
-        self._link = link or self._default_link
 
     # hooks
 
