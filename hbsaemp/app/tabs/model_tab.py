@@ -7,7 +7,6 @@ import asyncio
 import copy
 import inspect
 import io
-import warnings
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -19,7 +18,6 @@ import param
 
 from hbsaemp import (
     BaseModel,
-    ConvergenceWarning,
     DataValidationError,
     EstimationError,
     FormulaError,
@@ -28,7 +26,6 @@ from hbsaemp import (
     ModelNotFittedError,
     ModelRegistryError,
     PriorSpecError,
-    check_convergence,
     get_family_spec,
     hbm_beta,
     hbm_binomial,
@@ -108,13 +105,6 @@ def _success_box(body: str) -> str:
 def _info_box(body: str) -> str:
     return (
         f'<div style="background:#0072B2;color:white;padding:10px 16px;'
-        f'border-radius:8px;margin-top:8px">{body}</div>'
-    )
-
-
-def _warn_box(body: str) -> str:
-    return (
-        f'<div style="background:#f0ad4e;color:#3a2e00;padding:10px 16px;'
         f'border-radius:8px;margin-top:8px">{body}</div>'
     )
 
@@ -653,17 +643,18 @@ class ModelTab(param.Parameterized):
     async def _on_save_model(self, event: Any) -> None:
         """Freeze the active model as a named snapshot for Model Comparison.
 
-        Runs `check_convergence()` at save time (the same function the
-        Results tab uses) so the saved snapshot carries its own
-        convergence status — Model Comparison can then refuse to compare
-        anything that hasn't converged, without re-running diagnostics
-        itself. Stores a `copy.copy()` of the model, not the live
-        `state.model` reference: `update_model()` replaces (rather than
-        mutates) the attributes it touches, so a shallow copy is enough to
-        stop a later refit of the *active* model from silently changing
-        an already-saved entry.
+        Stores a `copy.copy()` of the model, not the live `state.model`
+        reference: `update_model()` replaces (rather than mutates) the
+        attributes it touches, so a shallow copy is enough to stop a
+        later refit of the *active* model from silently changing an
+        already-saved entry.
+
+        Does not check convergence — the GUI does not judge or gate on it
+        anywhere; R-hat/ESS/divergence numbers are shown as-is in
+        Convergence Evaluation, and it's up to whoever is looking at them
+        to decide whether a fit is usable.
         """
-        if self._save_btn.loading:  
+        if self._save_btn.loading:
             return
         model = getattr(self.state, "model", None)
         if model is None or not model.is_fitted:
@@ -678,48 +669,14 @@ class ModelTab(param.Parameterized):
             )
             return
 
-        self._save_btn.loading = self._save_btn.disabled = True
-        self._save_status.object = _info_box("Checking convergence before saving…")
-        try:
-            loop = asyncio.get_running_loop()
-            converged, warning_messages = await loop.run_in_executor(
-                None, self._convergence_check_blocking, model
-            )
-        except Exception as exc:
-            logger.exception("ModelTab save-model convergence check failed")
-            title, body = _describe_error(exc)
-            self._save_status.object = _error_box(title, body)
-            return
-        finally:
-            self._save_btn.loading = self._save_btn.disabled = False
-
         from hbsaemp.app._app import SavedModel  # local: avoids a circular import
 
-        snapshot = SavedModel(
-            model=copy.copy(model), converged=converged, warnings=warning_messages,
-        )
+        snapshot = SavedModel(model=copy.copy(model))
         # Reassign (not in-place mutation) so param.watch on "saved_models" fires.
         self.state.saved_models = {**self.state.saved_models, name: snapshot}
 
-        status = _success_box if converged else _warn_box
-        note = "" if converged else (
-            "<br>" + "<br>".join(f"• {m}" for m in warning_messages)
-            + "<br><br><b>This model can still be saved, but Model Comparison "
-            "will not let you select it for comparison until it converges.</b>"
-        )
-        self._save_status.object = status(
-            f"Saved as <b>{name}</b>.{note}"
-        )
+        self._save_status.object = _success_box(f"Saved as <b>{name}</b>.")
         self._save_name_in.value = f"Model {len(self.state.saved_models) + 1}"
-
-    @staticmethod
-    def _convergence_check_blocking(model: BaseModel) -> tuple[bool, list[str]]:
-        """Synchronous, Panel-free — runs in the executor thread."""
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always", ConvergenceWarning)
-            check_convergence(model)
-        messages = [str(w.message) for w in caught if issubclass(w.category, ConvergenceWarning)]
-        return not messages, messages
 
     async def _on_posterior_check(self, event: Any) -> None:
         if self._postpc_run_btn.loading:

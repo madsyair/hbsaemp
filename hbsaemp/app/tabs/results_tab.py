@@ -1,12 +1,12 @@
 """Tab 4 — Results: diagnostics, model comparison, refit, and export.
-Sub-tabs (in workflow order — convergence is checked before anything
-built on top of the posterior is trusted, per standard Bayesian workflow):
+Sub-tabs (in workflow order):
 
-1. **Convergence Evaluation** — R-hat/ESS table, diagnostic plots, and an
-   automatic issue summary from `check_convergence()`.
+1. **Convergence Evaluation** — R-hat/ESS table and diagnostic plots from
+   `check_convergence()`, shown as-is. The GUI does not judge or gate on
+   convergence anywhere — it's up to whoever is reading these numbers to
+   decide whether a fit is usable.
 2. **Model Comparison** — compare models saved from the Modeling tab's
-   "Save Model" button, via `compare_models()`. Only models that already
-   converged (checked at save time) can be selected.
+   "Save Model" button, via `compare_models()`.
 3. **Update Model** — refit the model currently in use (`state.model`)
    via `update_model()`, without rebuilding it from scratch. Embeds
    :class:`~hbsaemp.app.tabs.update_tab.UpdateModelTab`.
@@ -192,7 +192,6 @@ class ResultsTab(param.Parameterized):
         self._rhat_ess_table = pn.widgets.Tabulator(
             pd.DataFrame(), show_index=False, pagination="remote", page_size=15,
         )
-        self._diag_badges = pn.pane.HTML("")
         self._plots_pane = pn.Column()
         self._last_plots: dict[str, Any] = {}
         self._plots_download_btn = pn.widgets.FileDownload(
@@ -220,7 +219,7 @@ class ResultsTab(param.Parameterized):
         self._conv_status.object = _info_box("Computing convergence diagnostics…")
         try:
             loop = asyncio.get_running_loop()
-            result, caught_warnings = await loop.run_in_executor(
+            result = await loop.run_in_executor(
                 None, self._convergence_blocking, model
             )
         except Exception as exc:
@@ -231,27 +230,34 @@ class ResultsTab(param.Parameterized):
         finally:
             self._conv_run_btn.loading = self._conv_run_btn.disabled = False
 
-        self._render_convergence(result, caught_warnings)
+        self._render_convergence(result)
 
     @staticmethod
-    def _convergence_blocking(model: Any) -> tuple[ConvergenceResult, list[str]]:
-        """Synchronous, Panel-free — runs in the executor thread."""
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always", ConvergenceWarning)
-            result = check_convergence(model)
-        messages = [str(w.message) for w in caught if issubclass(w.category, ConvergenceWarning)]
-        return result, messages
+    def _convergence_blocking(model: Any) -> ConvergenceResult:
+        """Synchronous, Panel-free — runs in the executor thread.
 
-    def _render_convergence(self, result: ConvergenceResult, warning_messages: list[str]) -> None:
+        `check_convergence()` raises `ConvergenceWarning` through Python's
+        own warnings machinery; caught here only so it doesn't print to
+        the server's console — not used to render a verdict. The GUI
+        shows the R-hat/ESS/divergence numbers as-is and leaves the
+        judgment of "did this converge" to whoever is reading them.
+        """
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", ConvergenceWarning)
+            return check_convergence(model)
+
+    def _render_convergence(self, result: ConvergenceResult) -> None:
         # diagnostics-frontend.md S2: thresholds come from the result, not
         # hardcoded text (R-hat rank-normalized threshold is 1.01; ESS
-        # threshold scales with chain count).
+        # threshold scales with chain count). Stated so the reader can
+        # judge convergence themselves — the GUI does not.
         self._rhat_ess_desc.object = (
             "The **R-hat (Gelman-Rubin)** diagnostic compares within-chain to "
             "between-chain variance. Values noticeably above `1` suggest the "
-            f"chains have not mixed adequately. Threshold used here: "
+            f"chains have not mixed adequately. Commonly used thresholds: "
             f"**R-hat ≤ 1.01**, **ESS ≥ {result.ess_threshold}** "
-            "(100 × number of chains)."
+            "(100 × number of chains) — interpret against your own study's "
+            "requirements."
         )
 
         if result.rhat_ess is not None and not result.rhat_ess.empty:
@@ -262,27 +268,6 @@ class ResultsTab(param.Parameterized):
             }
             table = result.rhat_ess.round(display_cols) if display_cols else result.rhat_ess
             self._rhat_ess_table.value = table.reset_index().rename(columns={"index": "Parameter"})
-
-        # diagnostics-frontend.md S3 (optional): compact badges from the
-        # structured diagnostics, alongside the full warning text below.
-        diag = result.diagnose or {}
-        badges: list[str] = []
-        if (div := diag.get("divergent")) is not None:
-            color = "#d62728" if div.get("n_divergent") else "#2ca02c"
-            badges.append(
-                f'<span style="background:{color};color:white;padding:4px 10px;'
-                f'border-radius:20px;margin-right:6px">'
-                f'Divergences: {div.get("n_divergent", 0)} ({div.get("pct", 0):.2f}%)</span>'
-            )
-        if (bfmi := diag.get("bfmi")) is not None:
-            failed = bfmi.get("failed_chains") or []
-            color = "#d62728" if failed else "#2ca02c"
-            label = f"chain(s) {failed}" if failed else "OK"
-            badges.append(
-                f'<span style="background:{color};color:white;padding:4px 10px;'
-                f'border-radius:20px">E-BFMI: {label}</span>'
-            )
-        self._diag_badges.object = "".join(badges)
 
         self._last_plots = dict(result.plots)
         self._plots_download_btn.disabled = not self._last_plots
@@ -303,17 +288,7 @@ class ResultsTab(param.Parameterized):
             pn.Accordion(*sections, active=[], sizing_mode="stretch_width")
         ] if sections else [pn.pane.Markdown("*No plots were generated.*")]
 
-        if warning_messages:
-            self._conv_status.object = _warn_box(
-                "<b>Convergence issues detected:</b><br>"
-                + "<br>".join(f"• {m}" for m in warning_messages)
-                + "<br><br>Consider reviewing the model specification, or refitting "
-                "with adjusted sampler settings in <b>Update Model</b>."
-            )
-        else:
-            self._conv_status.object = _success_box(
-                "Diagnostics computed. No convergence warnings raised."
-            )
+        self._conv_status.object = _success_box("Diagnostics computed.")
 
     def _plots_pdf_callback(self) -> io.BytesIO:
         from matplotlib.backends.backend_pdf import PdfPages
@@ -331,10 +306,9 @@ class ResultsTab(param.Parameterized):
 
     def _build_comparison_widgets(self) -> None:
         self._compare_table = pn.widgets.Tabulator(
-            pd.DataFrame(columns=["Model", "Converged"]),
+            pd.DataFrame(columns=["Model"]),
             show_index=False,
             selectable="checkbox",
-            selectable_rows=self._compare_selectable_rows,
             disabled=True,  # read-only cells; only row selection is interactive
         )
         self._compare_bf_cb = pn.widgets.Checkbox(
@@ -356,27 +330,12 @@ class ResultsTab(param.Parameterized):
         self.state.param.watch(self._on_saved_models_change, "saved_models")
         self._refresh_saved_models_table()
 
-    def _compare_selectable_rows(self, df: pd.DataFrame) -> list[int]:
-        """Only converged models can be selected for comparison.
-
-        Backed by the status each model was saved with (Modeling tab), not
-        recomputed here — Comparison trusts, rather than re-derives,
-        Convergence's verdict.
-        """
-        if "Converged" not in df.columns:
-            return []
-        return df.index[df["Converged"] == "✓"].tolist()
-
     def _on_saved_models_change(self, event: param.parameterized.Event) -> None:
         self._refresh_saved_models_table()
 
     def _refresh_saved_models_table(self) -> None:
         saved = self.state.saved_models or {}
-        rows = [
-            {"Model": name, "Converged": "✓" if sm.converged else "⚠"}
-            for name, sm in saved.items()
-        ]
-        self._compare_table.value = pd.DataFrame(rows, columns=["Model", "Converged"])
+        self._compare_table.value = pd.DataFrame({"Model": list(saved.keys())})
         self._use_model_sel.options = [None, *saved.keys()]
 
     async def _on_compare_click(self, event: Any) -> None:
@@ -389,20 +348,7 @@ class ResultsTab(param.Parameterized):
         if len(names) < 2:
             self._compare_status.object = _error_box(
                 "Select at least 2 models",
-                "Check two or more converged models above, then click Compare Selected.",
-            )
-            return
-
-        # Defense in depth: `selectable_rows` only stops a user from
-        # *clicking* an unconverged row's checkbox in the UI — it does not
-        # stop `.selection` being set some other way. Re-validate here so
-        # this handler enforces the rule itself, not just the widget.
-        not_converged = [n for n in names if not saved[n].converged]
-        if not_converged:
-            self._compare_status.object = _error_box(
-                "Cannot compare unconverged model(s)",
-                f"{', '.join(not_converged)} did not converge when saved. Refit and "
-                "re-save before comparing.",
+                "Check two or more models above, then click Compare Selected.",
             )
             return
 
@@ -686,7 +632,6 @@ class ResultsTab(param.Parameterized):
                 self._conv_run_btn,
                 self._conv_status,
                 pn.layout.Divider(),
-                self._diag_badges,
                 pn.Accordion(
                     (
                         "R-hat and ESS",
@@ -704,7 +649,10 @@ class ResultsTab(param.Parameterized):
         modelcomparison_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "Only models that had already converged when saved can be selected.",
+                    "Compare models saved from the <b>Modeling</b> tab's "
+                    "<i>Save Model</i> button, ranked by predictive fit (LOO/ELPD). "
+                    "Check the Convergence Evaluation numbers yourself before "
+                    "relying on this ranking.",
                     margin=(4, 0, 8, 0),
                 ),
                 self._compare_table,

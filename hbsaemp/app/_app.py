@@ -1,20 +1,9 @@
 """Main application class for the hbsaemp web dashboard.
-Mapping from R hbsaems
------------------------
-.. code-block:: text
-
-    R Shiny structure                  Panel v1 equivalent
-    ─────────────────────────────────  ────────────────────────────────────
-    dashboardPage(header, sidebar, …)  pn.template.FastListTemplate(...)
-    dashboardSidebar(sidebarMenu(…))   sidebar= parameter of template
-    dashboardBody(tabItems(…))         main= parameter of template
-    reactiveValues(data=NULL, …)       AppState(param.Parameterized)
-    observe({ if model_fit… })         pn.param.watch callback
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import panel as pn
@@ -54,16 +43,15 @@ class SavedModel:
     a fitted ``BaseModel`` holds a reference to the ``bambi`` module,
     which isn't deep-copyable.
 
+    The GUI does not judge or gate on convergence anywhere — R-hat/ESS/
+    divergence numbers are shown as-is (Convergence Evaluation) and it is
+    up to the person reading them to decide whether a fit is usable. This
+    snapshot accordingly holds only the model itself.
+
     Attributes:
         model: The frozen model snapshot.
-        converged: Whether :func:`~hbsaemp.check_convergence` raised no
-            :class:`~hbsaemp.ConvergenceWarning` when this was saved.
-        warnings: The convergence warning messages, if any (empty when
-            ``converged`` is ``True``).
     """
     model: Any
-    converged: bool
-    warnings: list[str] = field(default_factory=list)
 
 
 class AppState(param.Parameterized):
