@@ -17,6 +17,7 @@ import xarray as xr
 
 from hbsaemp.diagnostics.comparison import (
     _SUPPORTED_METRICS,
+    _bf_frame,
     _check_same_observations,
     _require_log_likelihood,
     _validate_compare_args,
@@ -184,3 +185,42 @@ class TestCheckSameObservations:
     def test_missing_observed_data_rejected(self):
         with pytest.raises(ValueError, match="observed_data"):
             _check_same_observations([_observed([1, 2]), FakeIdata(["posterior"])])
+
+
+def _bf_dataset(values: dict[str, tuple[float, float]]) -> xr.Dataset:
+    """Rebuild what ``az.bayes_factor`` returns from arviz-stats 1.2.0 on.
+
+    Same construction as upstream: one variable per term, values concatenated
+    along a ``bf_type`` dimension coordinated ``["BF10", "BF01"]``.
+    """
+    return xr.Dataset(
+        {
+            var: xr.concat(
+                [xr.DataArray(bf10), xr.DataArray(bf01)],
+                dim=xr.DataArray(["BF10", "BF01"], dims="bf_type"),
+            ).rename(var)
+            for var, (bf10, bf01) in values.items()
+        }
+    )
+
+
+class TestBfFrame:
+    """``_bf_frame`` turns that Dataset into the BF10/BF01 table per term."""
+
+    def test_terms_on_the_index_and_bf_on_the_columns(self):
+        ds = _bf_dataset({"x1": (6.9e14, 1.4e-15), "x2": (0.196, 5.1)})
+        frame = _bf_frame(ds, ["x1", "x2"])
+        assert list(frame.index) == ["x1", "x2"]
+        assert list(frame.columns) == ["BF10", "BF01"]
+        assert frame.loc["x2", "BF10"] == pytest.approx(0.196)
+        assert frame.loc["x1", "BF01"] == pytest.approx(1.4e-15)
+
+    def test_values_are_float_and_columns_unnamed(self):
+        frame = _bf_frame(_bf_dataset({"x1": (2.0, 0.5)}), ["x1"])
+        assert all(frame.dtypes == np.float64)
+        # "bf_type" would otherwise leak into the rendered table header.
+        assert frame.columns.name is None
+
+    def test_row_order_follows_terms(self):
+        ds = _bf_dataset({"x2": (0.5, 2.0), "x1": (2.0, 0.5)})
+        assert list(_bf_frame(ds, ["x1", "x2"]).index) == ["x1", "x2"]

@@ -260,7 +260,7 @@ def check_convergence(
         import arviz as az
     except ImportError as exc:
         raise ImportError(
-            "check_convergence() requires arviz>=1.1. "
+            "check_convergence() requires arviz>=1.2. "
             "Install with: pip install 'hbsaemp[bambi]'"
         ) from exc
 

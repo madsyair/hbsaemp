@@ -1,8 +1,11 @@
-"""v0 smoke tests — run without Bambi, PyMC, or ArviZ.
+"""Bambi-free core checks — run without Bambi, PyMC, or ArviZ.
 
-All model/diagnostic/estimation stubs must raise NotImplementedError.
-All result dataclasses must be constructable.
-All validation (ModelConfig, AppConfig) must work.
+Covers everything reachable before a model is built: the export surface and
+R-style aliases, `ModelConfig` validation and `to_sampler_kwargs()`,
+`create_model()` argument handling (family dispatch, `(1|group)` injection,
+cross-family rejection), the data layer (`DataValidator` /
+`DataPreprocessor`), `parse_formula`, the result dataclasses, and the
+exception hierarchy.
 """
 import warnings
 import pytest

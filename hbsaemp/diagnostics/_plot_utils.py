@@ -86,7 +86,9 @@ def _diagnostic_var_names(
 #   ``plot_forest`` cannot show R-hat in ArviZ 1.1.
 # * ``pair`` highlights divergent draws; ArviZ 1.1 enables them through
 #   ``visuals`` and rejects the old ``divergences`` keyword.
-# * ``energy`` overlays BFMI itself (``show_bfmi=True, threshold=0.3``).
+# * ``energy`` takes no kwargs — it is the energy transition plot only. E-BFMI
+#   is checked separately by ``az.diagnose(bfmi_threshold=...)`` in
+#   ``convergence.py``, not read off this figure.
 _CONVERGENCE_PLOTS: dict[str, tuple[str, dict[str, Any], DiagnosticVarPolicy | None]] = {
     "trace":  ("plot_trace", {}, "scalar_only"),
     "dens":   ("plot_dist", {}, "scalar_only"),

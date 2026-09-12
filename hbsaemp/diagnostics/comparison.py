@@ -257,6 +257,18 @@ def _common_terms(model: BaseModel) -> list[str]:
     return list(component.common_terms)
 
 
+def _bf_frame(bf: Any, terms: list[str]) -> pd.DataFrame:
+    """Reshape ``arviz.bayes_factor`` output into a BF10/BF01 table per term.
+
+    Since arviz-stats 1.2.0 the function returns an ``xarray.Dataset`` — one
+    variable per term, carrying a ``bf_type`` dimension coordinated
+    ``["BF10", "BF01"]``. Transposing its frame puts the terms back on the
+    index; ``reindex`` also fixes the row order to *terms*.
+    """
+    frame = bf.to_dataframe().T.rename_axis(None, axis=1)
+    return frame.reindex(index=terms, columns=["BF10", "BF01"]).astype(float)
+
+
 def _bayes_factor_table(model: BaseModel, az: Any) -> pd.DataFrame:
     """Savage-Dickey Bayes factors (H0: coefficient = 0) per fixed effect."""
     terms = _common_terms(model)
@@ -266,8 +278,7 @@ def _bayes_factor_table(model: BaseModel, az: Any) -> pd.DataFrame:
     # The prior group is attached to a copy only: result.idata stays as fitted.
     dt = model.result.idata.copy()
     dt["prior"] = prior["prior"]
-    bf = az.bayes_factor(dt, var_names=terms, ref_vals=0)
-    return pd.DataFrame.from_dict(bf, orient="index")[["BF10", "BF01"]].astype(float)
+    return _bf_frame(az.bayes_factor(dt, var_names=terms, ref_vals=0), terms)
 
 
 def _log_prior_idata(model: BaseModel) -> Any:
@@ -417,7 +428,7 @@ def compare_models(
         import arviz as az
     except ImportError as exc:
         raise ImportError(
-            "compare_models() requires arviz>=1.1. "
+            "compare_models() requires arviz>=1.2. "
             "Install with: pip install 'hbsaemp[bambi]'"
         ) from exc
 
