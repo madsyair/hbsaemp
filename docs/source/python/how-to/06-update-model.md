@@ -55,7 +55,8 @@ Refit against newer data, keeping the same formula, family and priors:
 updated = update_model(model, new_data=df_2025)
 ```
 
-If the new frame lacks the survey-design columns (`sampling_var`, or `n` and `deff`) but
+If the new frame lacks a column a pinned parameter is computed from — the survey-design
+columns (`sampling_var`, or `n` and `deff`) and any column named by `fixed_params=` — but
 has the same number of rows, they are copied from the current data with a warning, on the
 assumption that the rows are in the same order. With a different number of rows they
 cannot be copied and the call raises.

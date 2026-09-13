@@ -6,11 +6,19 @@ mutates the input.
 """
 from __future__ import annotations
 
+from typing import Any
+
+import numpy as np
 import pandas as pd
 
 from hbsaemp._exceptions import DataValidationError
 from hbsaemp._logging import get_logger
-from hbsaemp.models._family_spec import FAMILY_SPECS
+from hbsaemp.models._family_spec import (
+    FAMILY_SPECS,
+    USER_FIXED_COL,
+    apply_link,
+    pin_source_columns,
+)
 
 logger = get_logger(__name__)
 __all__: list[str] = ["DataPreprocessor"]
@@ -58,11 +66,7 @@ class DataPreprocessor:
         *,
         group: str | None = None,
         family: str,
-        n_col: str | None = None,
-        deff_col: str | None = None,
-        sampling_var_col: str | None = None,
-        trials_col: str | None = None,
-        squeeze: bool = False,
+        **pipeline_fields: Any,
     ) -> pd.DataFrame:
         """Preprocess *data* and return a cleaned, transformed copy.
 
@@ -72,21 +76,32 @@ class DataPreprocessor:
             predictors: Predictor column names.
             group: Grouping column for random effects (``None`` = no RE).
             family: Distribution family — determines which transforms apply.
-            n_col: *Beta* — sample-size column for phi computation.
-            deff_col: *Beta* — design-effect column for phi computation.
-            sampling_var_col: *Gaussian FH* — sampling-variance column ``D``.
-            trials_col: *Binomial* — number-of-trials column.
-            squeeze: *Beta* — apply Smithson-Verkuilen squeeze
-                ``(y*(n-1)+0.5)/n`` to the response before fitting.
-                Default ``False``.  Set ``True`` only when the dataset
-                contains boundary values ``y=0`` or ``y=1`` (requires
-                ``n_col`` and ``deff_col`` to be provided).
+            **pipeline_fields: The family's own fields, exactly as declared in
+                ``FAMILY_SPECS[family].pipeline_fields`` and assembled by
+                ``BaseModel._extra_pipeline_kwargs()`` — e.g. ``n_col`` and
+                ``deff_col`` (Beta), ``sampling_var_col`` (Gaussian FH),
+                ``trials_col`` (Binomial), ``squeeze`` (Beta). String values
+                are read as data-column names and join the NaN-drop subset;
+                other values are settings. Passed through unchanged to the
+                family's ``preprocess``. Taken as ``**kwargs`` on purpose: a
+                family that declares a new field must not have to edit this
+                signature.
 
         Returns:
             Preprocessed :class:`pandas.DataFrame` ready to pass to Bambi.
             Contains all original columns plus any added transform columns.
         """
-        optional = [group, n_col, deff_col, sampling_var_col, trials_col]
+        # String-valued pipeline fields name data columns; other values are
+        # settings. Derived rather than enumerated so a family can add a field
+        # in FAMILY_SPECS.pipeline_fields without editing this signature. A
+        # caller pin naming a column joins them, so a NaN there drops the row
+        # exactly as a NaN in a survey-design column does — otherwise it would
+        # survive into the offset as log(NaN) and reach the sampler.
+        optional = [
+            group,
+            *(v for v in pipeline_fields.values() if isinstance(v, str)),
+            *pin_source_columns(pipeline_fields.get("fixed_params")),
+        ]
         relevant_cols = [response, *predictors, *[c for c in optional if c is not None]]
 
         df = data.copy()
@@ -113,13 +128,21 @@ class DataPreprocessor:
         # (FAMILY_SPECS). None means the family needs no offset transform.
         spec = FAMILY_SPECS[family]
         if spec.preprocess is not None:
-            df = spec.preprocess(df, response, {
-                "n_col": n_col,
-                "deff_col": deff_col,
-                "sampling_var_col": sampling_var_col,
-                "trials_col": trials_col,
-                "squeeze": squeeze,
-            })
+            df = spec.preprocess(df, response, pipeline_fields)
+
+        # Caller-supplied pins: materialise one offset column per parameter.
+        # The family's own pins are computed by `preprocess` above; these are
+        # values the caller gave directly, so all that is left is to put them
+        # on the parameter's link scale.
+        for param, source in (pipeline_fields.get("fixed_params") or {}).items():
+            values = (
+                df[source].to_numpy(dtype=float)
+                if isinstance(source, str)
+                else np.full(len(df), float(source))
+            )
+            df[USER_FIXED_COL.format(param=param)] = apply_link(
+                values, spec.pinnable_params[param]
+            )
 
         logger.debug(
             "DataPreprocessor: %d rows ready (family=%r).", len(df), family

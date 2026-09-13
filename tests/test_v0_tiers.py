@@ -7,12 +7,14 @@ to `create_model()`.
 """
 from __future__ import annotations
 
+import inspect
 import re
 from pathlib import Path
 
 import pytest
 
 import hbsaemp as hb
+from hbsaemp.models._family_spec import FAMILY_SPECS
 
 # Public API surface
 
@@ -94,24 +96,47 @@ class TestHbmFlexValidation:
 
 class TestHbmFlexDelegation:
 
-    def test_family_specific_kwargs_forwarded(self, data_binomial, default_config):
+    def test_addition_var_forwarded(self, data_binomial, default_config):
+        """`addition_var` reaches the family's own field without naming it."""
         m = hb.hbm_flex("y", ["x1"], data_binomial,
-                        family="binomial", trials="n",
+                        family="binomial", addition_var="n",
                         config=default_config)
         assert type(m).__name__ == "BinomialModel"
         assert m._trials_col == "n"
 
-    def test_beta_n_deff_forwarded(self, data_beta, default_config):
+    def test_aux_args_forwarded(self, data_beta, default_config):
         m = hb.hbm_flex("y", ["x1"], data_beta,
-                        family="beta", n="n", deff="deff",
+                        family="beta", aux_args={"n": "n", "deff": "deff"},
                         config=default_config)
         assert m._n_col == "n" and m._deff_col == "deff"
 
-    def test_cross_family_kwargs_rejected(self, data_gaussian, default_config):
-        # Validation still happens centrally in create_model._validate_family_args.
+    def test_family_names_are_not_in_the_tier2_signature(self, data_beta,
+                                                         default_config):
+        """Tier 2 knows no family vocabulary — that is the point of it.
+
+        Adding a family must not touch this signature, so the per-family
+        names live one tier up (`_shortcuts.py`) and reach tier 2 only
+        through `aux_args` / `addition_var`.
+        """
+        import inspect
+        params = set(inspect.signature(hb.hbm_flex).parameters)
+        assert not params & {"n", "deff", "squeeze", "trials"}
+        with pytest.raises(TypeError, match="unexpected keyword argument 'n'"):
+            hb.hbm_flex("y", ["x1"], data_beta, family="beta", n="n",
+                        config=default_config)
+
+    def test_cross_family_aux_args_rejected(self, data_gaussian, default_config):
+        # Validation still happens centrally, in create_model.
         with pytest.raises(ValueError, match="not valid for family='gaussian'"):
             hb.hbm_flex("y", ["x1"], data_gaussian,
-                        family="gaussian", trials="n",
+                        family="gaussian", aux_args={"trials": "n"},
+                        config=default_config)
+
+    def test_addition_var_rejected_when_family_takes_none(self, data_gaussian,
+                                                          default_config):
+        with pytest.raises(ValueError, match="takes no addition variable"):
+            hb.hbm_flex("y", ["x1"], data_gaussian,
+                        family="gaussian", addition_var="n",
                         config=default_config)
 
     def test_unknown_family_raises(self, data_gaussian, default_config):
@@ -174,6 +199,30 @@ class TestShortcutSignatures:
                         sampling_var="deff",  # type: ignore[call-arg]
                         config=default_config)
 
+    @pytest.mark.parametrize("family", sorted(FAMILY_SPECS))
+    def test_fixed_params_exposed_iff_family_pins_something(self, family):
+        """Tier 3 takes `fixed_params=` exactly when the family can pin.
+
+        Binomial's only parameter is the estimand, so the argument could only
+        ever raise `ValueError` downstream — a `TypeError` at the call is the
+        better failure. Derived from the spec so adding a pinnable family and
+        forgetting its shortcut argument fails here, not in a user's script.
+        """
+        shortcut = getattr(hb, f"hbm_{family}")
+        accepts = "fixed_params" in inspect.signature(shortcut).parameters
+
+        assert accepts is bool(FAMILY_SPECS[family].pinnable_params)
+
+    def test_hbm_gaussian_forwards_fixed_params(self, data_gaussian, default_config):
+        m = hb.hbm_gaussian("y", ["x1"], data_gaussian, config=default_config,
+                            fixed_params={"sigma": 2.0})
+        assert tuple(fp.param for fp in m._active_fixed_params()) == ("sigma",)
+
+    def test_hbm_beta_forwards_fixed_params(self, data_beta, default_config):
+        m = hb.hbm_beta("y", ["x1"], data_beta, config=default_config,
+                        fixed_params={"kappa": 49.0})
+        assert tuple(fp.param for fp in m._active_fixed_params()) == ("kappa",)
+
 
 # hbm_<specific> — area_var pass-through
 
@@ -202,7 +251,8 @@ def test_delegation_chain_consistency(data_beta, default_config):
                               config=default_config)
     m_flex = hb.hbm_flex("y", ["x1", "x2"], data_beta,
                           family="beta", area_var="group",
-                          n="n", deff="deff", config=default_config)
+                          aux_args={"n": "n", "deff": "deff"},
+                          config=default_config)
     assert type(m_specific) is type(m_flex)
     assert m_specific.formula == m_flex.formula
     assert m_specific.family == m_flex.family

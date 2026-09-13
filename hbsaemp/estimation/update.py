@@ -18,7 +18,7 @@ from hbsaemp._logging import get_logger
 from hbsaemp._types import FormulaStr, PriorDict
 from hbsaemp.models._base import BaseModel, ModelResult
 from hbsaemp.models._config import ModelConfig
-from hbsaemp.models._family_spec import FAMILY_SPECS
+from hbsaemp.models._family_spec import FAMILY_SPECS, pin_source_columns
 from hbsaemp.models._prior import validate_priors
 from hbsaemp.utils._formula import parse_formula, update_formula
 
@@ -27,12 +27,14 @@ __all__: list[str] = ["update_model", "update_hbm"]
 
 
 def _carry_design_columns(model: BaseModel, new_data: pd.DataFrame) -> pd.DataFrame:
-    """Return *new_data* with any missing survey-design columns filled in.
+    """Return *new_data* with any missing pin-source columns filled in.
 
-    The design columns (`sampling_var`, `n`/`deff`) feed the fixed offset.
-    When *new_data* lacks them but has as many rows as the current data, they
-    are copied over by position with a warning — the treatment hbsaems gives
-    its offset columns. The caller's frame is never modified.
+    Two kinds of column feed a fixed offset and both are treated alike: the
+    survey-design columns a family pins from (`sampling_var`, `n`/`deff`) and
+    any column named by a caller's `fixed_params=`. When *new_data* lacks them
+    but has as many rows as the current data, they are copied over by position
+    with a warning — the treatment hbsaems gives its offset columns. The
+    caller's frame is never modified.
 
     Raises:
         DataValidationError: If columns are missing and the row counts differ.
@@ -42,12 +44,14 @@ def _carry_design_columns(model: BaseModel, new_data: pd.DataFrame) -> pd.DataFr
         for name in FAMILY_SPECS[model._family].offset_source_fields
         if (col := getattr(model, f"_{name}")) is not None
     ]
+    source_cols += pin_source_columns(model._fixed_params)
     missing = [c for c in source_cols if c not in new_data.columns]
     if not missing:
         return new_data
     if len(new_data) != len(model._data):
         raise DataValidationError(
-            f"new_data is missing survey-design column(s) {missing} and has "
+            f"new_data is missing column(s) {missing}, which a pinned "
+            f"parameter is computed from, and has "
             f"{len(new_data)} row(s) instead of {len(model._data)}, so they "
             "cannot be copied from the current data. Add the column(s) to "
             "new_data, or build a fresh model with create_model().",
@@ -55,7 +59,8 @@ def _carry_design_columns(model: BaseModel, new_data: pd.DataFrame) -> pd.DataFr
             context={"missing_columns": missing},
         )
     warnings.warn(
-        f"new_data is missing survey-design column(s) {missing}; copying "
+        f"new_data is missing column(s) {missing}, which a pinned parameter "
+        "is computed from; copying "
         "them from the current data by position (row order is assumed "
         "unchanged). Add them to new_data if rows were reordered or filtered.",
         UserWarning,
@@ -123,9 +128,10 @@ def update_model(
     Args:
         model: Fitted `BaseModel`.
         new_data: Replacement DataFrame; `None` reuses the current data.
-            Missing survey-design columns (`sampling_var`, `n`/`deff`) are
-            copied from the current data, with a `UserWarning`, when the row
-            count is unchanged.
+            Missing columns a pinned parameter is computed from — the
+            survey-design columns (`sampling_var`, `n`/`deff`) and any column
+            named by `fixed_params=` — are copied from the current data, with
+            a `UserWarning`, when the row count is unchanged.
         formula: New formula, or an update template in R `update.formula`
             style: `"."` stands for the current side, `+ term` adds and
             `- term` removes a term, e.g. `". ~ . + x3 - x1"`. Without
@@ -217,6 +223,9 @@ def update_model(
 
     # Rebuild the same subclass, forwarding only its family attrs.
     # FAMILY_SPECS[family].user_params keys mirror `self._<key>` on the model.
+    # `link` is carried separately: it is universal, so it is not in any
+    # family's user_params, and omitting it here would silently reset a
+    # non-default link back to the family default on every refit.
     family_attrs = {
         mp: getattr(model, f"_{mp}")
         for mp in FAMILY_SPECS[model._family].user_params
@@ -229,6 +238,8 @@ def update_model(
         priors=new_priors,
         group=new_group,
         handle_missing=model._handle_missing,
+        link=model._link,
+        fixed_params=model._fixed_params,
         **family_attrs,
     )
 

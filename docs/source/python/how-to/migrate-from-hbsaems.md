@@ -57,6 +57,39 @@ One difference is in the result: R returns a new `hbmfit` and leaves the origina
 untouched, while `update_model()` updates the model in place and returns its new
 `ModelResult`.
 
+### Pinned parameters
+
+R's `fixed_params` carries over under the same name, and `sampling_variance` is the same
+convenience over it in both packages — in R it means `fixed_params = list(sigma =
+sqrt(D))`, and `sampling_var=` here computes exactly that:
+
+| R `hbsaems` | Python `hbsaemp` |
+| --- | --- |
+| `sampling_variance = "D"` | `sampling_var="D"` |
+| `fixed_params = list(sigma = "sd_col")` | `fixed_params={"sigma": "sd_col"}` |
+| `fixed_params = list(sigma = 2)` | `fixed_params={"sigma": 2.0}` |
+| `fixed_params = list(phi = ...)` | `fixed_params={"kappa": ...}` |
+| `fixed_params = list(sigma = c(...))` | add the vector as a column, pass its name |
+| `fixed_params = list(phi = ~ I(n/deff - 1))` | `n=`/`deff=`, or pre-compute a column |
+
+Three things to watch when translating:
+
+**The Beta precision is called `kappa`, not `phi`.** R builds on brms, which names it
+`phi`; Python builds on Bambi, which names it `kappa`. It is the same parameter and the
+same value, `n/deff - 1`.
+
+**A vector or a one-sided formula becomes a column.** R accepts `c(...)` and `~ I(n/deff
+- 1)` directly. Here the value is either a column name or a single number, which is the
+same rule that bars transformations inside a formula: compute it in pandas first and pass
+the column name. The column then survives into `result.data`, so what was fitted stays
+readable.
+
+**The pin is tight, not exact.** R writes `<par> ~ 0 + offset(...)`. Bambi 0.18 crashes on
+an empty design matrix there, so hbsaemp writes `1 + offset(...)` and clamps the intercept
+with a `Normal(0, 1e-3)` prior instead. The prior outweighs the likelihood by roughly five
+orders of magnitude, so the parameter lands within about 0.1% of the value you pinned
+rather than exactly on it.
+
 The dataset names carry over unchanged — `data_fhnorm`, `data_betalogitnorm`,
 `data_binlogitnorm`, `data_lnln` — and so do the column names inside them:
 

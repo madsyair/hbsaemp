@@ -224,6 +224,31 @@ class TestEstimateAreasNewAreas:
         with pytest.raises(hb.DataValidationError, match="group"):
             hb.estimate_areas(beta_fitted, new_data=bad)
 
+    def test_new_areas_with_a_caller_pin(self, data_gaussian):
+        """A `fixed_params=` model must reach non-sampled areas like any other.
+
+        End-to-end guard for the bug the fast tests pin down structurally:
+        only the family's own offset column was written onto the new-area
+        frame, so the pinned sub-formula's column was missing and every
+        out-of-sample estimate died on `KeyError: 'hbsaemp_sigma_fixed'` —
+        the non-sampled-area workflow, which is the point of SAE.
+        """
+        cfg = hb.ModelConfig(draws=200, tune=200, chains=2, cores=1,
+                             target_accept=0.9, random_seed=11)
+        model = hb.create_model(
+            "y ~ x1 + x2 + (1|group)", family="gaussian", data=data_gaussian,
+            config=cfg, fixed_params={"sigma": 2.0},
+        )
+        model.fit()
+
+        new_data = data_gaussian.tail(5).drop(columns=["y"]).reset_index(drop=True)
+        new_data["group"] = np.arange(9001, 9006)
+        df = hb.estimate_areas(model, new_data=new_data).result_table
+
+        assert len(df) == 5
+        assert (df["sd"] > 0).all()
+        assert (df["ci_lower"] <= df["mean"]).all()
+
 
 # ---------------------------------------------------------------------------
 # estimate_areas() — ModelNotFittedError guard

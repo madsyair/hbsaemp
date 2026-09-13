@@ -387,3 +387,59 @@ class TestAreaEstimatesSummary:
         s = result.summary()
         assert "ConvergenceResult" in s
         assert "Rhat" in s or "rhat" in s.lower()
+
+
+# ===========================================================================
+# Pinned parameters survive the likelihood
+#
+# The prior-side tests in test_v1_prior_predictive.py prove the pin reaches
+# Bambi. They cannot prove it *holds*: hbsaemp pins through
+# `param ~ 1 + offset(col)` plus a tight prior on the intercept, not through
+# hbsaems' `0 + offset(col)`, so the pin is soft and the likelihood is free to
+# push back — and in a Fay-Herriot model the likelihood pushes on precisely
+# the parameter being pinned. These fit the model and read the posterior.
+# ===========================================================================
+
+class TestPinnedParameterAfterFitting:
+
+    def _posterior_mean(self, model: hb.BaseModel, param: str) -> float:
+        draws = np.asarray(model.result.idata.posterior[param].values)
+        return float(draws.mean())
+
+    def test_gaussian_fh_sigma_stays_at_sqrt_sampling_variance(self):
+        """sigma must still equal sqrt(D) after sampling, not drift off it."""
+        df = hb.load_dataset("data_fhnorm").assign(D=0.25)
+        m = hb.create_model(
+            "y ~ x1 + x2 + (1|group)",
+            family="gaussian", data=df, sampling_var="D", config=_CFG,
+        )
+        m.fit()
+
+        assert self._posterior_mean(m, "sigma") == pytest.approx(
+            np.sqrt(0.25), rel=0.01
+        )
+
+    def test_beta_kappa_stays_at_the_design_precision(self):
+        """kappa must still equal n/deff - 1 after sampling."""
+        df = hb.load_dataset("data_betalogitnorm").assign(n=100.0, deff=2.0)
+        m = hb.create_model(
+            "y ~ x1 + x2 + (1|group)",
+            family="beta", data=df, n="n", deff="deff", config=_CFG,
+        )
+        m.fit()
+
+        assert self._posterior_mean(m, "kappa") == pytest.approx(
+            100.0 / 2.0 - 1.0, rel=0.01
+        )
+
+    def test_user_pin_holds_after_fitting(self):
+        """A `fixed_params=` pin is as binding as a survey-design one."""
+        df = hb.load_dataset("data_fhnorm")
+        m = hb.create_model(
+            "y ~ x1 + x2 + (1|group)",
+            family="gaussian", data=df, config=_CFG,
+            fixed_params={"sigma": 0.4},
+        )
+        m.fit()
+
+        assert self._posterior_mean(m, "sigma") == pytest.approx(0.4, rel=0.01)

@@ -142,7 +142,12 @@ class ModelRegistryError(HBSAEError):
 
 
 class ModelNotFittedError(HBSAEError):
-    """`predict()`, `summary()`, or a diagnostic was called before `fit()`."""
+    """`.result`, `predict()`, or a diagnostic was reached before `fit()`.
+
+    `summary()` is deliberately not in that list: both `BaseModel.summary()`
+    and `ModelResult.summary()` return a `[not fitted]` placeholder so a model
+    can be inspected before sampling is paid for.
+    """
 
 
 class EstimationError(HBSAEError):

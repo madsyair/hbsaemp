@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import abc
 import warnings
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -19,7 +20,12 @@ import pandas as pd
 from hbsaemp._exceptions import DataValidationError, ModelNotFittedError
 from hbsaemp._logging import get_logger
 from hbsaemp._types import FamilyLiteral, FormulaStr, PriorDict
-from hbsaemp.models._family_spec import FamilySpec, get_family_spec
+from hbsaemp.models._family_spec import (
+    USER_FIXED_COL,
+    FamilySpec,
+    FixedParam,
+    get_family_spec,
+)
 
 if TYPE_CHECKING:
     from hbsaemp.models._config import ModelConfig
@@ -86,11 +92,18 @@ class BaseModel(abc.ABC):
     """Abstract base for all HBSAE distribution models.
 
     Subclasses inherit the concrete `fit()` / `predict()` and override only
-    family-specific *behavior* hooks, each documented on its own method. The
-    single required override is `_build_formula_and_link`. All family metadata
-    (mean parameter, links, pipeline fields, backend family) is read from
-    `FAMILY_SPECS[self._family]` via `self._spec` — subclasses never re-declare
-    it.
+    family-specific *behavior* hooks, each documented on its own method.
+    There is **no required override**: a family whose only departure from
+    plain regression is pinning distributional parameters declares that in
+    `FAMILY_SPECS[...].fixed_params` and needs no subclass code at all. All
+    family metadata (mean parameter, links, pipeline fields, backend family,
+    which parameters are pinned) is read from `FAMILY_SPECS[self._family]`
+    via `self._spec` — subclasses never re-declare it.
+
+    Since no override is required, no `@abc.abstractmethod` remains and the
+    `ABC` base no longer blocks construction. It is kept as a statement of
+    intent — models are built through `create_model()`, which is what picks
+    the subclass and validates the family arguments — not as an enforcement.
 
     Args:
         formula: R/lme4-style formula, e.g. `"y ~ x1 + (1|group)"`.
@@ -102,6 +115,8 @@ class BaseModel(abc.ABC):
         handle_missing: Missing data strategy (`"deleted"` only in v1).
         link: Link for the mean parameter. `None` takes the family default
             from `FAMILY_SPECS[family].default_link`.
+        fixed_params: `{parameter: column name or scalar}` pinning a
+            distributional parameter to known values instead of sampling it.
     """
 
     def __init__(
@@ -115,6 +130,7 @@ class BaseModel(abc.ABC):
         group: str | None = None,
         handle_missing: str = "deleted",
         link: str | None = None,
+        fixed_params: dict[str, str | float] | None = None,
     ) -> None:
         self._formula = formula
         self._family = family
@@ -123,6 +139,7 @@ class BaseModel(abc.ABC):
         self._priors = priors
         self._group = group
         self._handle_missing = handle_missing
+        self._fixed_params = dict(fixed_params) if fixed_params else {}
         # After _family: the default is read from that family's spec.
         self._link = link or self._default_link
         self._result: ModelResult | None = None
@@ -203,14 +220,56 @@ class BaseModel(abc.ABC):
         Called from `_pre_fit_checks()`, so the check runs before the bambi
         import on every `fit()`.
         """
-        link = getattr(self, "_link", None)
-        if link not in self._spec.supported_links:
+        if self._link not in self._spec.supported_links:
             raise ValueError(
-                f"link={link!r} not supported for family={self._family!r}. "
+                f"link={self._link!r} not supported for family={self._family!r}. "
                 f"Valid links: {sorted(self._spec.supported_links)}"
             )
 
-    # Abstract hooks (subclass must implement)
+    # Fixed (computed) distributional parameters
+
+    def _active_fixed_params(self) -> tuple[FixedParam, ...]:
+        """Every pin that applies to this model, from either source.
+
+        Two ways a parameter gets pinned, and they produce the same object so
+        nothing downstream needs to know which is which:
+
+        * the family declares it in `FAMILY_SPECS[...].fixed_params`, derived
+          from survey-design columns — active once all of them were supplied;
+        * the caller passes `fixed_params={param: column or scalar}`, which
+          needs no design column and so is always active.
+
+        An empty `source_fields` makes `all()` vacuously true, which is why
+        the caller's pins need no special case here.
+
+        At most one pin per parameter is returned: `create_model()` refuses a
+        parameter pinned through both doors, but a subclass constructed
+        directly can still carry both, and two sub-formulas for one parameter
+        is not something Bambi should be asked to resolve. The caller's pin
+        wins, being the more specific of the two.
+        """
+        declared = tuple(
+            fp for fp in self._spec.fixed_params
+            if all(
+                getattr(self, f"_{name}") is not None for name in fp.source_fields
+            )
+        )
+        if not self._fixed_params:
+            return declared
+
+        pinnable = self._spec.pinnable_params
+        user = tuple(
+            FixedParam(
+                param=param,
+                link=pinnable[param],
+                offset_col=USER_FIXED_COL.format(param=param),
+            )
+            for param in self._fixed_params
+        )
+        overridden = {fp.param for fp in user}
+        return tuple(fp for fp in declared if fp.param not in overridden) + user
+
+    # Hooks (concrete defaults; subclass overrides only where behavior differs)
 
     def _extra_pipeline_kwargs(self) -> dict[str, Any]:
         """Family-specific kwargs unpacked into validator and preprocessor.
@@ -234,13 +293,37 @@ class BaseModel(abc.ABC):
             )
         return {name: getattr(self, f"_{name}") for name in self._spec.pipeline_fields}
 
-    @abc.abstractmethod
+    def _addition_lhs(self, response: str) -> str:
+        """Formula left-hand side: wrapped per the spec, or the bare response.
+
+        A family whose likelihood needs more than the response column on the
+        left (Binomial needs the trial counts) declares `addition_template`;
+        it is formatted with `response` plus **every pipeline field by name**,
+        so a template can reference any of them and no list of format keys is
+        maintained anywhere.
+
+        This is also the posterior-predictive key: Bambi stores the PP group
+        under the literal LHS it was given, so `_response_pp_key` calls this
+        very method rather than rebuilding the same string by hand.
+        """
+        if self._spec.addition_template is None:
+            return response
+        return self._spec.addition_template.format(
+            response=response, **self._extra_pipeline_kwargs()
+        )
+
     def _build_formula_and_link(
         self,
         bmb_module: Any,
         response: str,
     ) -> tuple[Any, Any]:
         """Build the Bambi formula and link spec for `bmb.Model`.
+
+        Covers every family declaratively: the left-hand side comes from
+        `_addition_lhs()` (spec's `addition_template`) and the distributional
+        sub-formulas from `_active_fixed_params()` (spec's `fixed_params`). A
+        family that wraps nothing and pins nothing gets the plain formula and
+        a single link. Override only for a formula no spec field can express.
 
         Args:
             bmb_module: Imported `bambi` module (subclass doesn't import it
@@ -252,15 +335,33 @@ class BaseModel(abc.ABC):
             `link` is a string (single link) or a dict (distributional —
             must include all parameter keys).
         """
+        main = self._formula
+        lhs = self._addition_lhs(response)
+        if lhs != response:
+            # Only the RHS is taken from the user formula; the LHS is the
+            # family's wrapper. Legacy "y | trials(n) ~ x" was dropped when
+            # formulae>=0.5 repurposed "|" on the left-hand side.
+            _, rhs = main.split("~", 1)
+            main = f"{lhs} ~ {rhs.strip()}"
+            logger.debug("%s: rewritten formula = %r", type(self).__name__, main)
+        return self._build_distributional_formula(
+            bmb_module, main, self._active_fixed_params()
+        )
 
     def _extra_result_dict(self) -> dict[str, Any]:
         """Family-specific keys merged into `ModelResult.extra`.
 
-        `fit()` always adds `"response"` and `"group"`. Default delegates
-        to `_extra_pipeline_kwargs()`; override only when result keys must
-        differ from pipeline keys.
+        `fit()` always adds `"response"` and `"group"`. Default is the
+        pipeline kwargs plus a caller's `fixed_params`, which is not a
+        pipeline field and so would otherwise be the one model input the
+        result does not record — leaving anyone rebuilding a model from
+        `result.extra` with a silently unpinned parameter. Override only when
+        result keys must differ from pipeline keys.
         """
-        return self._extra_pipeline_kwargs()
+        extra = self._extra_pipeline_kwargs()
+        if self._fixed_params:
+            extra["fixed_params"] = dict(self._fixed_params)
+        return extra
 
     # Concrete hooks (overridable)
 
@@ -284,26 +385,26 @@ class BaseModel(abc.ABC):
     def _response_pp_key(self, response: str) -> str:
         """Key under which `posterior_predictive` stores the response.
 
-        Defaults to *response*; `BinomialModel` overrides (Bambi wraps it as
-        `p(y, trials_col)`).
+        Bambi 0.18+ files the PP group under the literal left-hand side it was
+        handed, so this is `_addition_lhs()` by definition — the same call
+        `_build_formula_and_link` makes. Deriving it rather than re-spelling
+        `f"p({response}, {trials_col})"` keeps the two from drifting apart.
         """
-        return response
+        return self._addition_lhs(response)
 
     def _workaround_priors(self, bmb_module: Any) -> dict[str, Any]:
         """Auto-injected priors that work around Bambi backend bugs.
 
-        Default returns `{}`. User priors (`self._priors`) take precedence —
-        `fit()` merges with the workaround dict as the lower-priority base.
+        Default pins the intercept of every active fixed param, which is the
+        second half of the offset trick `_build_distributional_formula` sets
+        up. A family that pins nothing gets `{}`. User priors
+        (`self._priors`) take precedence — `fit()` merges with this dict as
+        the lower-priority base.
         """
-        return {}
-
-    @property
-    def _preproc_family(self) -> str:
-        """Family for validator and preprocessor.
-
-        Read from `FAMILY_SPECS`.
-        """
-        return self._spec.preproc_family
+        priors: dict[str, Any] = {}
+        for fp in self._active_fixed_params():
+            priors.update(self._pin_intercept_prior(bmb_module, param=fp.param))
+        return priors
 
     # Hook helpers (concrete utilities for subclass hooks)
 
@@ -311,41 +412,40 @@ class BaseModel(abc.ABC):
         self,
         bmb_module: Any,
         main_formula: str,
-        *,
-        param: str,
-        offset_col: str | None,
-        mu_link: str,
+        fixed_params: Sequence[FixedParam],
     ) -> tuple[Any, Any]:
-        """Build a Bambi distributional formula for Fay-Herriot offset models.
+        """Build a Bambi formula that pins *fixed_params* through offsets.
 
-        Shared between Gaussian and Beta. When `offset_col` is
-        None, returns the plain formula + single link.
+        With no fixed params this is a plain formula plus a single link.
+        Otherwise each pinned parameter gets its own sub-formula carrying the
+        pre-computed column as an offset, and the link becomes a dict.
 
-        The secondary sub-formula uses `"1 + offset(...)"` (not `"0 + ..."`)
-        as a Bambi 0.18+ workaround — the `0+` form leaves an empty common
-        design matrix and crashes `DistributionalComponent.predict()`. The
-        intercept is clamped near zero by `_pin_intercept_prior`.
+        Each sub-formula uses `"1 + offset(...)"` rather than `"0 + ..."` as a
+        Bambi 0.18+ workaround — the `0 +` form leaves an empty common design
+        matrix and crashes `DistributionalComponent.predict()`. (hbsaems does
+        write `0 + offset(...)`; brms has no such restriction.) The intercept
+        is clamped near zero by `_pin_intercept_prior`, so the offset is all
+        that remains.
 
         Args:
             bmb_module: Imported `bambi` module.
             main_formula: Response-side formula, e.g. `"y ~ x1 + x2"`.
-            param: Distributional parameter name (`"sigma"`, `"kappa"`).
-            offset_col: Pre-computed offset column (e.g. `"log_sqrt_D"`),
-                or None for plain regression.
-            mu_link: Link function for the mean parameter.
+            fixed_params: Parameters to pin, usually `_active_fixed_params()`.
 
         Returns:
             `(formula, link)` ready for `bmb.Model`.
         """
-        if offset_col is not None:
-            formula = bmb_module.Formula(
-                main_formula, f"{param} ~ 1 + offset({offset_col})"
-            )
-            # Both keys required — partial dict raises KeyError in Bambi backend.
-            link: Any = {self._mean_param_key: mu_link, param: "log"}
-        else:
-            formula = main_formula
-            link = mu_link
+        if not fixed_params:
+            return main_formula, self._link
+
+        formula = bmb_module.Formula(
+            main_formula,
+            *(f"{fp.param} ~ 1 + offset({fp.offset_col})" for fp in fixed_params),
+        )
+        # Every parameter needs a key — a partial dict raises KeyError in the
+        # Bambi backend.
+        link: Any = {self._mean_param_key: self._link}
+        link.update({fp.param: fp.link for fp in fixed_params})
         return formula, link
 
     def _pin_intercept_prior(
@@ -353,18 +453,24 @@ class BaseModel(abc.ABC):
         bmb_module: Any,
         *,
         param: str,
-        active: bool,
     ) -> dict[str, Any]:
-        """Tight `Normal(0, 1e-3)` prior on `{param}_Intercept` when *active*.
+        """Tight `Normal(0, 1e-3)` prior clamping `{param}_Intercept` to ~0.
 
-        Used by the distributional offset workaround to keep `param ≈ offset`
-        (see `_build_distributional_formula`). Returns `{}` when not active.
+        Second half of the offset workaround: with the intercept pinned, the
+        offset column is effectively all that drives *param*
+        (see `_build_distributional_formula`). Callers decide *whether* to pin
+        by asking `_active_fixed_params()`, so this helper has no inactive
+        branch of its own.
+
+        The prior is **nested** under the parameter name. Bambi routes priors
+        for a distributional parameter through that parameter's own component;
+        a flat `{"sigma_Intercept": ...}` key silently matches nothing, Bambi
+        keeps its default `Normal(0, 1)` on the intercept, and the parameter
+        ends up merely *scaled* by the offset rather than pinned to it.
         """
-        if active:
-            return {
-                f"{param}_Intercept": bmb_module.Prior("Normal", mu=0.0, sigma=1e-3),
-            }
-        return {}
+        return {
+            param: {"Intercept": bmb_module.Prior("Normal", mu=0.0, sigma=1e-3)},
+        }
 
     # Pipeline helpers (concrete)
 
@@ -390,18 +496,25 @@ class BaseModel(abc.ABC):
             random_groups[0] if random_groups else None
         )
 
-        extra_kwargs = self._extra_pipeline_kwargs()
+        # Caller-supplied pins ride alongside the family's own fields: the
+        # validator checks any column they name exists and is numeric, and the
+        # preprocessor materialises one column per pin — which is also where
+        # the link's domain is enforced, since that needs the values.
+        extra_kwargs = {
+            **self._extra_pipeline_kwargs(),
+            "fixed_params": self._fixed_params,
+        }
 
         DataValidator(self._handle_missing).validate(
             data, response, predictors,
-            family=self._preproc_family,
+            family=self._family,
             group=group_col,
             **extra_kwargs,
         )
         df_clean: pd.DataFrame = DataPreprocessor(self._handle_missing).process(
             data, response, predictors,
             group=group_col,
-            family=self._preproc_family,
+            family=self._family,
             **extra_kwargs,
         )
         return response, predictors, random_groups, group_col, df_clean
@@ -426,8 +539,9 @@ class BaseModel(abc.ABC):
         return DataPreprocessor(self._handle_missing).process(
             new_data, response, predictors,
             group=group_col,
-            family=self._preproc_family,
+            family=self._family,
             **self._extra_pipeline_kwargs(),
+            fixed_params=self._fixed_params,
         )
 
     def _prepare_mean_data(self, new_data: pd.DataFrame) -> pd.DataFrame:
@@ -471,12 +585,13 @@ class BaseModel(abc.ABC):
                 context={"required_columns": required, "n_original": len(new_data)},
             )
 
-        offset_col = self._spec.offset_col
-        if offset_col is not None and offset_col in result.data.columns:
-            # The fitted formula evaluates the offset for sigma/kappa, so the
-            # column must exist; mu never reads it, so any finite value gives
-            # the same mean draws.
-            df[offset_col] = 0.0
+        for fp in self._active_fixed_params():
+            # The fitted formula evaluates one offset per pinned parameter, so
+            # every such column must exist; mu never reads them, so any finite
+            # value gives the same mean draws. Driven by `_active_fixed_params`
+            # like the formula and the pinned priors are, so a caller pin
+            # (`hbsaemp_<par>_fixed`) is covered as well as a family's own.
+            df[fp.offset_col] = 0.0
         return df
 
     # predict() kind normalisation
