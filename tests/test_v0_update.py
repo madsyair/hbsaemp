@@ -94,6 +94,37 @@ def fitted(fh_data, default_config, stub_fit) -> BaseModel:
     return m
 
 
+def test_refit_keeps_a_non_default_link(fh_data, default_config, stub_fit):
+    """A refit must not quietly reset `link` to the family default.
+
+    `update_model()` rebuilds the subclass from `FAMILY_SPECS[...].user_params`.
+    `link` is universal, so it is deliberately *not* in any family's
+    user_params — which means it has to be carried across explicitly. Forget
+    that and every refit silently drops back to the default link.
+    """
+    m = hb.create_model(
+        "y ~ x1", family="gaussian", data=fh_data, group="group",
+        sampling_var="D", config=default_config, link="log",
+    )
+    m.fit()
+    stub_fit.clear()
+    assert m._link == "log"
+
+    hb.update_model(m, formula=". ~ . + x2")
+
+    (refit,) = stub_fit
+    assert refit._link == "log", "refit fell back to the family default link"
+    assert m._link == "log"
+
+
+def test_refit_keeps_the_fixed_param_columns(fitted, stub_fit):
+    """The design columns that pin a parameter survive the rebuild."""
+    hb.update_model(fitted, formula=". ~ . + x3")
+    (refit,) = stub_fit
+    assert refit._sampling_var_col == "D"
+    assert tuple(fp.param for fp in refit._active_fixed_params()) == ("sigma",)
+
+
 def test_formula_template_updates_model_formula(fitted):
     hb.update_model(fitted, formula=". ~ . + x3 - x1")
     assert fitted.formula == "y ~ x2 + (1|group) + x3"
@@ -175,6 +206,27 @@ def test_missing_design_column_with_other_rows_raises(fitted, fh_data, stub_fit)
     with pytest.raises(hb.DataValidationError, match=r"\['D'\]"):
         hb.update_model(fitted, new_data=fh_data.head(20).drop(columns=["D"]))
     assert stub_fit == []
+
+
+def test_missing_caller_pin_column_is_carried_too(fh_data, default_config, stub_fit):
+    """A `fixed_params=` column gets the same carry-over as a design column.
+
+    Both name a column a pinned parameter is computed from, so treating only
+    the survey-design ones meant a refit that worked with `sampling_var="D"`
+    failed with `fixed_params={"sigma": "D"}` — same model, same data.
+    """
+    m = hb.create_model(
+        "y ~ x1", family="gaussian", data=fh_data, group="group",
+        config=default_config, fixed_params={"sigma": "D"},
+    )
+    m.fit()
+
+    new = fh_data.drop(columns=["D"])
+    with pytest.warns(UserWarning, match=r"\['D'\]"):
+        hb.update_model(m, new_data=new)
+
+    np.testing.assert_array_equal(m.data["D"].to_numpy(), fh_data["D"].to_numpy())
+    assert "D" not in new.columns  # the caller's frame is untouched
 
 
 def test_failed_refit_leaves_model_unchanged(fitted, monkeypatch):

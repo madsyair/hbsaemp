@@ -4,6 +4,13 @@ User supplies `response` (str) and `auxiliary` (list of column names)
 instead of a full R-style formula. The constructed formula is forwarded
 to `create_model()`; this layer only validates the inputs and assembles
 the formula string.
+
+Family-agnostic is literal: no argument here names a family's own vocabulary.
+A family's parameters arrive through `aux_args`, its addition term through
+`addition_var`, and its pinned parameters through `fixed_params` — the same
+three channels hbsaems' `hbm_flex()` uses. Adding a family therefore does not
+touch this signature. Tier 3 (`_shortcuts.py`) is where the per-family names
+live, so a typo there is still a Python `TypeError`.
 """
 
 from __future__ import annotations
@@ -46,12 +53,11 @@ def hbm_flex(
     priors: PriorDict | None = None,
     handle_missing: MissingStrategyLiteral = "deleted",
     config: ModelConfig | None = None,
+    addition_var: str | None = None,
+    aux_args: dict[str, object] | None = None,
     sampling_var: str | None = None,
-    n: str | None = None,
-    deff: str | None = None,
-    trials: str | None = None,
+    fixed_params: dict[str, str | float] | None = None,
     link: str | None = None,
-    squeeze: bool = False,
 ) -> BaseModel:
     """Build an unfitted model from response + auxiliary list (no formula).
 
@@ -76,12 +82,19 @@ def hbm_flex(
         priors: Optional prior dict or `Prior` instances; forwarded.
         handle_missing: Missing data strategy; only `"deleted"` in v1.
         config: `ModelConfig` (sampler settings); `None` uses `DEFAULT_CONFIG`.
-        sampling_var: Gaussian FH — sampling variance column.
-        n: Beta — survey sample size column (pair with `deff`).
-        deff: Beta — design effect column (pair with `n`).
-        trials: Binomial — column with trial counts.
+        addition_var: Column for the family's addition term — the trial
+            counts for Binomial. Named generically so this layer needs no
+            per-family vocabulary.
+        aux_args: `{parameter: value}` for the family's own parameters, e.g.
+            `{"n": "n", "deff": "deff"}` for Beta or `{"squeeze": True}`.
+        sampling_var: Column of known sampling variances D_i, for the
+            Fay-Herriot setup. Kept as a named argument rather than folded
+            into `aux_args` because it is the one survey-design quantity SAE
+            reaches for constantly — hbsaems keeps `sampling_variance` at this
+            layer for the same reason.
+        fixed_params: `{parameter: column name or number}` pinning a
+            distributional parameter to known values.
         link: Override default link function.
-        squeeze: Beta — Smithson-Verkuilen squeeze for boundary y values.
 
     Returns:
         Unfitted `BaseModel` subclass.
@@ -121,10 +134,9 @@ def hbm_flex(
         priors=priors,
         handle_missing=handle_missing,
         config=config,
+        addition_var=addition_var,
+        aux_args=aux_args,
         sampling_var=sampling_var,
-        n=n,
-        deff=deff,
-        trials=trials,
+        fixed_params=fixed_params,
         link=link,
-        squeeze=squeeze,
     )

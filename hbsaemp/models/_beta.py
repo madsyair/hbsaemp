@@ -3,7 +3,9 @@
 When `n_col` and `deff_col` are given, precision is pinned to phi = n/deff - 1
 via `kappa ~ 1 + offset(log_phi)`. Otherwise Bambi estimates kappa.
 
-Pipeline lives in `BaseModel`; this module supplies only family-specific hooks.
+The pin itself is declared in `FAMILY_SPECS["beta"].fixed_params` and
+assembled by `BaseModel`. What remains here is the one rule a spec cannot
+state: `squeeze` only makes sense while that pin is active.
 """
 from __future__ import annotations
 
@@ -60,29 +62,3 @@ class BetaModel(BaseModel):
                 "precision offset is active)."
             )
         super()._pre_fit_checks()
-
-    def _build_formula_and_link(
-        self,
-        bmb_module: Any,
-        response: str,
-    ) -> tuple[Any, Any]:
-        # Delegate to the shared FH offset helper in BaseModel.
-        # When phi is pinned: distributional kappa ~ 1 + offset(log_phi).
-        # When absent: plain Beta regression.
-        return self._build_distributional_formula(
-            bmb_module,
-            self._formula,
-            param="kappa",
-            offset_col=self._spec.offset_col if (
-                self._n_col is not None and self._deff_col is not None
-            ) else None,
-            mu_link=self._link,
-        )
-
-    def _workaround_priors(self, bmb_module: Any) -> dict[str, Any]:
-        # Pin kappa intercept to ~0 so kappa ≈ phi from the offset.
-        return self._pin_intercept_prior(
-            bmb_module,
-            param="kappa",
-            active=self._n_col is not None and self._deff_col is not None,
-        )

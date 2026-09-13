@@ -40,6 +40,26 @@ Compare the signatures and the pattern is visible without reading any prose.
 with `response` and `auxiliary`. `hbm_gaussian` drops `family` too, and in its place
 exposes `sampling_var` — the one extra column a Gaussian small area model actually needs.
 
+### Where a family's own vocabulary lives
+
+Tier 3 is the only tier that names a family's columns. `hbm_beta` takes `n` and `deff`;
+`hbm_binomial` takes `trials`. Tier 2 takes neither — it routes them through two generic
+arguments instead:
+
+```python
+hbm_binomial("y", ["x1"], df, trials="n")                   # tier 3
+hbm_flex("y", ["x1"], df, family="binomial", addition_var="n")   # the same model
+hbm_beta("y", ["x1"], df, n="n", deff="deff")               # tier 3
+hbm_flex("y", ["x1"], df, family="beta",
+         aux_args={"n": "n", "deff": "deff"})               # the same model
+```
+
+`addition_var` is whatever column the likelihood needs beside the response, and
+`aux_args` carries the rest. The payoff is that adding a distribution never edits
+`hbm_flex` — a new family declares its columns in the registry and reaches tier 2
+through the same two doors every other family uses. The names stay spelled out at tier 3,
+where a typo is still an immediate `TypeError`.
+
 ### Why delegation rather than three implementations
 
 Each tier calls the one below it. Tier 3 assembles nothing itself; it fixes the family

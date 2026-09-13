@@ -5,12 +5,14 @@ None; it never mutates the frame.
 """
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 
 from hbsaemp._exceptions import DataValidationError
 from hbsaemp._logging import get_logger
-from hbsaemp.models._family_spec import FAMILY_SPECS
+from hbsaemp.models._family_spec import FAMILY_SPECS, pin_source_columns
 
 logger = get_logger(__name__)
 __all__: list[str] = ["DataValidator"]
@@ -42,11 +44,7 @@ class DataValidator:
         *,
         family: str,
         group: str | None = None,
-        n_col: str | None = None,
-        deff_col: str | None = None,
-        sampling_var_col: str | None = None,
-        trials_col: str | None = None,
-        squeeze: bool = False,
+        **pipeline_fields: Any,
     ) -> None:
         """Validate *data* in place; raises on failure, otherwise returns ``None``.
 
@@ -67,14 +65,16 @@ class DataValidator:
             predictors: Predictor column names.
             family: Distribution family for domain checks.
             group: Optional grouping column (non-numeric allowed).
-            n_col: *Beta* — survey sample-size column.
-            deff_col: *Beta* — design-effect column.
-            sampling_var_col: *Gaussian FH* — sampling-variance column.
-            trials_col: *Binomial* — number-of-trials column.
-            squeeze: *Beta* — when ``True``, relax the response domain check
-                to ``[0, 1]`` (closed) instead of the default ``(0, 1)``
-                (strict), since the Smithson-Verkuilen transform will map
-                boundary values into the open interval before fitting.
+            **pipeline_fields: The family's own fields, exactly as declared in
+                ``FAMILY_SPECS[family].pipeline_fields`` and assembled by
+                ``BaseModel._extra_pipeline_kwargs()`` — e.g. ``n_col`` and
+                ``deff_col`` (Beta), ``sampling_var_col`` (Gaussian FH),
+                ``trials_col`` (Binomial), ``squeeze`` (Beta). String values
+                are read as data-column names and checked for existence and
+                numeric dtype; other values are settings. Passed through
+                unchanged to the family's ``response_check``. Taken as
+                ``**kwargs`` on purpose: a family that declares a new field
+                must not have to edit this signature.
 
         Returns:
             ``None``.  All failures surface as :class:`DataValidationError`.
@@ -93,10 +93,13 @@ class DataValidator:
                 f"Unknown family {family!r}. Supported: {sorted(FAMILY_SPECS)}."
             )
 
-        aux_cols = [
-            c for c in (n_col, deff_col, sampling_var_col, trials_col)
-            if c is not None
-        ]
+        # A pipeline field naming a data column is a string; anything else
+        # (a flag such as `squeeze`) is a setting, not a column. Deriving the
+        # list this way means a family can declare a new field in
+        # FAMILY_SPECS.pipeline_fields without editing this signature.
+        aux_cols = [v for v in pipeline_fields.values() if isinstance(v, str)]
+        # A caller-supplied pin may name a column too; a scalar pin names none.
+        aux_cols += pin_source_columns(pipeline_fields.get("fixed_params"))
         all_cols = [response, *predictors, *aux_cols, *([group] if group else [])]
 
         self._check_columns_exist(data, all_cols)
@@ -106,13 +109,7 @@ class DataValidator:
         # (FAMILY_SPECS). None means the family declares no extra check.
         spec = FAMILY_SPECS[family]
         if spec.response_check is not None:
-            spec.response_check(data, response, {
-                "n_col": n_col,
-                "deff_col": deff_col,
-                "sampling_var_col": sampling_var_col,
-                "trials_col": trials_col,
-                "squeeze": squeeze,
-            })
+            spec.response_check(data, response, pipeline_fields)
 
         logger.debug("DataValidator: passed (family=%r, n=%d)", family, len(data))
 

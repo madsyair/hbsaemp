@@ -124,3 +124,28 @@ def test_prepare_mean_data_adds_no_offset_when_inactive(data_gaussian, default_c
     ))
     out = m._prepare_mean_data(data_gaussian.tail(2).drop(columns=["y"]))
     assert "log_sqrt_D" not in out.columns
+
+
+@pytest.mark.parametrize("source", ["sd_col", 3.0])
+def test_prepare_mean_data_adds_the_caller_pin_offset(
+    data_gaussian, default_config, source
+):
+    """A pin from `fixed_params=` needs its offset column just like a family's.
+
+    Regression guard. This frame satisfied only the family's own offset column
+    (`log_sqrt_D`), never `hbsaemp_<par>_fixed`, so every out-of-sample mean
+    prediction on a model built with `fixed_params=` died on
+    `KeyError: 'hbsaemp_sigma_fixed'` — `predict(kind="response_params")` and
+    `estimate_areas(new_data=...)` alike, which is the non-sampled-area
+    workflow SAE exists for.
+    """
+    df = data_gaussian.assign(sd_col=2.0)
+    m = _fake_fit(hb.create_model(
+        "y ~ x1 + (1|group)", family="gaussian", data=df,
+        config=default_config, fixed_params={"sigma": source},
+    ))
+
+    # A non-sampled area carries neither the response nor the pin column.
+    out = m._prepare_mean_data(df.tail(2).drop(columns=["y", "sd_col"]))
+
+    assert (out["hbsaemp_sigma_fixed"] == 0.0).all()

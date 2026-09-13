@@ -22,7 +22,16 @@ from hbsaemp._logging import get_logger
 
 logger = get_logger(__name__)
 
-__all__: list[str] = ["FamilySpec", "FAMILY_SPECS", "list_families", "get_family_spec"]
+__all__: list[str] = [
+    "FamilySpec",
+    "FixedParam",
+    "FAMILY_SPECS",
+    "USER_FIXED_COL",
+    "apply_link",
+    "list_families",
+    "get_family_spec",
+    "pin_source_columns",
+]
 
 #: Raise `DataValidationError` when the response (or its auxiliary columns)
 #: violates the family's domain; return `None` on success. `ctx` carries the
@@ -34,9 +43,83 @@ ResponseCheck = Callable[[pd.DataFrame, str, dict], None]
 Preprocess = Callable[[pd.DataFrame, str, dict], pd.DataFrame]
 
 #: Offset columns written by the preprocess functions below and declared as
-#: `FamilySpec.offset_col` — one name each, so spec and transform cannot drift.
+#: `FixedParam.offset_col` — one name each, so spec and transform cannot drift.
 _GAUSSIAN_OFFSET = "log_sqrt_D"
 _BETA_OFFSET = "log_phi"
+
+#: Column a user-supplied pin is materialised into, by parameter name.
+#: The counterpart of hbsaems' `.hbsaems_<par>_fixed`; no leading dot, because
+#: `formulae` needs the offset term to be a valid Python identifier.
+USER_FIXED_COL = "hbsaemp_{param}_fixed"
+
+
+def pin_source_columns(fixed_params: dict[str, str | float] | None) -> list[str]:
+    """Data columns a caller-supplied pin names; a scalar pin names none.
+
+    The one place that rule is written. Every layer handling caller pins needs
+    it — the validator checks the columns exist and are numeric, the
+    preprocessor drops rows where they are NaN, and `update_model()` carries
+    them onto replacement data — and a second copy of the rule is exactly how
+    a pin column ends up treated differently from a survey-design column.
+    """
+    return [src for src in (fixed_params or {}).values() if isinstance(src, str)]
+
+
+def apply_link(values: np.ndarray, link: str) -> np.ndarray:
+    """Map parameter values onto the scale the offset term is read on.
+
+    A pin says "this parameter equals these values". Bambi adds `offset(col)`
+    to the parameter's *linear predictor*, so the column must hold the values
+    already transformed by the parameter's link — `log` for the positive-scale
+    parameters (`sigma`, `kappa`) that SAE pins in practice.
+
+    Raises:
+        DataValidationError: Values outside the link's domain.
+        ModelRegistryError: Link has no transform defined here.
+    """
+    if link == "identity":
+        return values
+    if link == "log":
+        if np.any(values <= 0):
+            n_bad = int(np.sum(values <= 0))
+            raise DataValidationError(
+                f"A parameter pinned through a 'log' link must be positive. "
+                f"Found {n_bad} non-positive value(s).",
+                context={"n_nonpositive": n_bad},
+            )
+        return np.log(values)
+    raise ModelRegistryError(
+        f"No transform defined for link {link!r}. Known: 'identity', 'log'."
+    )
+
+
+@dataclass(frozen=True)
+class FixedParam:
+    """A distributional parameter computed from data instead of sampled.
+
+    The Bayesian default is that every parameter is stochastic. Small-area
+    models break that on purpose: the Beta precision is ``phi = n/deff - 1``
+    and the Gaussian Fay-Herriot scale is ``sqrt(D)``, both known from the
+    survey design. Such a parameter is pinned by feeding its pre-computed
+    column in as an ``offset()`` on the parameter's own sub-formula, then
+    clamping that sub-formula's intercept to ~0 so the offset is all that
+    remains. It is the Bambi counterpart of a WinBUGS logical node.
+
+    Attributes:
+        param: Distributional parameter name (`"sigma"`, `"kappa"`).
+        link: Link applied to *param*; the offset column is stored on that
+            scale (`preprocess` writes `log(...)` for a `"log"` link).
+        offset_col: Column `preprocess` adds, carrying the pinned values.
+        source_fields: Pipeline fields (`self._<name>`) naming the data
+            columns *offset_col* is derived from. All must be supplied for
+            the pin to apply; an empty tuple means it needs no design column
+            and therefore always applies.
+    """
+
+    param: str
+    link: str
+    offset_col: str
+    source_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -45,9 +128,6 @@ class FamilySpec:
 
     Attributes:
         bambi_family: Family string passed to `bambi.Model(family=...)`.
-        preproc_family: Family string for `DataValidator` and
-            `DataPreprocessor`. Same as `bambi_family` in practice; kept
-            separate so a future family can request different preprocessing.
         mean_param_key: Key in `idata.posterior` for the latent mean
             parameter; `"mu"` for Gaussian/Beta, `"p"` for Binomial.
             Read by `predict(kind="response_params")`.
@@ -67,19 +147,26 @@ class FamilySpec:
         addition_template: `str.format` template for the formula left-hand
             side when the family wraps the response (e.g. Binomial
             `"p({response}, {trials_col})"`), or `None` for a bare response.
-        offset_col: Column `preprocess` adds for the secondary distributional
-            parameter (`sigma`/`kappa`) when the survey-design columns are
-            given, or `None` when the family has no offset. The mean
-            parameter never depends on it.
-        offset_source_fields: Pipeline fields (`self._<name>`) naming the data
-            columns `offset_col` is derived from — the counterpart of the
-            hidden `.hbsaems_<par>_fixed` columns in hbsaems. `update_model()`
-            carries them over when replacement data lacks them. Empty when
-            the family has no offset.
+            Formatted by `BaseModel._addition_lhs()` with `response` plus
+            every pipeline field by name, so a template may reference any of
+            them without anyone maintaining a list of format keys.
+        addition_field: Which `pipeline_fields` entry the tier-2 `addition_var`
+            argument fills (`"trials_col"` for Binomial). This is what lets a
+            caller write `addition_var="n"` without knowing the family's own
+            vocabulary. Set it whenever `addition_template` is set; `None`
+            means the family takes no addition variable.
+        fixed_params: Distributional parameters this family computes from the
+            survey design instead of sampling. Empty means every parameter is
+            stochastic — the ordinary Bayesian case. `BaseModel` builds the
+            whole offset-and-pin machinery from these, so a family declares
+            the contract here and writes no formula code of its own.
+        required_params: User-facing kwarg names `create_model()` refuses to
+            go without (Binomial cannot be fitted without `trials`). Params
+            that must be supplied *together* are not listed here — that rule
+            follows from `FixedParam.source_fields`.
     """
 
     bambi_family: str
-    preproc_family: str
     mean_param_key: str
     default_link: str
     supported_links: frozenset[str]
@@ -89,8 +176,66 @@ class FamilySpec:
     response_check: ResponseCheck | None = None
     preprocess: Preprocess | None = None
     addition_template: str | None = None
-    offset_col: str | None = None
-    offset_source_fields: tuple[str, ...] = ()
+    addition_field: str | None = None
+    fixed_params: tuple[FixedParam, ...] = ()
+    required_params: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        """Reject a spec whose wiring cannot work, at import time.
+
+        Both rules are things the machinery dereferences later, where the
+        failure would be a bare `KeyError` far from its cause:
+
+        * every `FixedParam.source_fields` name is looked up in `user_params`
+          by the factory's arity and double-pin checks;
+        * `addition_template` and `addition_field` are one mechanism — a
+          template with no field has no `addition_var` to fill it, and a field
+          with no template is never read.
+        """
+        for fp in self.fixed_params:
+            unknown = [f for f in fp.source_fields if f not in self.user_params]
+            if unknown:
+                raise ModelRegistryError(
+                    f"FixedParam({fp.param!r}) names source field(s) {unknown} "
+                    f"that are not in user_params {sorted(self.user_params)}."
+                )
+        if (self.addition_template is None) != (self.addition_field is None):
+            raise ModelRegistryError(
+                "addition_template and addition_field must be set together; "
+                f"got template={self.addition_template!r}, "
+                f"field={self.addition_field!r}."
+            )
+        if self.addition_field is not None and (
+            self.addition_field not in self.pipeline_fields
+        ):
+            raise ModelRegistryError(
+                f"addition_field={self.addition_field!r} is not one of "
+                f"pipeline_fields {list(self.pipeline_fields)}."
+            )
+
+    @property
+    def pinnable_params(self) -> dict[str, str]:
+        """Map each parameter this family can pin to that parameter's link.
+
+        Declaring a `FixedParam` is what makes a parameter pinnable at all —
+        the same entry serves both the family's own design-column pin and a
+        value the caller supplies directly through `fixed_params=`. A family
+        with none (Binomial, whose only parameter is the estimand) accepts no
+        user pin either.
+        """
+        return {fp.param: fp.link for fp in self.fixed_params}
+
+    @property
+    def offset_source_fields(self) -> tuple[str, ...]:
+        """Every design column the fixed params are derived from, flattened.
+
+        `update_model()` reads this to carry design columns over when
+        replacement data lacks them — the counterpart of hbsaems' hidden
+        `.hbsaems_<par>_fixed` columns.
+        """
+        return tuple(
+            name for fp in self.fixed_params for name in fp.source_fields
+        )
 
 
 # Family behavior — module-level functions (cycle-free: only numpy/pandas/
@@ -234,29 +379,37 @@ def _check_binomial(df: pd.DataFrame, response: str, ctx: dict) -> None:
             )
 
 
-# Adding a new family is a near-one-file change: (1) a FamilySpec entry here
-# carrying metadata AND behavior (response_check / preprocess /
-# addition_template), plus (2) a MODEL_REGISTRY entry in _factory.py. A
-# BaseModel subclass is needed ONLY for formula behavior a template cannot
-# express, or prior workarounds — never to re-declare metadata or domain/offset
-# logic, which the data layer reads straight from this spec.
+# Adding a family that reuses the existing pipeline fields is a two-entry
+# change: (1) a FamilySpec entry here carrying metadata AND behavior
+# (response_check / preprocess / addition_template / fixed_params /
+# required_params), plus (2) a MODEL_REGISTRY entry in _factory.py pointing at
+# a subclass whose only job is to store those fields. Everything the offset
+# machinery needs — which parameter is pinned, on what link, from which column,
+# and when the pin applies — is read off `fixed_params`, so no formula or prior
+# code is written per family. A subclass hook is needed ONLY for formula
+# behavior a template cannot express (Binomial rewrites its LHS) or a guard a
+# spec cannot state (Beta's squeeze/offset combination).
+#
+# That holds even for a family introducing a *new* pipeline field:
+# `DataValidator.validate()` and `DataPreprocessor.process()` take the family's
+# fields as **kwargs and derive which of them name data columns (the string
+# values), so a field they have never heard of needs no edit there.
 FAMILY_SPECS: dict[str, FamilySpec] = {
     "gaussian": FamilySpec(
         bambi_family="gaussian",
-        preproc_family="gaussian",
         mean_param_key="mu",
         default_link="identity",
         supported_links=frozenset({"identity", "log"}),
         pipeline_fields=("sampling_var_col",),
-        user_params={"sampling_var_col": "sampling_var", "link": "link"},
+        user_params={"sampling_var_col": "sampling_var"},
         response_check=_check_gaussian,
         preprocess=_preprocess_gaussian,
-        offset_col=_GAUSSIAN_OFFSET,
-        offset_source_fields=("sampling_var_col",),
+        fixed_params=(
+            FixedParam("sigma", "log", _GAUSSIAN_OFFSET, ("sampling_var_col",)),
+        ),
     ),
     "beta": FamilySpec(
         bambi_family="beta",
-        preproc_family="beta",
         mean_param_key="mu",
         default_link="logit",
         supported_links=frozenset({"logit", "probit"}),
@@ -265,24 +418,27 @@ FAMILY_SPECS: dict[str, FamilySpec] = {
             "n_col": "n",
             "deff_col": "deff",
             "squeeze": "squeeze",
-            "link": "link",
         },
         response_check=_check_beta,
         preprocess=_preprocess_beta,
-        offset_col=_BETA_OFFSET,
-        offset_source_fields=("n_col", "deff_col"),
+        fixed_params=(
+            FixedParam("kappa", "log", _BETA_OFFSET, ("n_col", "deff_col")),
+        ),
     ),
     "binomial": FamilySpec(
         bambi_family="binomial",
-        preproc_family="binomial",
         mean_param_key="p",
         default_link="logit",
         supported_links=frozenset({"logit", "probit"}),
         pipeline_fields=("trials_col",),
-        user_params={"trials_col": "trials", "link": "link"},
+        user_params={"trials_col": "trials"},
         response_check=_check_binomial,
         preprocess=None,  # binomial needs no offset transform
         addition_template="p({response}, {trials_col})",
+        addition_field="trials_col",
+        # Nothing is pinned: p is the only parameter and it is the estimand.
+        fixed_params=(),
+        required_params=("trials",),
     ),
 }
 

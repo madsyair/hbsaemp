@@ -116,6 +116,64 @@ print([c for c in clean.columns if c not in df.columns])
 The extra column is the Fay-Herriot offset the Gaussian family derives from
 `sampling_var`. You never add it yourself.
 
+## Pin a parameter to a value you already know
+
+`sampling_var=` is a specific case of a general idea: a parameter that is **known from
+the survey design** rather than estimated from the data. `fixed_params=` states that
+directly, for any parameter the family allows — `{"sigma": ...}` for Gaussian,
+`{"kappa": ...}` for Beta. The value is either a column name or a single number:
+
+```{testcode}
+pinned = create_model(
+    "y ~ x1 + x2",
+    family="gaussian",
+    data=df,
+    group="group",
+    fixed_params={"sigma": 2.0},
+)
+clean = pinned.check_data()
+print([c for c in clean.columns if c not in df.columns])
+```
+
+```{testoutput}
+['hbsaemp_sigma_fixed']
+```
+
+Give the parameter's own value — `sigma = 2.0`, not `log(2.0)`. The link is applied for
+you, which is why the column above holds `0.6931`. A value the link cannot carry (a
+negative scale, say) is refused when the pipeline runs, rather than becoming a silent
+`NaN`.
+
+The same parameter cannot be pinned two ways at once. `sampling_var` already pins
+`sigma`, so asking for both is an error rather than one of them quietly winning:
+
+```{testcode}
+try:
+    create_model("y ~ x1", family="gaussian", data=df, group="group",
+                 sampling_var="D", fixed_params={"sigma": 2.0})
+except ValueError as err:
+    print(err)
+```
+
+```{testoutput}
+'sigma' is pinned twice: once through ['sampling_var'] and once through fixed_params['sigma']. Pass one or the other.
+```
+
+Not every parameter can be pinned. Binomial's only parameter is the very thing you are
+estimating, so it has nothing to fix:
+
+```{testcode}
+try:
+    create_model("y ~ x1", family="binomial", data=df, group="group",
+                 trials="n", fixed_params={"p": 0.5})
+except ValueError as err:
+    print(err)
+```
+
+```{testoutput}
+family='binomial' cannot pin ['p']. Pinnable parameter(s): none.
+```
+
 ## If it fails
 
 **The family name is not recognised.**

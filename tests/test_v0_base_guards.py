@@ -135,6 +135,27 @@ def test_import_bambi_error_points_at_the_extra(gaussian_unfitted, monkeypatch):
     assert "GaussianModel" in message
 
 
+# summary() before fit() — placeholder, not an error
+
+
+def test_summary_before_fit_returns_placeholder(gaussian_unfitted):
+    """`summary()` must stay inspectable before sampling is paid for.
+
+    `ModelNotFittedError` used to list `summary()` among its triggers; it never
+    raised there, and the mismatch is what sent an earlier documentation pass
+    down the wrong path.
+    """
+    from hbsaemp.models._base import ModelResult
+
+    text = gaussian_unfitted.summary()
+    assert "[not fitted]" in text
+    assert "not fitted" in ModelResult().summary()
+
+    # The guard that does raise is the result property, not summary().
+    with pytest.raises(hb.ModelNotFittedError):
+        _ = gaussian_unfitted.result
+
+
 # link default now lives on BaseModel
 
 
