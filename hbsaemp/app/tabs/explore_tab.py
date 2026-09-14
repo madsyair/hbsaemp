@@ -63,9 +63,16 @@ class ExploreTab(param.Parameterized):
             return
         cols  = df.select_dtypes(include="number").columns.tolist()
         first = cols[0] if cols else None
-        for w in [self._hist_var, self._box_var, self._x_var, self._y_var]:
+        # All four widgets' *options* first, then all four *values* — a
+        # value-watcher (_update_scatter_corr, on _x_var/_y_var) can fire
+        # mid-loop, before every widget has moved past the old dataset's
+        # columns. Setting options first narrows, but doesn't close, that
+        # window: _transformed_xy() below is the actual guard.
+        widgets = [self._hist_var, self._box_var, self._x_var, self._y_var]
+        for w in widgets:
             w.options = cols
-            w.value   = first
+        for w in widgets:
+            w.value = first
         self._update_summary()
         self._update_histogram()
         self._update_boxplot()
@@ -121,6 +128,14 @@ class ExploreTab(param.Parameterized):
         x_var = self._x_var.value
         y_var = self._y_var.value
         if df is None or not x_var or not y_var:
+            return None
+        # _on_data_change updates the four selector widgets one at a
+        # time; a value-watcher on _x_var/_y_var can fire mid-loop, while
+        # the other one still names a column from the *previous* dataset.
+        # Skip rendering rather than crash on a stale/mismatched name —
+        # the imminent update to the remaining widget(s) re-triggers this
+        # anyway once everything is in sync.
+        if x_var not in df.columns or y_var not in df.columns:
             return None
         x, y           = df[x_var].copy(), df[y_var].copy()
         x_name, y_name = x_var, y_var

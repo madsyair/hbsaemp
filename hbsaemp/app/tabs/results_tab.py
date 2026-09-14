@@ -355,10 +355,12 @@ class ResultsTab(param.Parameterized):
         selected_rows = self._compare_table.value.iloc[self._compare_table.selection]
         names = selected_rows["Model"].tolist() if not selected_rows.empty else []
 
-        if len(names) < 2:
+        if not names:
             self._compare_status.object = _error_box(
-                "Select at least 2 models",
-                "Check two or more models above, then click Compare Selected.",
+                "Select a model",
+                "Check one or more models above, then click Compare Selected. "
+                "A single model shows its own diagnostics (LOO, Bayes Factor if "
+                "enabled); two or more also add a side-by-side ranking.",
             )
             return
 
@@ -659,10 +661,11 @@ class ResultsTab(param.Parameterized):
         modelcomparison_card = pn.Card(
             pn.Column(
                 pn.pane.Markdown(
-                    "Compare models saved from the <b>Modeling</b> tab's "
-                    "<i>Save Model</i> button, ranked by predictive fit (LOO/ELPD). "
-                    "Check the Convergence Evaluation numbers yourself before "
-                    "relying on this ranking.",
+                    "Check one or more models saved from the <b>Modeling</b> tab's "
+                    "<i>Save Model</i> button. A single model shows its own LOO/ELPD "
+                    "and, if enabled below, Bayes Factor per coefficient; two or more "
+                    "add a side-by-side ranking. Check the Convergence Evaluation "
+                    "numbers yourself before relying on any of it.",
                     margin=(4, 0, 8, 0),
                 ),
                 self._compare_table,
