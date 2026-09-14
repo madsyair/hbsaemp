@@ -523,6 +523,29 @@ def test_model_comparison_table_reflects_saved_models():
     assert rt._use_model_sel.options == [None, "Model A", "Model B"]
 
 
+def test_compare_table_model_column_is_never_numeric_dtype():
+    """Regression test: an empty pd.DataFrame({"Model": []}) defaults to
+    float64 (pandas' rule for a column with nothing to infer a type
+    from). Tabulator.js then treats "Model" as a numeric column, and a
+    later string value renders as NaN in the browser instead of the
+    model's name — this only shows up in the rendered widget, not in
+    plain `.value` access, so it's checked via the Bokeh model's actual
+    ColumnDataSource here rather than just `.value.dtypes`."""
+    from hbsaemp.app._app import SavedModel
+
+    state = AppState()
+    rt = ResultsTab(state=state)
+    bokeh_model = rt._compare_table.get_root()
+
+    assert rt._compare_table.value["Model"].dtype == object
+    assert bokeh_model.source.data["Model"].dtype == object
+
+    state.saved_models = {"Model 1": SavedModel(model=object())}
+    assert rt._compare_table.value["Model"].dtype == object
+    assert bokeh_model.source.data["Model"].dtype == object
+    assert list(bokeh_model.source.data["Model"]) == ["Model 1"]
+
+
 def test_compare_requires_at_least_two_models():
     from hbsaemp.app._app import SavedModel
 
@@ -781,3 +804,67 @@ def test_update_blocking_captures_user_warning(data_gaussian: pd.DataFrame, monk
     ut = UpdateModelTab(state=state)
     fitted, notes = ut._update_blocking(state.model, None, {})
     assert any("copied" in n for n in notes)
+
+
+# ---------------------------------------------------------------------------
+# Fit/refit progress feedback (progress bar + elapsed-time ticker)
+# ---------------------------------------------------------------------------
+
+def test_sampling_progress_callback_updates_progress_bar():
+    from hbsaemp.app.tabs.model_tab import _make_sampling_progress_callback
+
+    progress = pn.indicators.Progress(max=100, value=0)
+    callback = _make_sampling_progress_callback(progress, total_draws=10)
+
+    class _FakeDraw:
+        chain = 0
+
+    for _ in range(10):
+        callback(None, _FakeDraw())
+
+    assert progress.value == 100
+
+
+@pytest.mark.slow
+def test_fit_progress_bar_hidden_before_and_after(data_gaussian: pd.DataFrame):
+    """The bar only shows *during* a fit — not before it starts, and not
+    left dangling at 100% once it's done (the status text already
+    confirms completion)."""
+    import asyncio
+
+    state = AppState()
+    state.data = data_gaussian
+    mt = ModelTab(state=state)
+    mt._response_sel.value = "y"
+    mt._predictors_sel.value = ["x1", "x2"]
+    mt._draws_in.value = 50
+    mt._tune_in.value = 50
+    mt._chains_in.value = 1
+    mt._cores_in.value = 1
+
+    assert mt._fit_progress.visible is False
+    asyncio.run(mt._on_fit_model(None))
+    assert mt._fit_progress.visible is False
+    assert mt._fit_progress.value == 100
+
+
+@pytest.mark.slow
+def test_update_progress_bar_hidden_before_and_after(data_gaussian: pd.DataFrame):
+    import asyncio
+
+    state = AppState()
+    state.data = data_gaussian
+    mt = ModelTab(state=state)
+    mt._response_sel.value = "y"
+    mt._predictors_sel.value = ["x1", "x2"]
+    mt._draws_in.value = 50
+    mt._tune_in.value = 50
+    mt._chains_in.value = 1
+    mt._cores_in.value = 1
+    asyncio.run(mt._on_fit_model(None))
+
+    ut = UpdateModelTab(state=state)
+    assert ut._update_progress.visible is False
+    asyncio.run(ut._on_update(None))
+    assert ut._update_progress.visible is False
+    assert ut._update_progress.value == 100

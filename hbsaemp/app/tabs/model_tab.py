@@ -7,6 +7,7 @@ import asyncio
 import copy
 import inspect
 import io
+import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -107,6 +108,48 @@ def _info_box(body: str) -> str:
         f'<div style="background:#0072B2;color:white;padding:10px 16px;'
         f'border-radius:8px;margin-top:8px">{body}</div>'
     )
+
+
+def _make_sampling_progress_callback(
+    progress: pn.indicators.Progress, total_draws: int,
+) -> Callable[[Any, Any], None]:
+    """A `pymc.sample(callback=...)` — fires after every single draw.
+
+    Runs on the executor's background thread, so the UI update goes
+    through `pn.state.execute()` (thread-safe) rather than setting
+    `progress.value` directly. Throttled to ~6 updates/second — sampling
+    can hit several thousand draws/second, and pushing a widget update
+    for every one of them would flood the UI thread for no visible gain.
+    """
+    seen = {"n": 0, "last": 0.0}
+
+    def callback(trace: Any, draw: Any) -> None:
+        seen["n"] += 1
+        now = time.monotonic()
+        if now - seen["last"] < 0.15 and seen["n"] < total_draws:
+            return
+        seen["last"] = now
+        pct = min(100, round(100 * seen["n"] / total_draws)) if total_draws else 0
+        pn.state.execute(lambda: setattr(progress, "value", pct))
+
+    return callback
+
+
+def _start_elapsed_timer(status: pn.pane.HTML, label: str) -> Any:
+    """Ticks `status` once a second with a running "Ns elapsed" suffix.
+
+    Not an ETA — MCMC runtime depends too much on model size, family, and
+    hardware to estimate reliably beforehand. This only confirms the app
+    hasn't frozen while a long fit runs. Returns the periodic callback
+    handle; call `.stop()` on it when the operation finishes.
+    """
+    start = time.monotonic()
+
+    def tick() -> None:
+        elapsed = int(time.monotonic() - start)
+        status.object = _info_box(f"{label} ({elapsed}s elapsed)")
+
+    return pn.state.add_periodic_callback(tick, period=1000)
 
 
 def _formula_box(formula: str) -> str:
@@ -304,6 +347,9 @@ class ModelTab(param.Parameterized):
         # --- Fit Model ---------------------------------------------------------
         self._fit_btn = pn.widgets.Button(name="Fit Model", button_type="primary", max_width=220)
         self._fit_status = pn.pane.HTML("")
+        self._fit_progress = pn.indicators.Progress(
+            max=100, value=0, sizing_mode="stretch_width", bar_color="primary", visible=False,
+        )
         self._fit_btn.on_click(self._on_fit_model)
 
         # --- Save Model (for the Results tab's Model Comparison) -----------------
@@ -605,7 +651,7 @@ class ModelTab(param.Parameterized):
         return check_prior(model, n_draws=n_draws)
 
     async def _on_fit_model(self, event: Any) -> None:
-        if self._fit_btn.loading:  
+        if self._fit_btn.loading:
             return
         if self._model_draft is None:
             self._fit_status.object = _error_box(
@@ -614,8 +660,20 @@ class ModelTab(param.Parameterized):
             return
 
         model = self._model_draft
+        cfg = model.config
+        total_draws = (cfg.draws + cfg.tune) * cfg.chains
+        # Attaches to the existing draft's config in place — no need to
+        # rebuild the model just to add a callback. `sampler_kwargs` is
+        # exactly the escape hatch ModelConfig documents for this: extra
+        # kwargs forwarded verbatim down to pymc.sample().
+        model.config.sampler_kwargs["callback"] = _make_sampling_progress_callback(
+            self._fit_progress, total_draws
+        )
+
         self._fit_btn.loading = self._fit_btn.disabled = True
-        self._fit_status.object = _info_box("Running MCMC sampling…")
+        self._fit_progress.value = 0
+        self._fit_progress.visible = True
+        timer = _start_elapsed_timer(self._fit_status, "Running MCMC sampling…")
         try:
             loop = asyncio.get_running_loop()
             fitted = await loop.run_in_executor(None, self._fit_blocking, model)
@@ -625,7 +683,9 @@ class ModelTab(param.Parameterized):
             self._fit_status.object = _error_box(title, body)
             return
         finally:
+            timer.stop()
             self._fit_btn.loading = self._fit_btn.disabled = False
+            self._fit_progress.visible = False
 
         self.state.model = fitted
         self._fit_status.object = _success_box(
@@ -793,6 +853,7 @@ class ModelTab(param.Parameterized):
                     margin=(4, 0, 8, 0),
                 ),
                 pn.Row(self._fit_btn),
+                self._fit_progress,
                 self._fit_status,
                 pn.layout.Divider(),
                 pn.pane.Markdown(

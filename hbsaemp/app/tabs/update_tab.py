@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import time
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -55,6 +56,48 @@ def _info_box(body: str) -> str:
         f'<div style="background:#0072B2;color:white;padding:10px 16px;'
         f'border-radius:8px;margin-top:8px">{body}</div>'
     )
+
+
+def _make_sampling_progress_callback(
+    progress: pn.indicators.Progress, total_draws: int,
+) -> Any:
+    """A `pymc.sample(callback=...)` — fires after every single draw.
+
+    Runs on the executor's background thread, so the UI update goes
+    through `pn.state.execute()` (thread-safe) rather than setting
+    `progress.value` directly. Throttled to ~6 updates/second — sampling
+    can hit several thousand draws/second, and pushing a widget update
+    for every one of them would flood the UI thread for no visible gain.
+    """
+    seen = {"n": 0, "last": 0.0}
+
+    def callback(trace: Any, draw: Any) -> None:
+        seen["n"] += 1
+        now = time.monotonic()
+        if now - seen["last"] < 0.15 and seen["n"] < total_draws:
+            return
+        seen["last"] = now
+        pct = min(100, round(100 * seen["n"] / total_draws)) if total_draws else 0
+        pn.state.execute(lambda: setattr(progress, "value", pct))
+
+    return callback
+
+
+def _start_elapsed_timer(status: pn.pane.HTML, label: str) -> Any:
+    """Ticks `status` once a second with a running "Ns elapsed" suffix.
+
+    Not an ETA — refit runtime depends too much on model size and
+    hardware to estimate beforehand. This only confirms the app hasn't
+    frozen while a long refit runs. Returns the periodic callback handle;
+    call `.stop()` on it when the operation finishes.
+    """
+    start = time.monotonic()
+
+    def tick() -> None:
+        elapsed = int(time.monotonic() - start)
+        status.object = _info_box(f"{label} ({elapsed}s elapsed)")
+
+    return pn.state.add_periodic_callback(tick, period=1000)
 
 
 def _pending_box(message: str) -> str:
@@ -163,6 +206,9 @@ class UpdateModelTab(param.Parameterized):
             name="Update Model", button_type="primary", max_width=200,
         )
         self._update_status = pn.pane.HTML("")
+        self._update_progress = pn.indicators.Progress(
+            max=100, value=0, sizing_mode="stretch_width", bar_color="primary", visible=False,
+        )
         self._update_btn.on_click(self._on_update)
 
         self.state.param.watch(self._on_model_change, "model")
@@ -282,8 +328,22 @@ class UpdateModelTab(param.Parameterized):
 
         overrides = self._collect_overrides()
 
+        # Effective draws/tune/chains for this refit — overrides win, else
+        # fall back to the model's current config (update_model() merges
+        # the same way).
+        cfg = model.config
+        eff_draws = overrides.get("draws", cfg.draws)
+        eff_tune = overrides.get("tune", cfg.tune)
+        eff_chains = overrides.get("chains", cfg.chains)
+        total_draws = (eff_draws + eff_tune) * eff_chains
+        overrides["sampler_kwargs"] = {
+            "callback": _make_sampling_progress_callback(self._update_progress, total_draws)
+        }
+
         self._update_btn.loading = self._update_btn.disabled = True
-        self._update_status.object = _info_box("Refitting model…")
+        self._update_progress.value = 0
+        self._update_progress.visible = True
+        timer = _start_elapsed_timer(self._update_status, "Refitting model…")
         try:
             loop = asyncio.get_running_loop()
             fitted, refit_notes = await loop.run_in_executor(
@@ -295,7 +355,9 @@ class UpdateModelTab(param.Parameterized):
             self._update_status.object = _error_box(title, body)
             return
         finally:
+            timer.stop()
             self._update_btn.loading = self._update_btn.disabled = False
+            self._update_progress.visible = False
 
         self.state.model = fitted
         self.state.param.trigger("model")
@@ -386,6 +448,7 @@ class UpdateModelTab(param.Parameterized):
             formula_card,
             data_card,
             pn.Row(self._update_btn),
+            self._update_progress,
             self._update_status,
         )
 
