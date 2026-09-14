@@ -832,7 +832,7 @@ class ModelTab(param.Parameterized):
                     "A prior predictive check assesses the plausibility of the prior before fitting the model",
                     margin=(4, 0, 8, 0),
                 ),
-                pn.Column(self._prior_run_btn, self._prior_n_draws),
+                pn.Column(self._prior_n_draws, self._prior_run_btn),
                 self._prior_status,
                 pn.layout.Divider(),
                 pn.pane.Markdown("#### Prior Summary"),
