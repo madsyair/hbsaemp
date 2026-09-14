@@ -45,16 +45,24 @@ __all__: list[str] = ["ModelTab"]
 
 # Tier-3 dispatch, built from the registry itself (never a hardcoded list) so
 # a new family registered in FAMILY_SPECS is picked up with zero code changes
-# here, and `set(_HBM_DISPATCH) == set(list_families())` holds by construction.
+# here — as long as a hbm_<family> shortcut exists for it too. If backend
+# adds a family without one, that family is hidden from the selector
+# (logged once, at import time) rather than crashing the whole app: an
+# `assert`/`raise` here would fail the *import* of this module, and since
+# the family selector's options are also built from `list_families()`,
+# an unguarded mismatch would otherwise surface as a bare `KeyError` the
+# moment a user picked that family from the dropdown.
 _HBM_DISPATCH: dict[str, Callable[..., BaseModel]] = {
     "gaussian": hbm_gaussian,
     "beta": hbm_beta,
     "binomial": hbm_binomial,
 }
-assert set(_HBM_DISPATCH) == set(list_families()), (
-    "_HBM_DISPATCH is out of sync with the family registry — "
-    "add a hbm_<family> shortcut and wire it in here."
-)
+_UNSUPPORTED_FAMILIES: list[str] = sorted(set(list_families()) - set(_HBM_DISPATCH))
+if _UNSUPPORTED_FAMILIES:
+    logger.warning(
+        "No hbm_<family> shortcut for %s; hidden from the family selector.",
+        _UNSUPPORTED_FAMILIES,
+    )
 
 # Frontend-owned prose (FamilySpec carries no description field). Only
 # families in the registry are described; "Default link: …" sentences are
@@ -68,7 +76,8 @@ _FAMILY_DESC: dict[str, str] = {
     "beta": (
         "**Beta**: response variable is a proportion or rate. The "
         "precision parameter phi_i can be computed from the `n` and `deff` "
-        "columns, or left to Bambi's auto-priors if omitted."
+        "columns, pinned directly to a known value/column below (\"Pin "
+        "kappa\"), or left to Bambi's auto-priors if neither is given."
     ),
     "binomial": (
         "**Binomial**: response variable is a count of successes out of a "
@@ -150,6 +159,33 @@ def _start_elapsed_timer(status: pn.pane.HTML, label: str) -> Any:
         status.object = _info_box(f"{label} ({elapsed}s elapsed)")
 
     return pn.state.add_periodic_callback(tick, period=1000)
+
+
+def _fig_from_plot_collection(pc: Any) -> Any | None:
+    """Best-effort `matplotlib.figure.Figure` extraction from an ArviZ PlotCollection.
+
+    Takes whatever `arviz_plots.plot_ppc_*()` returns. Mirrors what
+    `diagnostics/_plot_utils._fig_from_axes()` already does for the same
+    problem — `viz` can be `None`, missing the `"figure"` key, or hold
+    something that isn't a real `Figure` — but that helper isn't
+    importable from `app/` (backend-owned, `diagnostics/` internal). This
+    is a small enough check to duplicate locally rather than ask for it
+    to be relocated.
+
+    Returns `None` instead of raising, so a bad `pc1` doesn't take a good
+    `pc2` down with it — each plot gets its own outcome.
+    """
+    import matplotlib.figure
+
+    viz = getattr(pc, "viz", None)
+    if viz is None or "figure" not in viz:
+        return None
+    try:
+        fig = viz["figure"].item()
+    except Exception:
+        return None
+    return fig if isinstance(fig, matplotlib.figure.Figure) else None
+
 
 
 def _formula_box(formula: str) -> str:
@@ -281,7 +317,9 @@ class ModelTab(param.Parameterized):
         self._intercept_cb = pn.widgets.Checkbox(name="Include intercept", value=True)
 
         # --- Family / link (registry-driven) --------------------------
-        families = list_families()
+        # Only families with a hbm_<family> shortcut are selectable — see
+        # the _UNSUPPORTED_FAMILIES check at module level.
+        families = [f for f in list_families() if f in _HBM_DISPATCH]
         default_family = "gaussian" if "gaussian" in families else families[0]
         self._family_sel = pn.widgets.Select(
             name="HB Family", options=families, value=default_family, max_width=250,
@@ -289,8 +327,14 @@ class ModelTab(param.Parameterized):
         self._link_sel = pn.widgets.Select(name="Link Function", max_width=250)
         self._family_desc = pn.pane.Markdown("", margin=(4, 0, 8, 0))
         self._extra_params_pane = pn.Column()
+        self._pin_params_pane = pn.Column()
+        self._pin_cbs: dict[str, pn.widgets.Checkbox] = {}
+        self._pin_mode: dict[str, pn.widgets.RadioButtonGroup] = {}
+        self._pin_col: dict[str, pn.widgets.Select] = {}
+        self._pin_val: dict[str, pn.widgets.FloatInput] = {}
         self._apply_family_spec(default_family)
         self._refresh_extra_params(default_family)
+        self._refresh_pin_widgets(default_family)
         self._family_sel.param.watch(self._on_family_change, "value")
 
         # --- Sampler configuration -------------------------------------
@@ -388,13 +432,25 @@ class ModelTab(param.Parameterized):
         self._response_sel.options = num_cols
         self._response_sel.value   = num_cols[0] if num_cols else None
 
+        # Not auto-selected: blindly picking every remaining numeric
+        # column is wrong more often than it's right — it happily
+        # includes simulation ground-truth columns (e.g. data_fhnorm's
+        # theta_true/u), design columns meant for a different parameter
+        # (e.g. the sampling-variance column D, which belongs in
+        # `sampling_var=`, not as a regular predictor), or the same
+        # column already used as the area/group variable. check_data()
+        # doesn't catch any of this — it isn't a data problem, it's a
+        # modeling choice only the person building the model can make.
+        # An empty default forces that choice instead of silently
+        # guessing it.
         self._predictors_sel.options = num_cols
-        self._predictors_sel.value   = num_cols[1:] if len(num_cols) > 1 else []
+        self._predictors_sel.value   = []
 
         self._group_sel.options = [None, *all_cols]
         self._group_sel.value   = None
 
         self._refresh_extra_params(self._family_sel.value)
+        self._refresh_pin_widgets(self._family_sel.value)
         self._update_preview()
 
     def _apply_family_spec(self, family: str) -> None:
@@ -404,16 +460,42 @@ class ModelTab(param.Parameterized):
         self._family_desc.object = _FAMILY_DESC.get(family, "")
 
     def _on_family_change(self, event: param.parameterized.Event) -> None:
-        self._apply_family_spec(event.new)
+        # Widgets first, then link/description — _apply_family_spec writes
+        # self._link_sel.value, which has a watcher that triggers a model
+        # build; building against the *previous* family's still-attached
+        # extra widgets (e.g. "sampling_var" while family is now
+        # "binomial") throws, self-correcting only once _update_preview()
+        # runs again at the end of this method. Reordering avoids that
+        # wasted, error-flashing build entirely.
         self._refresh_extra_params(event.new)
+        self._refresh_pin_widgets(event.new)
+        self._apply_family_spec(event.new)
         self._update_preview()
 
     def _family_param_names(self, family: str) -> list[str]:
-        return [uk for uk in get_family_spec(family).user_params.values() if uk != "link"]
+        # `link` used to live in user_params too, so this filtered it out
+        # before it could become a duplicate widget (the Link dropdown is
+        # separate). The registry no longer includes it here at all, so
+        # this is now just `list(user_params.values())` — kept as its own
+        # method since callers shouldn't care where the names come from.
+        return list(get_family_spec(family).user_params.values())
 
-    def _param_traits(self, family: str, user_kw: str) -> tuple[type, bool]:
+    def _param_traits(self, family: str, user_kw: str) -> tuple[type, bool] | None:
+        """`(annotation, required)` for `hbm_<family>`'s `user_kw` parameter.
+
+        Returns `None` if the registry names a kwarg the tier-3 shortcut
+        doesn't actually expose — a mismatch that's now possible to reach
+        (see `_HBM_DISPATCH`'s note on `fixed_params`/family-specific
+        params being tier-3-only) rather than raising a bare `KeyError`
+        from `ModelTab.__init__` and failing the whole tab's construction.
+        """
         fn = _HBM_DISPATCH[family]
-        p = inspect.signature(fn).parameters[user_kw]
+        p = inspect.signature(fn).parameters.get(user_kw)
+        if p is None:
+            logger.warning(
+                "hbm_%s has no %r parameter; widget skipped.", family, user_kw
+            )
+            return None
         try:
             ann = inspect.get_annotations(fn, eval_str=True).get(user_kw, p.annotation)
         except Exception:  
@@ -435,7 +517,10 @@ class ModelTab(param.Parameterized):
         widgets: dict[str, pn.widgets.Widget] = {}
         objects: list[Any] = []
         for user_kw in self._family_param_names(family):
-            ann, required = self._param_traits(family, user_kw)
+            traits = self._param_traits(family, user_kw)
+            if traits is None:
+                continue
+            ann, required = traits
             label = _PARAM_LABEL.get(user_kw, user_kw)
             if required:
                 label += "  (required)"
@@ -450,8 +535,96 @@ class ModelTab(param.Parameterized):
         self._extra_widgets = widgets
         self._extra_params_pane.objects = objects
 
+    # Which of `_extra_widgets`' family-specific keys derive the same
+    # distributional parameter a given pin name locks — pinning and
+    # supplying both is rejected by the backend with ValueError ("pinned
+    # twice"), not a silent pick of one, so the GUI disables the other
+    # source instead of letting the user hit that error.
+    _PIN_CONFLICTS: dict[str, tuple[str, ...]] = {
+        "sigma": ("sampling_var",),
+        "kappa": ("n", "deff"),
+    }
+
+    def _refresh_pin_widgets(self, family: str) -> None:
+        """(Re)generate `fixed_params` pin widgets for `family`.
+
+        Gated on `get_family_spec(family).pinnable_params` — empty for
+        Binomial (`p` is the estimand itself, it can't be pinned), so no
+        widgets render there at all rather than a pin control that always
+        errors if used.
+        """
+        spec = get_family_spec(family)
+        pinnable = dict(getattr(spec, "pinnable_params", {}) or {})
+        data = self.state.data
+        numeric_cols = (
+            data.select_dtypes(include="number").columns.tolist() if data is not None else []
+        )
+
+        self._pin_cbs, self._pin_mode, self._pin_col, self._pin_val = {}, {}, {}, {}
+        rows: list[Any] = []
+        for param in sorted(pinnable):
+            cb = pn.widgets.Checkbox(name=f"Pin {param}", value=False, max_width=140)
+            mode = pn.widgets.RadioButtonGroup(
+                options=["Column", "Fixed value"], value="Column", disabled=True,
+            )
+            col = pn.widgets.Select(
+                name="Column", options=[None, *numeric_cols], value=None, disabled=True, max_width=200,
+            )
+            val = pn.widgets.FloatInput(name="Value", value=1.0, disabled=True, max_width=140)
+
+            def _sync_enabled(cb: pn.widgets.Checkbox = cb, mode: pn.widgets.RadioButtonGroup = mode,
+                               col: pn.widgets.Select = col, val: pn.widgets.FloatInput = val) -> None:
+                mode.disabled = not cb.value
+                col.disabled = not cb.value or mode.value != "Column"
+                val.disabled = not cb.value or mode.value != "Fixed value"
+
+            cb.param.watch(lambda e, p=param: self._on_pin_toggle(p, e.new), "value")
+            cb.param.watch(lambda e: _sync_enabled(), "value")
+            mode.param.watch(lambda e: _sync_enabled(), "value")
+            for w in (cb, mode, col, val):
+                w.param.watch(self._update_preview, "value")
+
+            self._pin_cbs[param] = cb
+            self._pin_mode[param] = mode
+            self._pin_col[param] = col
+            self._pin_val[param] = val
+            rows.append(pn.Column(
+                cb, pn.FlexBox(mode, col, val),
+                margin=(0, 0, 8, 0),
+            ))
+
+        self._pin_params_pane.objects = rows
+
+    def _on_pin_toggle(self, param: str, active: bool) -> None:
+        for conflict_kw in self._PIN_CONFLICTS.get(param, ()):
+            w = self._extra_widgets.get(conflict_kw)
+            if w is None:
+                continue
+            w.disabled = active
+            if active:
+                w.value = False if isinstance(w, pn.widgets.Checkbox) else None
+
+    def _collect_pin_kwargs(self) -> dict[str, Any]:
+        """`fixed_params={param: column_name_or_number, ...}` from the pin
+        widgets — omitted entirely (not sent as `{}`) when nothing is
+        pinned, since `hbm_binomial` doesn't accept `fixed_params=` at all."""
+        fixed: dict[str, Any] = {}
+        for param, cb in self._pin_cbs.items():
+            if not cb.value:
+                continue
+            if self._pin_mode[param].value == "Column":
+                if self._pin_col[param].value:
+                    fixed[param] = self._pin_col[param].value
+            else:
+                fixed[param] = float(self._pin_val[param].value)
+        return fixed
+
     def _collect_family_kwargs(self) -> dict[str, Any]:
-        return {name: w.value for name, w in self._extra_widgets.items()}
+        kwargs = {name: w.value for name, w in self._extra_widgets.items()}
+        fixed = self._collect_pin_kwargs()
+        if fixed:
+            kwargs["fixed_params"] = fixed
+        return kwargs
 
     def _collect_config(self) -> ModelConfig:
         return ModelConfig(
@@ -761,27 +934,46 @@ class ModelTab(param.Parameterized):
         finally:
             self._postpc_run_btn.loading = self._postpc_run_btn.disabled = False
 
+        # Each plot gets its own try/except — a failure extracting/
+        # rendering pc1 must not also blank out pc2 (S6: they used to
+        # share one try block and one generic error message).
+        errors: list[str] = []
+
         try:
             pc1 = azp.plot_ppc_dist(idata)
-            fig1 = pc1.viz["figure"].item()
+            fig1 = _fig_from_plot_collection(pc1)
+            if fig1 is None:
+                raise RuntimeError("plot_ppc_dist() did not return a renderable figure.")
             fig1.suptitle("Posterior Predictive Plot", fontsize=11, fontweight="bold")
             fig1.subplots_adjust(top=0.82)
             self._postpc_dist_pane.object = fig1
             plt.close(fig1)
+        except Exception as exc:
+            logger.exception("ModelTab posterior predictive dist plot failed")
+            self._postpc_dist_pane.object = None
+            errors.append(f"Posterior predictive plot: {exc}")
 
+        try:
             pc2 = azp.plot_ppc_interval(idata)
-            fig2 = pc2.viz["figure"].item()
-            fig2.suptitle("Rootgram",
-                          fontsize=11, fontweight="bold")
+            fig2 = _fig_from_plot_collection(pc2)
+            if fig2 is None:
+                raise RuntimeError("plot_ppc_interval() did not return a renderable figure.")
+            fig2.suptitle("Rootgram", fontsize=11, fontweight="bold")
             fig2.subplots_adjust(top=0.82)
             self._postpc_interval_pane.object = fig2
             plt.close(fig2)
-        except Exception as exc:  
-            logger.exception("ModelTab posterior predictive plotting failed")
-            self._postpc_status.object = _error_box("Could not render plots", str(exc))
-            return
+        except Exception as exc:
+            logger.exception("ModelTab posterior predictive interval plot failed")
+            self._postpc_interval_pane.object = None
+            errors.append(f"Rootgram: {exc}")
 
-        self._postpc_status.object = _success_box("Posterior predictive check complete.")
+        if errors:
+            self._postpc_status.object = _error_box(
+                "Posterior predictive check completed with errors",
+                "<br>".join(errors),
+            )
+        else:
+            self._postpc_status.object = _success_box("Posterior predictive check complete.")
 
     def panel(self) -> pn.Tabs:
         overview = pn.pane.Markdown("""
@@ -802,6 +994,7 @@ class ModelTab(param.Parameterized):
                 pn.FlexBox(self._family_sel, self._link_sel),
                 self._family_desc,
                 self._extra_params_pane,
+                self._pin_params_pane,
                 pn.layout.Divider(),
                 pn.pane.Markdown("**Sampler Configuration**", margin=(4, 0, 4, 0)),
                 pn.FlexBox(
@@ -832,7 +1025,7 @@ class ModelTab(param.Parameterized):
                     "A prior predictive check assesses the plausibility of the prior before fitting the model",
                     margin=(4, 0, 8, 0),
                 ),
-                pn.Column(self._prior_n_draws, self._prior_run_btn),
+                pn.Column(self._prior_run_btn, self._prior_n_draws),
                 self._prior_status,
                 pn.layout.Divider(),
                 pn.pane.Markdown("#### Prior Summary"),
