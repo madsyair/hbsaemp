@@ -115,7 +115,10 @@ def test_model_tab_uses_tier3_dispatch():
 # ---------------------------------------------------------------------------
 
 def test_dispatch_covers_every_family():
-    assert set(_HBM_DISPATCH) == set(hb.list_families())
+    """`<=`, not `==` — a future family without a hbm_<family> shortcut
+    should degrade gracefully (hidden from the selector, S1) rather than
+    fail this test; `_UNSUPPORTED_FAMILIES` is where that gets logged."""
+    assert set(_HBM_DISPATCH) <= set(hb.list_families())
 
 
 @pytest.mark.parametrize("family", hb.list_families())
@@ -546,16 +549,47 @@ def test_compare_table_model_column_is_never_numeric_dtype():
     assert list(bokeh_model.source.data["Model"]) == ["Model 1"]
 
 
-def test_compare_requires_at_least_two_models():
-    from hbsaemp.app._app import SavedModel
-
+def test_compare_requires_at_least_one_model():
+    """`compare_models(single_model, metrics=["bf"])` works fine on the
+    backend (single-model LOO/Bayes Factor is a real, supported use
+    case), so the GUI no longer forces 2+ just to reach it. Zero
+    selected is still rejected."""
     state = AppState()
-    state.saved_models = {"Solo": SavedModel(model=object())}
     rt = ResultsTab(state=state)
-    rt._compare_table.selection = [0]
+    rt._compare_table.selection = []
     import asyncio
     asyncio.run(rt._on_compare_click(None))
-    assert "at least 2" in rt._compare_status.object.lower()
+    assert "select a model" in rt._compare_status.object.lower()
+
+
+@pytest.mark.slow
+def test_compare_allows_single_model_for_its_own_diagnostics(data_gaussian: pd.DataFrame):
+    """A single saved model can be "compared" against nothing — this
+    just shows its own LOO/pp_check/params plots (and Bayes Factor, if
+    enabled), with no ranking table/plot (those need 2+, and stay None)."""
+    import asyncio
+
+    state = AppState()
+    state.data = data_gaussian
+    mt = ModelTab(state=state)
+    rt = ResultsTab(state=state)
+    mt._response_sel.value = "y"
+    mt._predictors_sel.value = ["x1"]
+    mt._draws_in.value = 200
+    mt._tune_in.value = 200
+    mt._chains_in.value = 2
+    mt._cores_in.value = 1
+    asyncio.run(mt._on_fit_model(None))
+    mt._save_name_in.value = "Solo"
+    asyncio.run(mt._on_save_model(None))
+
+    rt._compare_table.selection = [0]
+    rt._compare_bf_cb.value = True
+    asyncio.run(rt._on_compare_click(None))
+
+    titles = [o.title for o in rt._compare_result_pane.objects if isinstance(o, pn.Card)]
+    assert "Bayes Factor" in titles
+    assert "Ranking (LOO / ELPD)" not in titles  # needs 2+, correctly absent
 
 
 @pytest.mark.slow
@@ -868,3 +902,122 @@ def test_update_progress_bar_hidden_before_and_after(data_gaussian: pd.DataFrame
     asyncio.run(ut._on_update(None))
     assert ut._update_progress.visible is False
     assert ut._update_progress.value == 100
+
+
+# ---------------------------------------------------------------------------
+# fixed_params pinning
+# ---------------------------------------------------------------------------
+
+def test_pin_widgets_hidden_for_binomial(data_gaussian: pd.DataFrame):
+    """pinnable_params == {} for binomial (p is the estimand, can't be
+    pinned) — no pin widgets should render at all, not a control that
+    always errors if used."""
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    tab._family_sel.value = "binomial"
+    assert tab._pin_cbs == {}
+    assert tab._pin_params_pane.objects == []
+
+
+def test_pin_widgets_shown_for_gaussian_and_beta(data_gaussian: pd.DataFrame):
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    tab._family_sel.value = "gaussian"
+    assert set(tab._pin_cbs) == {"sigma"}
+    tab._family_sel.value = "beta"
+    assert set(tab._pin_cbs) == {"kappa"}
+
+
+def test_pinning_sigma_disables_sampling_var(data_gaussian: pd.DataFrame):
+    """Backend rejects pinning a parameter that's also supplied via
+    sampling_var/n+deff with ValueError ("pinned twice") — the GUI
+    disables the other source instead of letting the user hit that."""
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    tab._family_sel.value = "gaussian"
+    assert tab._extra_widgets["sampling_var"].disabled is False
+
+    tab._pin_cbs["sigma"].value = True
+    assert tab._extra_widgets["sampling_var"].disabled is True
+
+    tab._pin_cbs["sigma"].value = False
+    assert tab._extra_widgets["sampling_var"].disabled is False
+
+
+def test_collect_family_kwargs_includes_fixed_params_only_when_pinned(
+    data_gaussian: pd.DataFrame,
+):
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    tab._family_sel.value = "gaussian"
+    assert "fixed_params" not in tab._collect_family_kwargs()
+
+    tab._pin_cbs["sigma"].value = True
+    tab._pin_mode["sigma"].value = "Fixed value"
+    tab._pin_val["sigma"].value = 2.0
+    assert tab._collect_family_kwargs()["fixed_params"] == {"sigma": 2.0}
+
+    tab._pin_mode["sigma"].value = "Column"
+    tab._pin_col["sigma"].value = "D"
+    assert tab._collect_family_kwargs()["fixed_params"] == {"sigma": "D"}
+
+
+@pytest.mark.slow
+def test_pinned_model_builds_and_fits(data_gaussian: pd.DataFrame):
+    import asyncio
+
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    tab._response_sel.value = "y"
+    tab._predictors_sel.value = ["x1"]
+    tab._pin_cbs["sigma"].value = True
+    tab._pin_mode["sigma"].value = "Fixed value"
+    tab._pin_val["sigma"].value = 2.0
+    tab._draws_in.value = 50
+    tab._tune_in.value = 50
+    tab._chains_in.value = 1
+    tab._cores_in.value = 1
+
+    asyncio.run(tab._on_fit_model(None))
+    assert state.model is not None and state.model.is_fitted
+    assert "fixed_params" in tab.to_code()
+
+
+def test_switching_dataset_with_different_columns_does_not_crash():
+    """Regression test: loading a second dataset whose numeric
+    columns differ from the first used to KeyError inside
+    _transformed_xy() — one of the four selector widgets (_x_var/_y_var)
+    could still hold a column name from the previous dataframe when a
+    value-watcher fired mid-update-loop."""
+    from hbsaemp.app.tabs import ExploreTab
+
+    state = AppState()
+    tab = ExploreTab(state=state)
+
+    state.data = pd.DataFrame({"a": [1, 2, 3, 4], "b": [4, 3, 2, 1]})
+    state.data = pd.DataFrame({"c": [1, 2, 3, 4], "d": [4, 3, 2, 1]})  # must not raise
+
+    assert tab._x_var.value == "c"
+    assert tab._y_var.value == "c"
+    assert len(tab._corr_table.value) == 4  # scatter/corr still renders correctly after
+
+
+def test_default_predictors_start_empty(data_gaussian: pd.DataFrame):
+    """Regression test: auto-selecting *every* remaining numeric column
+    as a predictor silently includes columns that should never be
+    ordinary predictors — simulation ground-truth (e.g. data_fhnorm's
+    theta_true/u), design columns meant for a different parameter (the
+    sampling-variance column, which belongs in sampling_var=), or the
+    area/group column doing double duty. check_data() doesn't catch any
+    of this, so the GUI no longer guesses — predictors start empty and
+    the response is the only auto-picked field."""
+    state = AppState()
+    state.data = data_gaussian
+    tab = ModelTab(state=state)
+    assert tab._predictors_sel.value == []
+    assert tab._response_sel.value == data_gaussian.select_dtypes(include="number").columns[0]
