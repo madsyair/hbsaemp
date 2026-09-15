@@ -395,6 +395,14 @@ class UpdateModelTab(param.Parameterized):
         return model, notes
 
     def panel(self) -> pn.Column:
+        """Return the Panel layout for this tab.
+
+        Returns:
+            A ``panel.Column`` with the current fitted model's summary,
+            optional sampler overrides, an optional formula-update
+            template, an optional replacement-data picker, and the
+            **Update Model** button.
+        """
         overview = pn.pane.Markdown(
             "Refit the current model with updated MCMC settings, and optionally a "
             "modified formula (add/remove predictors) or replacement data. Family, "

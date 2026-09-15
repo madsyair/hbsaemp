@@ -21,6 +21,19 @@ __all__: list[str] = ["ExploreTab"]
 
 
 class ExploreTab(param.Parameterized):
+    """Exploratory data analysis tab.
+
+    Read-only relative to :class:`~hbsaemp.app._app.AppState`: it watches
+    ``state.data`` (written by
+    :class:`~hbsaemp.app.tabs.data_tab.DataTab`) and re-renders its summary
+    table, histogram, boxplot, and scatter/correlation panel whenever the
+    data changes, but never writes back to ``state``. Only numeric columns
+    (``df.select_dtypes(include="number")``) are offered in any dropdown.
+
+    Args:
+        state: Shared :class:`~hbsaemp.app._app.AppState` instance.
+    """
+
     state: AppState = param.Parameter()
 
     def __init__(self, state: AppState, **params: Any) -> None:
