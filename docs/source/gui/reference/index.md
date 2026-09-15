@@ -1,16 +1,9 @@
 # Reference
 
-Technical facts about every tab, control and exported file.
+Technical facts about every tab, control and exported file. Generated from the docstrings; not edited by hand.
 
-```{admonition} Not written yet
-:class: stub
-This page is part of the documentation structure. Its content lands in v0.3.
+```{toctree}
+:maxdepth: 1
+
+app-internals
 ```
-
-% STRUCTURE — do not delete, fill in and remove these comments when writing.
-% ## <nama tab>   satu bagian per tab
-% ##              tabel kontrol: nama, jenis masukan, nilai bawaan, akibatnya
-% ## Exports      berkas yang bisa diunduh dan formatnya
-%
-% RULE    halaman ini menyatakan fakta, tanpa prosedur dan tanpa alasan
-% OWNER   antarmuka grafis dikerjakan tim frontend; sinkronkan isi dengan mereka
