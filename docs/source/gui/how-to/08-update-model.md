@@ -55,7 +55,7 @@ current model.
    above.
 
    ```{figure} images/08-step4-refit-different-data.png
-   :alt: Refit on different data checkbox with CSV upload and built-in dataset picker
+   :alt: "Refit on different data" checkbox with CSV upload and built-in dataset picker
    :width: 600px
 
    The **"Refit on different data"** checkbox, with its CSV upload and
