@@ -1021,3 +1021,51 @@ def test_default_predictors_start_empty(data_gaussian: pd.DataFrame):
     tab = ModelTab(state=state)
     assert tab._predictors_sel.value == []
     assert tab._response_sel.value == data_gaussian.select_dtypes(include="number").columns[0]
+
+
+# ---------------------------------------------------------------------------
+# Prior Sensitivity in Model Comparison
+# ---------------------------------------------------------------------------
+
+def test_prior_sensitivity_option_defaults_off():
+    state = AppState()
+    rt = ResultsTab(state=state)
+    assert rt._compare_psense_cb.value is False
+
+
+@pytest.mark.slow
+def test_prior_sensitivity_rendered_with_saved_names_when_enabled(data_gaussian: pd.DataFrame):
+    import asyncio
+
+    state = AppState()
+    state.data = data_gaussian
+    mt = ModelTab(state=state)
+    rt = ResultsTab(state=state)
+
+    mt._response_sel.value = "y"
+    mt._predictors_sel.value = ["x1"]
+    mt._draws_in.value = 200
+    mt._tune_in.value = 200
+    mt._chains_in.value = 2
+    mt._cores_in.value = 1
+    asyncio.run(mt._on_fit_model(None))
+    mt._save_name_in.value = "Model A"
+    asyncio.run(mt._on_save_model(None))
+
+    rt._compare_table.selection = [0]
+    rt._compare_psense_cb.value = True
+    asyncio.run(rt._on_compare_click(None))
+
+    psense_card = next(
+        (obj for obj in rt._compare_result_pane.objects
+         if isinstance(obj, pn.Card) and obj.title == "Prior Sensitivity"),
+        None,
+    )
+    assert psense_card is not None, rt._compare_status.object
+
+    rendered_names = {
+        section.objects[0].object.strip("*")
+        for section in psense_card.objects[0].objects
+        if isinstance(section, pn.Column)
+    }
+    assert rendered_names == {"Model A"}
