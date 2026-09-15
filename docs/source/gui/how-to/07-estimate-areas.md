@@ -37,7 +37,7 @@ you'll likely publish, so check {doc}`05-check-convergence` first.
    what's loaded on the Data tab.
 
    ```{figure} images/07-step3-new-areas-upload.png
-   :alt: Estimate for new/unsampled areas checkbox and CSV upload
+   :alt: "Estimate for new/unsampled areas" checkbox and CSV upload
    :width: 600px
 
    The **"Estimate for new/unsampled areas"** checkbox and its CSV upload.

@@ -14,17 +14,64 @@ Saved models don't need to have converged — see
 
 1. Open **Results → Model Comparison**. The table lists every model you've
    saved, by name.
+
+   ```{figure} images/06-step1-model-comparison-table.png
+   :alt: Model Comparison sub-tab with the table of saved models
+   :width: 600px
+
+   The **Model Comparison** sub-tab, with the table of saved models.
+   ```
+
 2. Check the box next to each model you want to compare. A single checked
    model shows its own LOO/ELPD and (if enabled) Bayes Factor; two or more
    also produce a side-by-side ranking.
+
+   ```{figure} images/06-step2-model-checkboxes.png
+   :alt: Checkboxes for selecting which saved models to compare
+   :width: 600px
+
+   The checkboxes for selecting which saved models to compare.
+   ```
+
 3. Optionally check **Include Bayes Factor (Savage-Dickey, per coefficient)**
    — this costs an extra sampling pass per model on top of LOO, so it's off
    by default.
+
+   ```{figure} images/06-step3-bayes-factor-checkbox.png
+   :alt: Include Bayes Factor (Savage-Dickey, per coefficient) checkbox
+   :width: 600px
+
+   The **Include Bayes Factor (Savage-Dickey, per coefficient)** checkbox.
+   ```
+
 4. Click **Compare Selected**.
+
+   ```{figure} images/06-step4-compare-selected-button.png
+   :alt: Compare Selected button
+   :width: 600px
+
+   The **Compare Selected** button.
+   ```
+
 5. Read the **Ranking (LOO / ELPD)** table, the ranking/posterior predictive/
    parameter plots, and the Bayes Factor tables if enabled.
+
+   ```{figure} images/06-step5-ranking-table-and-plots.png
+   :alt: Ranking (LOO / ELPD) table and comparison plots
+   :width: 600px
+
+   The **Ranking (LOO / ELPD)** table and the comparison plots.
+   ```
+
 6. To make one of the compared models the active one, pick it from the
    **Select a model to use** dropdown and click **Use Selected Model**.
+
+   ```{figure} images/06-step6-use-selected-model.png
+   :alt: Select a model to use dropdown and Use Selected Model button
+   :width: 600px
+
+   The **Select a model to use** dropdown and the **Use Selected Model** button.
+   ```
 
 ## Check it worked
 

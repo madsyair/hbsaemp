@@ -12,13 +12,52 @@ You need a fitted model — see {doc}`04-fit-model`. This page covers the
 ## Do it
 
 1. Open **Results → MCMC Convergence Evaluation**.
+
+   ```{figure} images/05-step1-open-convergence-subtab.png
+   :alt: MCMC Convergence Evaluation sub-tab
+   :width: 600px
+
+   The **MCMC Convergence Evaluation** sub-tab.
+   ```
+
 2. Click **Load Convergence Diagnostics**.
+
+   ```{figure} images/05-step2-load-diagnostics-button.png
+   :alt: Load Convergence Diagnostics button
+   :width: 600px
+
+   The **Load Convergence Diagnostics** button.
+   ```
+
 3. Open the **R-hat and ESS** accordion to see the per-parameter table.
+
+   ```{figure} images/05-step3-rhat-ess-accordion.png
+   :alt: R-hat and ESS accordion with the per-parameter table
+   :width: 600px
+
+   The **R-hat and ESS** accordion, open to show the per-parameter table.
+   ```
+
 4. Scroll down to the diagnostic plots (trace, density, autocorrelation,
    R-hat distribution, effective sample size, NUTS energy/BFMI) — only the
    ones the backend actually produced are shown.
+
+   ```{figure} images/05-step4-diagnostic-plots.png
+   :alt: Diagnostic plots such as trace, density, autocorrelation, R-hat distribution, ESS, and NUTS energy/BFMI
+   :width: 600px
+
+   The diagnostic plots section.
+   ```
+
 5. Optionally click **Download Plots (PDF)** to save all rendered plots as one
    file.
+
+   ```{figure} images/05-step5-download-plots-button.png
+   :alt: Download Plots (PDF) button
+   :width: 600px
+
+   The **Download Plots (PDF)** button.
+   ```
 
 ## Check it worked
 
