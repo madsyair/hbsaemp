@@ -319,6 +319,9 @@ class ResultsTab(param.Parameterized):
         self._compare_bf_cb = pn.widgets.Checkbox(
             name="Include Bayes Factor (Savage-Dickey, per coefficient)", value=False,
         )
+        self._compare_psense_cb = pn.widgets.Checkbox(
+            name="Include Prior Sensitivity (power-scaling, per parameter)", value=False,
+        )
         self._compare_run_btn = pn.widgets.Button(
             name="Compare Selected", button_type="primary", max_width=220,
         )
@@ -366,13 +369,14 @@ class ResultsTab(param.Parameterized):
 
         models = [saved[n].model for n in names]
         with_bf = self._compare_bf_cb.value
+        with_psense = self._compare_psense_cb.value
 
         self._compare_run_btn.loading = self._compare_run_btn.disabled = True
         self._compare_status.object = _info_box(f"Comparing {len(models)} model(s)…")
         try:
             loop = asyncio.get_running_loop()
             result: ComparisonResult = await loop.run_in_executor(
-                None, self._compare_blocking, models, with_bf
+                None, self._compare_blocking, models, with_bf, with_psense
             )
         except Exception as exc:
             logger.exception("ResultsTab model comparison failed")
@@ -385,20 +389,23 @@ class ResultsTab(param.Parameterized):
         self._render_comparison(result, names)
 
     @staticmethod
-    def _compare_blocking(models: list[Any], with_bf: bool = False) -> ComparisonResult:
+    def _compare_blocking(
+        models: list[Any], with_bf: bool = False, with_psense: bool = False,
+    ) -> ComparisonResult:
         """Synchronous, Panel-free — runs in the executor thread.
 
-        ``metrics=["loo", "bf"]`` is opt-in (checkbox default off) rather
-        than always-on. Not because it's unsafe now — the backend's
-        ``_bf_frame()`` correctly handles the ``xarray.Dataset`` shape
-        ``az.bayes_factor()`` returns since arviz-stats 1.2.0, which is
-        this project's pinned floor (``arviz>=1.2.0`` in pyproject.toml) —
-        but because it's an extra statistic most comparisons don't need,
-        and it costs another `prior_predictive_idata()` sampling pass per
-        model on top of LOO.
+        ``metrics=["loo", "bf"]`` and ``run_prior_sensitivity=True`` are
+        both opt-in (checkboxes default off) rather than always-on. Not
+        because either is unsafe — the backend's ``_bf_frame()`` correctly
+        handles the ``xarray.Dataset`` shape ``az.bayes_factor()`` returns
+        since arviz-stats 1.2.0, which is this project's pinned floor
+        (``arviz>=1.2.0`` in pyproject.toml) — but because they're extra
+        statistics most comparisons don't need, and each costs another
+        `prior_predictive_idata()`-adjacent sampling pass per model on
+        top of plain LOO.
         """
         metrics = ["loo", "bf"] if with_bf else None
-        return compare_models(models, metrics=metrics)
+        return compare_models(models, metrics=metrics, run_prior_sensitivity=with_psense)
 
     def _render_comparison(self, result: ComparisonResult, names: list[str]) -> None:
         content: list[Any] = []
@@ -468,6 +475,35 @@ class ResultsTab(param.Parameterized):
                         *bf_tables,
                     ),
                     title="Bayes Factor", margin=10,
+                ))
+
+        if result.prior_sensitivity:
+            psense_tables = []
+            for key, name in label_map.items():
+                psense_df = result.prior_sensitivity.get(key)
+                if psense_df is not None and not psense_df.empty:
+                    psense_tables.append(pn.Column(
+                        pn.pane.Markdown(f"**{name}**", margin=(4, 0, 2, 0)),
+                        pn.widgets.Tabulator(
+                            psense_df.reset_index().rename(columns={"index": "Parameter"}),
+                            show_index=False,
+                        ),
+                    ))
+            if psense_tables:
+                content.append(pn.Card(
+                    pn.Column(
+                        pn.pane.Markdown(
+                            "Power-scaling prior/likelihood sensitivity per parameter. Higher "
+                            "**prior** or **likelihood** values mean the posterior shifts more "
+                            "when that side is scaled up/down; **diagnosis** flags a parameter "
+                            "whose posterior is driven mainly by the prior rather than the data "
+                            "(e.g. \"potential strong prior / weak likelihood\") — worth a second "
+                            "look before trusting that parameter's estimate.",
+                            margin=(4, 0, 8, 0),
+                        ),
+                        *psense_tables,
+                    ),
+                    title="Prior Sensitivity", margin=10,
                 ))
 
         for err_pane in _plot_errors_section(result.plot_errors or {}, {
@@ -681,6 +717,7 @@ class ResultsTab(param.Parameterized):
                 ),
                 self._compare_table,
                 self._compare_bf_cb,
+                self._compare_psense_cb,
                 pn.Row(self._compare_run_btn),
                 self._compare_status,
                 self._compare_result_pane,
