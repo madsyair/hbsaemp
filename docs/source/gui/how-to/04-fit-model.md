@@ -16,7 +16,7 @@ spending the time to sample.
 
 ::::{tab-set}
 
-:::{tab-item} 1. Prior Predictive Check 
+:::{tab-item} 1. Prior Predictive Check (optional but free)
 On the **Prior Predictive Check** sub-tab:
 
 1. Adjust **n_draws** if you want more or fewer prior draws (default 50).
@@ -77,14 +77,14 @@ On the **Fit Model** sub-tab:
 3. Wait for "The MCMC sampling has completed."
 
    ```{figure} images/04-fit-completed-message.png
-   :alt: "The MCMC sampling has completed" success message
+   :alt: The MCMC sampling has completed success message
    :width: 600px
 
    The "The MCMC sampling has completed" message.
    ```
 :::
 
-:::{tab-item} 3. Save Model 
+:::{tab-item} 3. Save Model (optional)
 Still on **Fit Model**, once a fit completes:
 
 1. A **Model name** field is enabled, pre-filled with a default like
@@ -112,7 +112,7 @@ for why). You can fit again with different settings and save another named
 snapshot without losing this one.
 :::
 
-:::{tab-item} 4. Posterior Predictive Check 
+:::{tab-item} 4. Posterior Predictive Check (optional)
 On the **Posterior Predictive Check** sub-tab, available once a model is
 fitted:
 

@@ -12,16 +12,63 @@ you'll likely publish, so check {doc}`05-check-convergence` first.
 ## Do it
 
 1. Open **Results → SAE Estimation**.
+
+   ```{figure} images/07-step1-sae-estimation-subtab.png
+   :alt: SAE Estimation sub-tab
+   :width: 600px
+
+   The **SAE Estimation** sub-tab.
+   ```
+
 2. Adjust the **Credible interval (ci_prob)** if you don't want the default
    0.95.
+
+   ```{figure} images/07-step2-ci-prob-field.png
+   :alt: Credible interval (ci_prob) field
+   :width: 600px
+
+   The **Credible interval (ci_prob)** field.
+   ```
+
 3. **Optional — estimate for new/unsampled areas.** Check
    "Estimate for new/unsampled areas" and upload a CSV of predictors (plus an
    area column) for areas with no survey data — no response column needed.
    This replaces the training data for this run only; it does not change
    what's loaded on the Data tab.
+
+   ```{figure} images/07-step3-new-areas-upload.png
+   :alt: Estimate for new/unsampled areas checkbox and CSV upload
+   :width: 600px
+
+   The **"Estimate for new/unsampled areas"** checkbox and its CSV upload.
+   ```
+
 4. Click **Run SAE Estimation**.
+
+   ```{figure} images/07-step4-run-sae-button.png
+   :alt: Run SAE Estimation button
+   :width: 600px
+
+   The **Run SAE Estimation** button.
+   ```
+
 5. Review the results table and any notes below the status message.
+
+   ```{figure} images/07-step5-results-table-and-notes.png
+   :alt: SAE results table and notes below the status message
+   :width: 600px
+
+   The results table and the notes below the status message.
+   ```
+
 6. Click **Download CSV of SAE Results** to save the table.
+
+   ```{figure} images/07-step6-download-csv-button.png
+   :alt: Download CSV of SAE Results button
+   :width: 600px
+
+   The **Download CSV of SAE Results** button.
+   ```
 
 ## Check it worked
 

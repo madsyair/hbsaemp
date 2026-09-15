@@ -15,22 +15,70 @@ current model.
 
 1. Open **Results → Update Model**. The **Current Fitted Model** card
    summarizes what's active now.
+
+   ```{figure} images/08-step1-current-fitted-model-card.png
+   :alt: Update Model sub-tab with the Current Fitted Model card
+   :width: 600px
+
+   The **Update Model** sub-tab, with the **Current Fitted Model** card.
+   ```
+
 2. **Optional — override sampler settings.** Check **Override draws**,
    **Override tune**, **Override chains**, **Override cores**, **Override
    target_accept**, **Override max_treedepth**, or **Override random_seed**
    individually — each checkbox enables its own input field. Anything left
    unchecked keeps the current model's value.
+
+   ```{figure} images/08-step2-sampler-override-checkboxes.png
+   :alt: Sampler override checkboxes and their input fields
+   :width: 600px
+
+   The sampler override checkboxes and their input fields.
+   ```
+
 3. **Optional — update the formula.** In **Formula Update**, type a template
    like `. ~ . + x3 - x1` to add `x3` and remove `x1` while keeping everything
    else the same. A live preview shows the resulting formula string; whether
    the new column actually exists in the data is only checked when you click
    **Update Model**, not here.
+
+   ```{figure} images/08-step3-formula-update-field.png
+   :alt: Formula Update field with live preview
+   :width: 600px
+
+   The **Formula Update** field, with its live preview.
+   ```
+
 4. **Optional — refit on different data.** Check "Refit on different data"
    and either upload a replacement CSV or pick a built-in dataset. Formula,
    family, link, and group stay the same unless you also changed the formula
    above.
+
+   ```{figure} images/08-step4-refit-different-data.png
+   :alt: Refit on different data checkbox with CSV upload and built-in dataset picker
+   :width: 600px
+
+   The **"Refit on different data"** checkbox, with its CSV upload and
+   built-in dataset picker.
+   ```
+
 5. Click **Update Model**.
+
+   ```{figure} images/08-step5-update-model-button.png
+   :alt: Update Model button
+   :width: 600px
+
+   The **Update Model** button.
+   ```
+
 6. Watch the progress bar and elapsed-time counter while the refit runs.
+
+   ```{figure} images/08-step6-update-progress-bar.png
+   :alt: Progress bar and elapsed-time counter during the refit
+   :width: 600px
+
+   The progress bar and elapsed-time counter while the refit runs.
+   ```
 
 ## Check it worked
 
