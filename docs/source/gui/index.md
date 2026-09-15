@@ -3,11 +3,6 @@
 Work through the analysis by clicking. This track is self-contained: no Python is needed
 beyond the one command that starts the app.
 
-```{admonition} Not written yet
-:class: stub
-This page is part of the documentation structure. Its content lands in v0.3.
-```
-
 ::::{grid} 1 1 2 2
 :gutter: 3
 
