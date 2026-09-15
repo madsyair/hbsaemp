@@ -235,6 +235,18 @@ def _describe_error(exc: Exception) -> tuple[str, str]:
 
 
 class PredictorCheckboxes(param.Parameterized):
+    """A checkbox-per-column widget for picking auxiliary/predictor variables.
+
+    Setting :attr:`options` rebuilds the checkboxes (e.g. when a new
+    dataset is loaded), and :attr:`value` always reflects exactly the
+    columns whose checkbox is currently ticked, kept in sync in both
+    directions.
+
+    Attributes:
+        value: The currently selected column names.
+        options: The full list of column names to offer as checkboxes.
+    """
+
     value   = param.List(default=[])
     options = param.List(default=[])
 
@@ -275,6 +287,12 @@ class PredictorCheckboxes(param.Parameterized):
             self._syncing = False
 
     def panel(self) -> pn.FlexBox:
+        """Return the checkbox row as a Panel layout.
+
+        Returns:
+            A ``panel.FlexBox`` containing one checkbox per entry in
+            :attr:`options`.
+        """
         return self._box
 
 
@@ -289,6 +307,10 @@ class ModelTab(param.Parameterized):
             :class:`~hbsaemp.models._base.BaseModel` — after
             :meth:`~hbsaemp.models._base.BaseModel.fit` succeeds, for
             :class:`~hbsaemp.app.tabs.results_tab.ResultsTab` to consume.
+            Also writes ``state.saved_models`` — a name to
+            :class:`~hbsaemp.app._app.SavedModel` mapping — each time the
+            **Save Model** button is used to freeze the currently-fitted
+            model for later comparison.
     """
 
     state: AppState = param.Parameter()
@@ -337,7 +359,7 @@ class ModelTab(param.Parameterized):
         self._refresh_pin_widgets(default_family)
         self._family_sel.param.watch(self._on_family_change, "value")
 
-        # --- Sampler configuration -------------------------------------
+        # Sampler configuration
         self._draws_in = pn.widgets.IntInput(name="draws", value=1000, start=1, max_width=140)
         self._tune_in  = pn.widgets.IntInput(name="tune",  value=1000, start=0, max_width=140)
         self._chains_in = pn.widgets.IntInput(name="chains", value=4, start=1, max_width=140)
@@ -351,7 +373,7 @@ class ModelTab(param.Parameterized):
             lambda e: setattr(self._seed_in, "disabled", not e.new), "value"
         )
 
-        # --- Formula preview ------------------------------------------------
+        # Formula preview
         self._formula_preview = pn.pane.HTML(_pending_box("select a response and at least one predictor."))
         for w in [self._response_sel, self._predictors_sel, self._group_sel,
                   self._family_sel, self._link_sel, self._intercept_cb,
@@ -359,7 +381,7 @@ class ModelTab(param.Parameterized):
                   self._target_accept_in, self._seed_cb, self._seed_in]:
             w.param.watch(self._update_preview, "value")
 
-        # --- Code export (save/preview equivalent hbsaemp CLI code) --------
+        # Code export (save/preview equivalent hbsaemp CLI code)
         self._code_view = pn.widgets.CodeEditor(
             value="", language="python", theme="monokai", readonly=True,
             height=320, sizing_mode="stretch_width",
@@ -373,12 +395,12 @@ class ModelTab(param.Parameterized):
             max_width=220,
         )
 
-        # --- Build Model -----------------------------------------------------
+        # Build Model
         self._build_btn = pn.widgets.Button(name="Build Model", button_type="primary", max_width=220)
         self._build_status = pn.pane.HTML("")
         self._build_btn.on_click(self._on_build)
 
-        # --- Prior Predictive Check -------------------------------------------
+        # Prior Predictive Check
         self._prior_run_btn = pn.widgets.Button(
             name="Run Prior Predictive Check", button_type="primary", max_width=260,
         )
@@ -388,7 +410,7 @@ class ModelTab(param.Parameterized):
         self._prior_plot_pane = pn.pane.Matplotlib(sizing_mode="stretch_width", tight=True, max_width=900)
         self._prior_run_btn.on_click(self._on_prior_check)
 
-        # --- Fit Model ---------------------------------------------------------
+        # Fit Model
         self._fit_btn = pn.widgets.Button(name="Fit Model", button_type="primary", max_width=220)
         self._fit_status = pn.pane.HTML("")
         self._fit_progress = pn.indicators.Progress(
@@ -396,7 +418,7 @@ class ModelTab(param.Parameterized):
         )
         self._fit_btn.on_click(self._on_fit_model)
 
-        # --- Save Model (for the Results tab's Model Comparison) -----------------
+        # Save Model (for the Results tab's Model Comparison)
         self._save_name_in = pn.widgets.TextInput(
             name="Model name", placeholder="e.g. Model 1", disabled=True, max_width=220,
         )
@@ -976,6 +998,14 @@ class ModelTab(param.Parameterized):
             self._postpc_status.object = _success_box("Posterior predictive check complete.")
 
     def panel(self) -> pn.Tabs:
+        """Return the Panel layout for this tab.
+
+        Returns:
+            A ``panel.Tabs`` with five sub-tabs: Overview, Model Building,
+            Prior Predictive Check, Fit Model (which also holds the
+            **Save Model** control for later comparison), and Posterior
+            Predictive Check.
+        """
         overview = pn.pane.Markdown("""
                                     This section allows you to specify the variables and model settings used for hierarchical Bayesian modeling.
                                     - **Response Variable:** The outcome variable being modeled.
@@ -1092,6 +1122,13 @@ class ModelTab(param.Parameterized):
         )
 
     def get_fitted_model(self) -> BaseModel | None:
+        """Return the fitted model, if one exists.
+
+        Returns:
+            ``state.model`` if it is set and
+            :attr:`~hbsaemp.models._base.BaseModel.is_fitted` is ``True``,
+            otherwise ``None``.
+        """
         model = getattr(self.state, "model", None)
         return model if (model is not None and model.is_fitted) else None
 

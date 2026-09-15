@@ -638,7 +638,18 @@ class ResultsTab(param.Parameterized):
     # Layout
 
     def panel(self) -> pn.Tabs:
-        """Return the Panel layout for this tab."""
+        """Return the Panel layout for this tab.
+
+        Returns:
+            A ``panel.Tabs`` with four sub-tabs: Convergence Evaluation
+            (R-hat/ESS table and diagnostic plots, shown as-is — the GUI
+            does not gate on them), Model Comparison (compare one or more
+            :class:`~hbsaemp.app._app.SavedModel` snapshots via
+            ``compare_models()``), Update Model (an embedded
+            :class:`~hbsaemp.app.tabs.update_tab.UpdateModelTab`), and
+            SAE Estimation (small-area estimates, including out-of-sample
+            areas, with CSV download).
+        """
         convergenceevaluation_card = pn.Card(
             pn.Column(
                 self._conv_run_btn,

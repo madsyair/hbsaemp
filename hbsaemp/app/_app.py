@@ -128,7 +128,8 @@ class App:
         return self._state
 
     def view(self) -> pn.template.FastListTemplate:
-        """Assemble and return the Panel dashboard object 
+        """Assemble and return the Panel dashboard object.
+
         Returns:
             A ``panel.template.FastListTemplate`` instance.
         """
