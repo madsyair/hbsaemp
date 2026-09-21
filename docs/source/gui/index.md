@@ -31,14 +31,6 @@ Context and reasoning. Answers why.
 :::
 ::::
 
-% STRUCTURE — do not delete, fill in and remove these comments when writing.
-% ## Install         perintah pemasangan ekstra [gui]
-% ## Start the app   satu perintah, dan apa yang muncul setelahnya
-% ## The tabs        satu kalimat per tab, sesuai urutan pemakaian
-%
-% RULE    jalur ini mandiri; jangan menyuruh pembaca menulis Python
-% OWNER   antarmuka grafis dikerjakan tim frontend; sinkronkan isi dengan mereka
-
 ```{toctree}
 :maxdepth: 2
 :hidden:
