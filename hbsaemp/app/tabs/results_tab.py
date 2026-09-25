@@ -421,7 +421,26 @@ class ResultsTab(param.Parameterized):
             table_df = result.comparison_table.reset_index().rename(columns={"index": "Model"})
             table_df["Model"] = table_df["Model"].replace(label_map)
             table = pn.widgets.Tabulator(table_df, show_index=False)
-            content.append(pn.Card(table, title="Ranking (LOO / ELPD)", margin=10))
+            content.append(pn.Card(
+                pn.Column(
+                    pn.pane.Markdown(
+                        "**LOO** estimates out-of-sample predictive accuracy by "
+                        "systematically leaving out one observation at a time, "
+                        "then computing the log-predictive density for the "
+                        "omitted point. It is computed efficiently using "
+                        "Pareto-smoothed importance sampling (PSIS). An "
+                        "important diagnostic in LOO is the **Pareto k "
+                        "diagnostic**, which measures the reliability of the "
+                        "importance sampling approximation. Values of "
+                        "**k > 0.7** indicate that the approximation may be "
+                        "unstable for certain observations — treat the ranking "
+                        "with caution when this appears.",
+                        margin=(4, 0, 8, 0),
+                    ),
+                    table,
+                ),
+                title="Ranking (LOO / ELPD)", margin=10,
+            ))
 
             # A Pareto-k warning belongs in front of the ranking it qualifies.
             summary_text = result.summary()
