@@ -38,7 +38,7 @@ jobs:
 
       # uv installs the same packages as pip, several times faster, and caches
       # the downloaded wheels between runs.
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
 
       # PyTensor compiles C extensions on first use and caches them here.
       # Without this the cost is paid again on every single run.
@@ -106,7 +106,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
       # The sampling blocks compile models too; same cache as `build`.
       - name: Cache PyTensor compiledir
         uses: actions/cache@v5
@@ -129,7 +129,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.2.0
       - name: Install package and documentation toolchain
         run: uv pip install --system -e ".[bambi]" -r docs/requirements-docs.txt
       - name: Check external links
