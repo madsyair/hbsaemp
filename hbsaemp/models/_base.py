@@ -89,32 +89,23 @@ class ModelResult:
 # BaseModel
 
 class BaseModel(abc.ABC):
-    """Abstract base for all HBSAE distribution models.
+    """Base class of every model the three interfaces return.
 
-    Subclasses inherit the concrete `fit()` / `predict()` and override only
-    family-specific *behavior* hooks, each documented on its own method.
-    There is **no required override**: a family whose only departure from
-    plain regression is pinning distributional parameters declares that in
-    `FAMILY_SPECS[...].fixed_params` and needs no subclass code at all. All
-    family metadata (mean parameter, links, pipeline fields, backend family,
-    which parameters are pinned) is read from `FAMILY_SPECS[self._family]`
-    via `self._spec` — subclasses never re-declare it.
-
-    Since no override is required, no `@abc.abstractmethod` remains and the
-    `ABC` base no longer blocks construction. It is kept as a statement of
-    intent — models are built through `create_model()`, which is what picks
-    the subclass and validates the family arguments — not as an enforcement.
+    Build models with `create_model()`, `hbm_flex()` or an `hbm_<family>()`
+    shortcut, not by instantiating this class. `fit()` and `predict()` are
+    shared by all families; family metadata (mean parameter, links, pipeline
+    fields, pinned parameters) comes from the family registry, see
+    `get_family_spec()`.
 
     Args:
         formula: R/lme4-style formula, e.g. `"y ~ x1 + (1|group)"`.
-        family: User-facing family label.
+        family: Family name.
         data: Input DataFrame.
         config: MCMC configuration.
-        priors: Optional prior dict; `None` means Bambi auto-priors.
+        priors: Optional prior dict; `None` means Bambi's default priors.
         group: Grouping column for random effects.
-        handle_missing: Missing data strategy (`"deleted"` only in v1).
-        link: Link for the mean parameter. `None` takes the family default
-            from `FAMILY_SPECS[family].default_link`.
+        handle_missing: Missing-data strategy; only `"deleted"`.
+        link: Link for the mean parameter. `None` uses the family default.
         fixed_params: `{parameter: column name or scalar}` pinning a
             distributional parameter to known values instead of sampling it.
     """
@@ -676,31 +667,27 @@ class BaseModel(abc.ABC):
 
     @property
     def response_name(self) -> str:
-        """Response column parsed from the formula — available before `fit()`.
-
-        Lets callers label plots and tables without re-parsing the formula or
-        waiting for `ModelResult.extra["response"]`.
-        """
+        """Response column, parsed from the formula; available before `fit()`."""
         from hbsaemp.utils._formula import parse_formula
 
         return str(parse_formula(self._formula)["response"])
 
     def check_data(self) -> pd.DataFrame:
-        """Run the pre-flight checks and data pipeline without importing bambi.
+        """Run the checks and data pipeline of `fit()` without sampling.
 
-        Same work `fit()` does before it touches Bambi: family pre-flight
-        checks, then parse -> validate -> preprocess. Callers get the frame
-        `fit()` would actually use, so missing-row counts and family-domain
-        violations surface *before* paying for MCMC.
+        Parses the formula, validates and preprocesses the data, and returns
+        the frame `fit()` would use, so data problems show before any MCMC.
+        Does not import bambi.
 
         Returns:
-            The preprocessed copy of the training data (offset columns added,
-            rows with missing values dropped per `handle_missing`).
+            The preprocessed copy of the training data, with offset columns
+            added and rows with missing values dropped.
 
         Raises:
-            DataValidationError: If the data fails validator checks.
-            ValueError: From `_pre_fit_checks` (unsupported link, missing
-                `trials`, invalid `squeeze`, ...).
+            DataValidationError: If the data fails validation.
+            ValueError: If the family arguments are invalid, such as an
+                unsupported link, a missing `trials` column or an invalid
+                `squeeze`.
         """
         self._pre_fit_checks()
         _, _, _, _, df_clean = self._run_pipeline(self._data)
@@ -801,21 +788,16 @@ class BaseModel(abc.ABC):
         var_names: list[str] | None = None,
         random_seed: int | None = None,
     ) -> Any:
-        """Sample the prior predictive distribution — no MCMC, no fitting.
+        """Sample the prior predictive distribution without fitting.
 
-        Runs the full build pipeline (validate -> preprocess -> offset columns
-        -> workaround priors -> user priors -> bambi) and then samples from the
-        prior only. The model stays unfitted: `self._result` is not written and
-        `is_fitted` stays `False`.
-
-        Counterpart of `predictive_idata()` on the posterior side — both return
-        a fresh `InferenceData` and mutate nothing.
+        Builds the model (validation, preprocessing, priors) and samples from
+        the priors only. The model stays unfitted: `is_fitted` stays `False`.
+        The prior-side counterpart of `predictive_idata()`.
 
         Args:
-            draws: Number of prior draws. Default 500 (Bambi's own default).
-            var_names: Restrict the sampled variables; `None` samples all.
-            random_seed: Seed for reproducibility. Falls back to
-                `config.random_seed` when `None`.
+            draws: Number of prior draws. Default 500, as in Bambi.
+            var_names: Variables to sample; `None` samples all.
+            random_seed: Seed. `None` uses `config.random_seed`.
 
         Returns:
             `arviz.InferenceData` with `prior`, `prior_predictive` and
@@ -823,7 +805,7 @@ class BaseModel(abc.ABC):
 
         Raises:
             ImportError: If `bambi` is not installed.
-            DataValidationError: If the data fails validator checks.
+            DataValidationError: If the data fails validation.
         """
         # Cheap family checks first, so bambi's ImportError never masks a bad
         # link or a missing `trials` column. `_build_backend` repeats them.
@@ -844,19 +826,15 @@ class BaseModel(abc.ABC):
     # Concrete fit() and predict()
 
     def fit(self) -> ModelResult:
-        """Fit the model via Bambi MCMC and return a `ModelResult`.
+        """Sample the posterior with Bambi's MCMC and return a `ModelResult`.
 
-        Pipeline (shared across all families): `_build_backend()` — pre_fit
-        checks, parse + validate + preprocess, formula+link, prior merge,
-        `bmb.Model` — then sampling.
-
-        Log-likelihood is computed post-sampling via
-        `bmodel.compute_log_likelihood(idata)` (PyMC 6.0 / Bambi 0.18 pattern) —
-        required for LOO downstream.
+        Checks and preprocesses the data, builds the Bambi model, samples,
+        and then computes the pointwise log-likelihood that LOO needs. The
+        result is also stored as `result`.
 
         Raises:
             ImportError: If `bambi` is not installed.
-            DataValidationError: If the data fails validator checks.
+            DataValidationError: If the data fails validation.
         """
         # 1. Family-specific pre-flight checks, BEFORE the bambi import, so a bad
         # link or a missing `trials` column reports its own error even when
@@ -976,19 +954,17 @@ class BaseModel(abc.ABC):
                 - `"response"` (default): posterior predictive Y_rep, from
                   `idata.posterior_predictive[response]`.
                 - `"response_params"`: posterior of the mean parameter
-                  (`mu` or `p`), from `idata.posterior[self._mean_param_key]`.
-                - `"pps"` / `"mean"`: deprecated aliases (FutureWarning).
-                - `"linear"`: removed in Bambi 0.18+ -> ValueError.
+                  (`mu` or `p`).
+                - `"pps"` / `"mean"`: deprecated aliases (`FutureWarning`).
+                - `"linear"`: removed in Bambi 0.18; raises `ValueError`.
             sample_new_groups: Allow rows whose group label was not seen
                 during fitting. Each posterior draw for such a row takes the
                 group effect of a randomly chosen fitted group (brms
                 `sample_new_levels="uncertainty"`), seeded by
                 `config.random_seed`. `False` raises on unseen groups.
-            n_samples: Number of posterior draws to return; `None` = all.
-                Draws are thinned at even spacing so every chain stays
-                represented — not taken as a leading slice, which would
-                return a single chain and discard the cross-chain check
-                that running several of them buys.
+            n_samples: Number of posterior draws to return; `None` returns
+                all. Draws are thinned at even spacing, so every chain is
+                represented.
 
         Raises:
             ModelNotFittedError: If `fit()` has not been called.
@@ -1041,14 +1017,12 @@ class BaseModel(abc.ABC):
         return flat
 
     def predictive_idata(self, new_data: pd.DataFrame | None = None) -> Any:
-        """Return a fresh idata with ``posterior_predictive`` populated.
+        """Return a new idata with the ``posterior_predictive`` group.
 
-        Does NOT mutate ``result.idata``. Public entry point for
-        posterior-predictive work: used internally by ``compare_models()`` for
-        its pp-check plot, and available to advanced users who want a custom PPC
-        without corrupting the stored idata. Wraps the private ``_predict_idata``
-        (``inplace=False``). On ArviZ 1.1 the returned object is a DataTree —
-        access groups as attributes (``idata.posterior_predictive``).
+        ``result.idata`` is not modified. ``compare_models()`` uses this for
+        its posterior predictive check; call it for a custom check. The
+        returned object is a DataTree: read groups as attributes, such as
+        ``idata.posterior_predictive``.
 
         Args:
             new_data: Out-of-sample data. ``None`` uses the training data.

@@ -1,16 +1,15 @@
 Datasets
 ========
 
-The bundled datasets, and the data-layer classes that validate and transform a
-frame before a model sees it.
+The bundled datasets, and the classes that validate and transform a frame
+before a model uses it.
 
-There are two kinds, both with one row per small area. The **synthetic**
-datasets in :data:`AVAILABLE_DATASETS` have 30 areas and are generated from a
-fixed seed (42): loading the same name twice gives the same numbers on any
-machine. The **real** datasets in :data:`REAL_DATASETS` cover the 42 districts
-and cities of Papua Island and are read from CSV files shipped with the package,
-exactly as published — defects included, so that preparing them is part of the
-case-study tutorial rather than hidden from it.
+Every dataset has one row per small area. The **synthetic** datasets in
+:data:`AVAILABLE_DATASETS` have 30 areas and are generated from a fixed seed
+(42), so they are identical on every machine. The **real** datasets in
+:data:`REAL_DATASETS` cover the 42 districts and cities of Papua Island. They
+are read from CSV files shipped with the package, exactly as published, defects
+included; the case-study tutorial prepares them.
 
 .. currentmodule:: hbsaemp
 
@@ -45,25 +44,24 @@ Module constants
    :type: list[str]
 
    Names of the real datasets: ``["susenas2023_papua", "podes2021_papua"]``.
-   :func:`load_dataset` accepts them too. They are kept out of
-   :data:`AVAILABLE_DATASETS` because, as shipped, they need preparing before a
-   model can use them. Any name in neither list raises :class:`ValueError`.
+   :func:`load_dataset` accepts them too. They are not in
+   :data:`AVAILABLE_DATASETS` because they need preparing before a model can
+   use them. Any name in neither list raises :class:`ValueError`.
 
 Two columns every synthetic dataset shares
 ------------------------------------------
 
-``group`` and ``sre`` are both the area identifier, numbered 1 to 30, and they
-hold **identical values** in all four synthetic datasets. Pass either one as ``group=``.
-The second name exists to mirror the R ``hbsaems`` package, where ``sre``
-labels the spatial random effect.
+``group`` and ``sre`` are both the area identifier, numbered 1 to 30, with
+**identical values** in all four synthetic datasets. Pass either one as
+``group=``. ``sre`` mirrors the R ``hbsaems`` package, where it labels the
+spatial random effect.
 
 .. warning::
 
    Columns whose name ends in ``_true``, plus ``theta``, ``u`` and
    ``mu_orig_true``, are the **values used to generate the data**. Real survey
-   data has no such columns. They are shipped so you can check an estimate
-   against the truth — never use them as auxiliary variables, or the model will
-   look excellent and mean nothing.
+   data has no such columns. Use them to check an estimate against the truth,
+   never as auxiliary variables.
 
 data_fhnorm
 -----------
@@ -100,11 +98,11 @@ Use with ``family="gaussian"`` and ``sampling_var="D"``.
      - [-1.95, 2.14]
    * - ``theta_true``
      - float64
-     - True area mean — generated only
+     - True area mean (generated only)
      - [3.33, 6.32]
    * - ``u``
      - float64
-     - True area random effect — generated only
+     - True area random effect (generated only)
      - [-0.864, 0.801]
    * - ``group``, ``sre``
      - int64
@@ -125,8 +123,8 @@ Beta logit-normal model for a proportion. Shape ``(30, 9)``.
    \phi_i = n_i / \text{deff}_i - 1
 
 Use with ``family="beta"``, ``n="n"`` and ``deff="deff"``. The precision
-:math:`\phi_i` is derived from the survey design rather than estimated, which
-is why ``n`` and ``deff`` must be supplied together or not at all.
+:math:`\phi_i` is derived from the survey design, not estimated, so ``n`` and
+``deff`` are supplied together or not at all.
 
 .. list-table::
    :header-rows: 1
@@ -142,7 +140,7 @@ is why ``n`` and ``deff`` must be supplied together or not at all.
      - [0.139, 0.617]
    * - ``theta``
      - float64
-     - True mean :math:`\mu_i` — generated only
+     - True mean :math:`\mu_i` (generated only)
      - [0.145, 0.625]
    * - ``x1``, ``x2``, ``x3``
      - float64
@@ -201,7 +199,7 @@ Use with ``family="binomial"`` and ``trials="n"``.
      - [-1.95, 2.14]
    * - ``u_true``, ``eta_true``, ``p_true``
      - float64
-     - True effect, linear predictor and probability — generated only
+     - True effect, linear predictor and probability (generated only)
      - [-0.864, 0.801] / [-1.95, 0.670] / [0.125, 0.662]
    * - ``psi_i``
      - float64
@@ -218,9 +216,8 @@ Use with ``family="binomial"`` and ``trials="n"``.
 
 .. note::
 
-   ``y_obs`` and ``p_obs`` duplicate ``y`` and ``p``. Model the integer ``y``
-   with ``trials="n"``; the float copies exist to mirror the R package's column
-   names.
+   ``y_obs`` and ``p_obs`` duplicate ``y`` and ``p`` to mirror the R package.
+   Model the integer ``y`` with ``trials="n"``.
 
 data_lnln
 ---------
@@ -230,13 +227,10 @@ Lognormal-lognormal model. Shape ``(30, 13)``.
 .. warning::
 
    **This dataset loads, but no family in this version can model it.**
-   ``load_dataset("data_lnln")`` returns a frame like any other, yet
    ``create_model(..., family="lognormal")`` raises
-   :class:`ModelRegistryError` — *"family='lognormal' is planned for V2 and is
-   not available in V1"* — and :class:`DataValidator` rejects the family
-   outright. It is documented here only because the name is visible in
-   :data:`AVAILABLE_DATASETS`, so finding it and getting no explanation would
-   be worse.
+   :class:`ModelRegistryError` (*"family='lognormal' is planned for V2 and is
+   not available in V1"*), and :class:`DataValidator` rejects the family. It is
+   listed here because its name is in :data:`AVAILABLE_DATASETS`.
 
 .. math::
 
@@ -278,7 +272,7 @@ Lognormal-lognormal model. Shape ``(30, 13)``.
      - [-1.95, 2.14]
    * - ``u_true``, ``theta_true``, ``mu_orig_true``
      - float64
-     - True effect, log-scale mean and original-scale mean — generated only
+     - True effect, log-scale mean and original-scale mean (generated only)
      - [-0.691, 0.641] / [0.688, 2.99] / [2.16, 21.4]
    * - ``group``, ``sre``
      - int64
@@ -350,8 +344,8 @@ podes2021_papua
 ~~~~~~~~~~~~~~~
 
 Auxiliary variables from the 2021 Village Potential Data Collection (Podes
-2021, BPS), aggregated from the village records — *desa* and *kelurahan* — of
-each district. Shape ``(42, 18)``.
+2021, BPS), aggregated per district from the records of all villages, *desa*
+and *kelurahan*. Shape ``(42, 18)``.
 
 .. list-table::
    :header-rows: 1

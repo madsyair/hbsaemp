@@ -129,13 +129,12 @@ class ConvergenceResult:
         plots: Dict of ``matplotlib.Figure`` keyed by plot-type name.
             Keys from ``["trace", "dens", "acf", "rhat", "neff", "energy"]``
             plus ``"pair"`` when requested.
-        plot_errors: Dict keyed by plot-type name → error message, for plots
-            that failed to render (surfaced rather than silently swallowed).
+        plot_errors: Error message per plot type that failed to render.
         diagnose: Detailed results of ``arviz.diagnose`` keyed
             ``"divergent"``, ``"treedepth"``, ``"bfmi"``, ``"ess"`` and
             ``"rhat"``. The first three are absent when the sampler did not
             record the underlying statistic.
-        ess_threshold: Bulk / tail ESS floor applied — ``100 × n_chains``.
+        ess_threshold: Bulk and tail ESS floor applied, ``100 × n_chains``.
     """
 
     rhat_ess: Any = None
@@ -217,36 +216,35 @@ def check_convergence(
 
     Python equivalent of ``hbcc()`` in R hbsaems.
 
-    Applies the ArviZ convergence checks (``arviz.summary`` and
-    ``arviz.diagnose``); each failing check emits a
-    :class:`~hbsaemp._exceptions.ConvergenceWarning`:
+    Applies the ArviZ checks (``arviz.summary`` and ``arviz.diagnose``).
+    Each failing check emits a :class:`~hbsaemp.ConvergenceWarning`:
 
-    * ``"rhat"`` — rank-normalised split :math:`\hat{R}` (maximum of the bulk
-      and folded variants) above 1.01 for any parameter.
-    * ``"ess"`` — bulk or tail effective sample size below
+    * ``"rhat"``: rank-normalised split :math:`\hat{R}` (the larger of the
+      bulk and folded variants) above 1.01 for any parameter.
+    * ``"ess"``: bulk or tail effective sample size below
       :math:`100 \times` the number of chains.
-    * ``"divergences"`` — any divergent NUTS transition.
-    * ``"treedepth"`` — any transition that hit the maximum tree depth.
-    * ``"bfmi"`` — E-BFMI below 0.3 in any chain.
+    * ``"divergences"``: any divergent NUTS transition.
+    * ``"treedepth"``: any transition that hit the maximum tree depth.
+    * ``"bfmi"``: E-BFMI below 0.3 in any chain.
 
-    Generates diagnostic plots (each stored as a ``matplotlib.Figure``):
+    Plots, each a ``matplotlib.Figure``:
 
-    * ``"trace"``  — trace plots
-    * ``"dens"``   — marginal posterior densities (``plot_dist``)
-    * ``"acf"``    — autocorrelation plots
-    * ``"rhat"``   — distribution of R-hat values across scalar and
-      group-level parameters (``plot_convergence_dist``)
-    * ``"neff"``   — effective sample size plot
-    * ``"energy"`` — NUTS energy / BFMI diagnostic
-    * ``"pair"``   — pairwise posterior scatter with divergent draws
-      highlighted; opt-in (not in the default set) because it is slow
+    * ``"trace"``: trace plots.
+    * ``"dens"``: marginal posterior densities (``plot_dist``).
+    * ``"acf"``: autocorrelation plots.
+    * ``"rhat"``: distribution of R-hat over the scalar and group-level
+      parameters (``plot_convergence_dist``).
+    * ``"neff"``: effective sample size.
+    * ``"energy"``: NUTS energy and BFMI.
+    * ``"pair"``: pairwise posterior scatter with divergent draws
+      highlighted. Slow, so not drawn by default.
 
     Args:
-        model: A fitted :class:`~hbsaemp.models._base.BaseModel`.
-        diag_tests: Checks allowed to emit warnings.  Default: all five listed
-            above.  Every check is still computed and stored.
-        plot_types: Plots to generate.  Default: all except ``"pair"``.
-            Pass ``[]`` to skip plotting.
+        model: A fitted :class:`~hbsaemp.BaseModel`.
+        diag_tests: Checks allowed to emit warnings. Default: all five above.
+            Every check is computed and stored either way.
+        plot_types: Plots to draw. Default: all except ``"pair"``. Pass
+            ``[]`` to draw none.
 
     Returns:
         :class:`ConvergenceResult` with the ``rhat_ess`` table, the

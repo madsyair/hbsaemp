@@ -1,0 +1,144 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:11
+msgid "8 · Check prior sensitivity"
+msgstr "8 · Memeriksa sensitivitas prior"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:13
+msgid "Measure how much each posterior depends on its prior."
+msgstr "Ukur seberapa besar setiap posterior bergantung pada prior-nya."
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:15
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:17
+#, python-brace-format
+msgid "You need the model chosen in {doc}`07-check-fit-and-compare`:"
+msgstr "Anda membutuhkan model yang dipilih di {doc}`07-check-fit-and-compare`:"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:30
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:40
+msgid "The check scales the prior and the likelihood by a small power and measures how much each posterior changes. It is the method of R's priorsense package. Without `sensitivity_vars=`, it covers every scalar and group-level parameter."
+msgstr "Pemeriksaan ini memangkatkan prior dan likelihood dengan pangkat kecil, lalu mengukur seberapa besar setiap posterior berubah. Ini adalah metode paket priorsense di R. Tanpa `sensitivity_vars=`, pemeriksaan mencakup setiap parameter skalar dan tingkat grup."
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:44
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "Column"
+msgstr "Kolom"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "Meaning"
+msgstr "Arti"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "`prior`"
+msgstr "`prior`"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "Sensitivity to scaling the prior"
+msgstr "Sensitivitas terhadap penskalaan prior"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "`likelihood`"
+msgstr "`likelihood`"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "Sensitivity to scaling the likelihood"
+msgstr "Sensitivitas terhadap penskalaan likelihood"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "`diagnosis`"
+msgstr "`diagnosis`"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "The verdict for the parameter"
+msgstr "Kesimpulan untuk parameter tersebut"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:52
+msgid "A value above 0.05 counts as sensitive. The `diagnosis` column flags two cases:"
+msgstr "Nilai di atas 0.05 dianggap sensitif. Kolom `diagnosis` menandai dua kasus:"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "Diagnosis"
+msgstr "Diagnosis"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "What to do"
+msgstr "Yang perlu dilakukan"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "potential prior-data conflict"
+msgstr "potential prior-data conflict"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "Prior and likelihood are both sensitive: they disagree"
+msgstr "Prior dan likelihood sama-sama sensitif: keduanya tidak sejalan"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+#, python-brace-format
+msgid "Revise the prior in {doc}`02-specify-model` and check it again in {doc}`03-check-priors`"
+msgstr "Perbaiki prior di {doc}`02-specify-model` dan periksa lagi di {doc}`03-check-priors`"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "potential strong prior / weak likelihood"
+msgstr "potential strong prior / weak likelihood"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "Only the prior is sensitive: the data says little about the parameter"
+msgstr "Hanya prior yang sensitif: data hanya sedikit memberi informasi tentang parameter tersebut"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md
+msgid "Report the prior with the result, or choose a prior you can justify"
+msgstr "Laporkan prior bersama hasilnya, atau pilih prior yang dapat Anda pertanggungjawabkan"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:59
+#, python-brace-format
+msgid "With no flagged parameter, continue to {doc}`09-estimate-areas`."
+msgstr "Jika tidak ada parameter yang ditandai, lanjutkan ke {doc}`09-estimate-areas`."
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:61
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:63
+msgid "**`ValueError`.** `sensitivity_vars=` is given without `run_prior_sensitivity=True`:"
+msgstr "**`ValueError`.** `sensitivity_vars=` diberikan tanpa `run_prior_sensitivity=True`:"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:72
+msgid "**`ModelNotFittedError`.** Fit the model first."
+msgstr "**`ModelNotFittedError`.** Lakukan fitting model terlebih dahulu."
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:74
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/08-prior-sensitivity.md:76
+#, python-brace-format
+msgid "Why the prior is checked both before and after fitting: {doc}`../explanation/workflow-order`."
+msgstr "Mengapa prior diperiksa sebelum dan sesudah fitting: {doc}`../explanation/workflow-order`."
+

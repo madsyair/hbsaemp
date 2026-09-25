@@ -1,0 +1,40 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/about/citation.rst:4
+msgid "Citation"
+msgstr "Sitasi"
+
+#: ../../source/about/citation.rst:6
+msgid "To cite hbsaemp in publications, use:"
+msgstr "Untuk mengutip hbsaemp dalam publikasi, gunakan:"
+
+#: ../../source/about/citation.rst:8
+msgid "Choir A, Kaffah MIS, Salsabiela RK (2026). *hbsaemp: Hierarchical Bayesian Small Area Estimation in Python*. Python package version |release|. https://madsyair.github.io/hbsaemp/"
+msgstr "Choir A, Kaffah MIS, Salsabiela RK (2026). *hbsaemp: Hierarchical Bayesian Small Area Estimation in Python*. Python package version |release|. https://madsyair.github.io/hbsaemp/"
+
+#: ../../source/about/citation.rst:12
+msgid "A BibTeX entry for LaTeX users:"
+msgstr "Entri BibTeX untuk pengguna LaTeX:"
+
+#: ../../source/about/citation.rst:24
+msgid "The version number follows the documentation you are reading. If you used a different release, cite that one."
+msgstr "Nomor versi mengikuti dokumentasi yang sedang Anda baca. Jika Anda memakai rilis lain, kutip rilis tersebut."
+

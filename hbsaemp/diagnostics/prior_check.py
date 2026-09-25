@@ -68,29 +68,24 @@ def check_prior(
 
     Python equivalent of ``hbpc()`` in R hbsaems.
 
-    Runs the model's full build pipeline and samples from the prior only —
-    ``model.is_fitted`` is guaranteed to stay ``False`` after this call,
-    because it never touches ``model.fit()``.
+    Runs the model's build pipeline and samples from the priors only. The
+    model is not fitted: ``model.is_fitted`` stays ``False``.
 
     Args:
-        model: An unfitted (or fitted) :class:`~hbsaemp.models._base.BaseModel`.
-        response_var: Response variable label for the plot title. If
-            ``None``, falls back to ``model.response_name`` (parsed from the
-            formula — available before fitting).
-        n_draws: Number of prior predictive draws to sample. Default 50
-            (deliberately smaller than Bambi's own 500-draw default — this is
-            a quick visual sanity check, not an inference run).
+        model: A :class:`~hbsaemp.BaseModel`, fitted or not.
+        response_var: Response label for the plot title. Default:
+            ``model.response_name``.
+        n_draws: Number of prior predictive draws. Default 50, enough for a
+            visual check.
 
     Returns:
-        :class:`PriorCheckResult` with ``prior_predictive_plot`` (may be
-        ``None`` on a plotting failure — see logs),  ``prior_summary``
-        (may be an empty ``DataFrame``), and the raw ``idata``.
+        :class:`PriorCheckResult` with ``prior_predictive_plot`` (``None`` if
+        the plot failed; the reason is logged), ``prior_summary`` (empty if
+        the draws could not be summarised) and ``idata``.
 
     Raises:
-        ImportError: If ``bambi`` is not installed (raised by
-            ``prior_predictive_idata()``).
-        DataValidationError: If the data fails validator checks (raised by
-            ``prior_predictive_idata()``).
+        ImportError: If ``bambi`` is not installed.
+        DataValidationError: If the data fails validation.
     """
     _ensure_headless_matplotlib()
 

@@ -1,9 +1,9 @@
 {# Footer credit: who develops the package, and links to the project pages. #}
 <p class="developed-by">
-  Developed by <a href="{{ pathto('about/authors') }}">{{ developers }}</a>.
+  {{ _('Developed by') }} <a href="{{ pathto('about/authors') }}">{{ developers }}</a>.
   <br/>
-  <a href="{{ pathto('about/authors') }}">Authors</a> ·
-  <a href="{{ pathto('about/citation') }}">Citation</a> ·
-  <a href="{{ pathto('about/license') }}">License</a> ·
-  <a href="{{ pathto('about/references') }}">References</a>
+  <a href="{{ pathto('about/authors') }}">{{ _('Authors') }}</a> ·
+  <a href="{{ pathto('about/citation') }}">{{ _('Citation') }}</a> ·
+  <a href="{{ pathto('about/license') }}">{{ _('License') }}</a> ·
+  <a href="{{ pathto('about/references') }}">{{ _('References') }}</a>
 </p>

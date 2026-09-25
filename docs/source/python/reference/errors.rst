@@ -22,10 +22,9 @@ covers all of them::
 .. important::
 
    :class:`ConvergenceWarning` is **not** covered by that clause. It inherits
-   from :class:`UserWarning`, not from :class:`HBSAEError`, because it reports
-   a result worth distrusting rather than an operation that failed. Sampling
-   finished; the answer may just be unreliable. Catch it with
-   :class:`warnings.catch_warnings`, not with ``except``.
+   from :class:`UserWarning`, not from :class:`HBSAEError`: sampling finished,
+   but the result may be unreliable. Catch it with
+   :class:`warnings.catch_warnings`.
 
 Which call raises what
 ----------------------
@@ -65,26 +64,21 @@ Which call raises what
        transitions, maximum tree depth hits, or E-BFMI below 0.3
      - ``check_convergence()``
 
-Two of these are worth reading twice. :class:`FormulaError` is raised rather
-than silently dropping a term: an in-formula transform such as ``np.log(x1)``
-or ``x1:x2`` is rejected, because a dropped term would hide a predictor from
-validation and resurface later as an obscure backend error. Pre-compute it as a
-DataFrame column instead. And :class:`ModelNotFittedError` is deliberately
-*not* wrapped by :class:`EstimationError`, so "called in the wrong order" stays
-distinguishable from "this model and data cannot be estimated".
+An in-formula transform such as ``np.log(x1)`` or ``x1:x2`` raises
+:class:`FormulaError` instead of being dropped; compute it as a DataFrame column.
+:class:`ModelNotFittedError` is not wrapped in :class:`EstimationError`, so a
+call in the wrong order stays distinguishable from a model that cannot be
+estimated.
 
 .. note::
 
-   ``summary()`` is the exception to the rule above: calling it before ``fit()``
-   returns a short "not fitted" description instead of raising, so it is always
-   safe to print a model to see what it will do.
+   ``summary()`` does not raise before ``fit()``: it returns a short
+   "not fitted" description of the model.
 
 Not raised in this version
 --------------------------
 
-Three names in the public API never appear as the *cause* of a failure here.
-They are listed because they are importable and part of the advertised
-surface, not because you should expect to see them.
+These three names are importable but never raised directly.
 
 .. list-table::
    :header-rows: 1
@@ -105,8 +99,7 @@ Attributes
 ----------
 
 Every error carries ``.message`` (the text) and ``.context`` (a dict for
-diagnostics, safe to log). Some add one more field naming the thing that was
-wrong.
+diagnostics, safe to log). Some add one more attribute:
 
 .. list-table::
    :header-rows: 1

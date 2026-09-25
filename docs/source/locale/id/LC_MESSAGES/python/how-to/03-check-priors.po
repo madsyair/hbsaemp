@@ -1,0 +1,118 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/03-check-priors.md:11
+msgid "3 · Check the priors"
+msgstr "3 · Memeriksa prior"
+
+#: ../../source/python/how-to/03-check-priors.md:13
+msgid "Check that the priors produce plausible data before you fit the model."
+msgstr "Periksa bahwa prior menghasilkan data yang masuk akal sebelum Anda melakukan fitting model."
+
+#: ../../source/python/how-to/03-check-priors.md:15
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/03-check-priors.md:17
+#, python-brace-format
+msgid "You need an unfitted model from {doc}`02-specify-model`. The check samples from the priors only. It takes seconds, and the model stays unfitted."
+msgstr "Anda membutuhkan model yang belum di-fit dari {doc}`02-specify-model`. Pemeriksaan ini hanya melakukan sampling dari prior. Prosesnya hanya beberapa detik, dan model tetap belum di-fit."
+
+#: ../../source/python/how-to/03-check-priors.md:20
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/03-check-priors.md:35
+msgid "The plot shows data simulated from the priors next to the observed data. The R-style alias `hbpc` is the same function, and `n_draws=` sets the number of simulated datasets (default 50)."
+msgstr "Plot menampilkan data yang disimulasikan dari prior di samping data amatan. Alias gaya R `hbpc` adalah fungsi yang sama, dan `n_draws=` menentukan jumlah dataset simulasi (bawaan 50)."
+
+#: ../../source/python/how-to/03-check-priors.md:39
+msgid "`prior.prior_summary` holds the prior distribution of each parameter:"
+msgstr "`prior.prior_summary` memuat distribusi prior setiap parameter:"
+
+#: ../../source/python/how-to/03-check-priors.md:45
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/03-check-priors.md:47
+msgid "The priors are reasonable when the simulated data:"
+msgstr "Prior wajar jika data simulasi:"
+
+#: ../../source/python/how-to/03-check-priors.md:49
+msgid "covers the observed data;"
+msgstr "menutupi data amatan;"
+
+#: ../../source/python/how-to/03-check-priors.md:50
+msgid "stays on the scale of the observed data, not orders of magnitude wider;"
+msgstr "berada pada skala data amatan, tidak berkali-kali lipat lebih lebar;"
+
+#: ../../source/python/how-to/03-check-priors.md:51
+msgid "puts little weight on impossible values, such as a proportion outside 0 to 1."
+msgstr "memberi bobot kecil pada nilai yang mustahil, misalnya proporsi di luar 0 sampai 1."
+
+#: ../../source/python/how-to/03-check-priors.md:53
+#, python-format
+msgid "Compare the middle 95% of the simulated values with the observed range:"
+msgstr "Bandingkan 95% nilai simulasi yang di tengah dengan rentang data amatan:"
+
+#: ../../source/python/how-to/03-check-priors.md:63
+#, python-brace-format
+msgid "The default priors simulate values from about −3 to 12 for data between 3.2 and 6.2. That is wider than the data but on the same scale, so the priors are reasonable. Continue to {doc}`04-fit-model`."
+msgstr "Prior bawaan menyimulasikan nilai sekitar −3 sampai 12 untuk data antara 3,2 dan 6,2. Rentang itu lebih lebar dari data tetapi pada skala yang sama, jadi prior-nya wajar. Lanjutkan ke {doc}`04-fit-model`."
+
+#: ../../source/python/how-to/03-check-priors.md:67
+msgid "If the priors are not reasonable"
+msgstr "Jika prior tidak wajar"
+
+#: ../../source/python/how-to/03-check-priors.md:69
+#, python-brace-format
+msgid "Go back to {doc}`02-specify-model`, change `priors=`, and run the check again. For example, a very wide prior on the coefficients:"
+msgstr "Kembali ke {doc}`02-specify-model`, ubah `priors=`, lalu jalankan pemeriksaan lagi. Contohnya, prior yang sangat lebar pada koefisien:"
+
+#: ../../source/python/how-to/03-check-priors.md:83
+msgid "These priors simulate values of about ±200 for data between 3 and 6. Narrow them before fitting."
+msgstr "Prior ini menyimulasikan nilai sekitar ±200 untuk data antara 3 dan 6. Persempit sebelum fitting."
+
+#: ../../source/python/how-to/03-check-priors.md:86
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/03-check-priors.md:88
+msgid "**`ImportError`.** The check builds the model in Bambi. Install the `bambi` extra: `pip install \"hbsaemp[bambi] @ git+https://github.com/madsyair/hbsaemp\"`."
+msgstr "**`ImportError`.** Pemeriksaan ini membangun model di Bambi. Pasang extra `bambi`: `pip install \"hbsaemp[bambi] @ git+https://github.com/madsyair/hbsaemp\"`."
+
+#: ../../source/python/how-to/03-check-priors.md:91
+#, python-brace-format
+msgid "**`DataValidationError`.** The data fails the same checks as `fit()`. See the errors in {doc}`02-specify-model`."
+msgstr "**`DataValidationError`.** Data gagal dalam pemeriksaan yang sama dengan `fit()`. Lihat galat di {doc}`02-specify-model`."
+
+#: ../../source/python/how-to/03-check-priors.md:94
+msgid "**The plot is missing.** `prior.prior_predictive_plot` is `None` and the reason is logged as a warning. The summary table and `prior.idata` are still returned."
+msgstr "**Plot tidak muncul.** `prior.prior_predictive_plot` bernilai `None` dan alasannya dicatat sebagai peringatan. Tabel ringkasan dan `prior.idata` tetap dikembalikan."
+
+#: ../../source/python/how-to/03-check-priors.md:97
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/03-check-priors.md:99
+#, python-brace-format
+msgid "Why priors are checked before fitting: {doc}`../explanation/workflow-order`."
+msgstr "Mengapa prior diperiksa sebelum fitting: {doc}`../explanation/workflow-order`."
+

@@ -1,0 +1,52 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/about/references.md:5
+msgid "References"
+msgstr "Referensi"
+
+#: ../../source/about/references.md:7
+msgid "Works cited across this documentation."
+msgstr "Karya yang dikutip di seluruh dokumentasi ini."
+
+#: ../../source/about/references.md:9
+msgid "Capretto, T. et al. (2022). Bambi: A simple interface for fitting Bayesian linear models in Python. *Journal of Statistical Software*, 103(15). <https://doi.org/10.18637/jss.v103.i15>"
+msgstr "Capretto, T. et al. (2022). Bambi: A simple interface for fitting Bayesian linear models in Python. *Journal of Statistical Software*, 103(15). <https://doi.org/10.18637/jss.v103.i15>"
+
+#: ../../source/about/references.md:12
+msgid "Choir, A. S., Nurhayati, S. S., Zamzanah, S., & Oktalia Siregar, A. L. (2026). *hbsaems: Hierarchical Bayesian Area-Level Small Area Estimation Models*. R package version 1.1.0. <https://madsyair.github.io/hbsaems/>"
+msgstr "Choir, A. S., Nurhayati, S. S., Zamzanah, S., & Oktalia Siregar, A. L. (2026). *hbsaems: Hierarchical Bayesian Area-Level Small Area Estimation Models*. R package version 1.1.0. <https://madsyair.github.io/hbsaems/>"
+
+#: ../../source/about/references.md:15
+msgid "Fay, R. E. & Herriot, R. A. (1979). Estimates of income for small places: an application of James-Stein procedures to census data. *Journal of the American Statistical Association*, 74(366), 269–277."
+msgstr "Fay, R. E. & Herriot, R. A. (1979). Estimates of income for small places: an application of James-Stein procedures to census data. *Journal of the American Statistical Association*, 74(366), 269–277."
+
+#: ../../source/about/references.md:18
+msgid "Prayoga, I. Y. A., Pusponegoro, N. H., Sukim, & Budiarti, W. (2024). Small area estimation for morbidity rate prediction. *Communications in Mathematical Biology and Neuroscience*, 2024:62. <https://doi.org/10.28919/cmbn/8845>"
+msgstr "Prayoga, I. Y. A., Pusponegoro, N. H., Sukim, & Budiarti, W. (2024). Small area estimation for morbidity rate prediction. *Communications in Mathematical Biology and Neuroscience*, 2024:62. <https://doi.org/10.28919/cmbn/8845>"
+
+#: ../../source/about/references.md:21
+msgid "Procida, D. (2022, 9 May). *Diátaxis: A systematic approach to technical documentation authoring*. <https://diataxis.fr/>"
+msgstr "Procida, D. (2022, 9 Mei). *Diátaxis: A systematic approach to technical documentation authoring*. <https://diataxis.fr/>"
+
+#: ../../source/about/references.md:23
+msgid "Rao, J. N. K. & Molina, I. (2015). *Small Area Estimation* (2nd ed.). Wiley."
+msgstr "Rao, J. N. K. & Molina, I. (2015). *Small Area Estimation* (2nd ed.). Wiley."
+

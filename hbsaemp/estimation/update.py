@@ -118,20 +118,20 @@ def update_model(
     Everything not passed is carried over: family, family-specific columns,
     link, grouping, missing-data strategy, the other priors and the other
     sampler settings. The refit samples from scratch. *model* is updated in
-    place — `.result`, `.data`, `.config`, `.formula` and its priors reflect
-    the new fit — so chained calls start from the current state. A failed
-    refit leaves *model* unchanged.
+    place (`.result`, `.data`, `.config`, `.formula` and its priors), so
+    chained calls start from the latest fit. A failed refit leaves *model*
+    unchanged.
 
-    Sampler settings come either as a full replacement `config` or as
-    individual overrides on the current config, not both.
+    Pass sampler settings as a whole `config` or as single overrides on the
+    current config, not both.
 
     Args:
         model: Fitted `BaseModel`.
-        new_data: Replacement DataFrame; `None` reuses the current data.
-            Missing columns a pinned parameter is computed from — the
-            survey-design columns (`sampling_var`, `n`/`deff`) and any column
-            named by `fixed_params=` — are copied from the current data, with
-            a `UserWarning`, when the row count is unchanged.
+        new_data: Replacement DataFrame; `None` reuses the current data. If
+            it lacks a column that a pinned parameter is computed from (the
+            survey-design columns `sampling_var`, `n`/`deff`, or a column
+            named in `fixed_params=`) and has the same number of rows, the
+            column is copied from the current data with a `UserWarning`.
         formula: New formula, or an update template in R `update.formula`
             style: `"."` stands for the current side, `+ term` adds and
             `- term` removes a term, e.g. `". ~ . + x3 - x1"`. Without

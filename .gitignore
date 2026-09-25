@@ -36,8 +36,11 @@ docs/*
 !docs/requirements-docs.txt
 !docs/Makefile
 !docs/make.bat
+!docs/i18n.py
 docs/_build/
 docs/source/python/reference/generated/
+# Compiled from the tracked .po catalogues on every build.
+docs/source/locale/**/*.mo
 **/.ipynb_checkpoints/
 
 # Claude Code

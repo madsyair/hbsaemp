@@ -90,20 +90,20 @@ class ComparisonResult:
         bayes_factor: ``pandas.DataFrame`` indexed by fixed-effect coefficient
             with ``BF10`` / ``BF01`` columns (Savage-Dickey, H0: coefficient
             = 0); ``None`` unless ``"bf"`` is in *metrics*.
-        pp_check_plot: ``matplotlib.Figure`` — posterior predictive check
-            for the first (or only) model.
-        params_plot: ``matplotlib.Figure`` — marginal posterior distributions
-            for the first (or only) model.
-        compare_plot: ``matplotlib.Figure`` — model-comparison summary
-            (``arviz.plot_compare``); only when *models* is a list with ≥ 2
-            elements, else ``None``.
+        pp_check_plot: ``matplotlib.Figure`` with the posterior predictive
+            check of the first (or only) model.
+        params_plot: ``matplotlib.Figure`` with the marginal posterior
+            distributions of the first (or only) model.
+        compare_plot: ``matplotlib.Figure`` with the model comparison
+            (``arviz.plot_compare``); only when *models* is a list of at
+            least 2, else ``None``.
         prior_sensitivity: ``pandas.DataFrame`` from ``arviz.psense_summary``
             with ``prior`` / ``likelihood`` sensitivity and a ``diagnosis``
             per parameter; ``None`` unless *run_prior_sensitivity*.
-        comparison_table: ``pandas.DataFrame`` from ``arviz.compare()``
-            (only when *models* is a list with ≥ 2 elements; else ``None``).
-        plot_errors: Dict keyed by plot name (``"pp_check"``, ``"params"``,
-            ``"compare"``) → error message, for plots that failed to render.
+        comparison_table: ``pandas.DataFrame`` from ``arviz.compare()``; only
+            when *models* is a list of at least 2, else ``None``.
+        plot_errors: Error message per plot that failed to render, keyed
+            ``"pp_check"``, ``"params"`` or ``"compare"``.
     """
 
     loo: Any = None
@@ -341,61 +341,53 @@ def compare_models(
 
     For each model, depending on *metrics* and *run_prior_sensitivity*:
 
-    * ``"loo"`` (default) — **PSIS-LOO-CV** via ``arviz.loo()``. Observations
-      whose Pareto *k* exceeds ArviZ's ``good_k`` make the estimate
-      unreliable; :meth:`ComparisonResult.summary` reports their count.
-    * ``"bf"`` — **Savage-Dickey Bayes factors** via ``arviz.bayes_factor()``
-      for every fixed-effect coefficient (intercept excluded), testing
-      H0: coefficient = 0 from the prior and posterior densities at zero.
-      Prior draws come from ``model.prior_predictive_idata()``. This is a
-      per-coefficient test within one model, not the model-versus-model
-      Bayes factor of R's ``hbmc()`` (bridge sampling), and it depends on the
-      coefficient's prior: a vague prior favours H0.
-    * ``run_prior_sensitivity=True`` — **power-scaling prior / likelihood
-      sensitivity** via ``arviz.psense_summary()`` (the method of R's
-      priorsense). Sensitivity above 0.05 is flagged in its ``diagnosis``
+    * ``"loo"`` (default): **PSIS-LOO-CV** via ``arviz.loo()``.
+      Observations whose Pareto *k* exceeds ArviZ's ``good_k`` make the
+      estimate unreliable; :meth:`ComparisonResult.summary` counts them.
+    * ``"bf"``: **Savage-Dickey Bayes factors** via ``arviz.bayes_factor()``
+      for every fixed-effect coefficient except the intercept, testing
+      H0: coefficient = 0. Prior draws come from
+      ``model.prior_predictive_idata()``. This tests one coefficient within
+      one model, unlike the bridge-sampling Bayes factor of R's ``hbmc()``,
+      and a vague prior favours H0.
+    * ``run_prior_sensitivity=True``: **power-scaling prior and likelihood
+      sensitivity** via ``arviz.psense_summary()``, the method of R's
+      priorsense. Sensitivity above 0.05 is flagged in the ``diagnosis``
       column.
 
-    WAIC is **not** computed: ArviZ removed ``arviz.waic()`` in ≥0.20 in
-    favour of PSIS-LOO-CV, which is more robust, has better theoretical
-    properties, and ships reliability diagnostics (Pareto-k). Use LOO for
-    model selection.
+    WAIC is not computed: ArviZ removed ``arviz.waic()`` in favour of
+    PSIS-LOO-CV.
 
-    For the **first** (or only) model:
+    For the first (or only) model, two plots are drawn:
 
-    * Generates a **posterior predictive check** plot via
-      ``arviz.plot_ppc_dist()`` (``az.plot_ppc`` was removed in ArviZ 1.1).
-      When ``posterior_predictive`` is missing it is built on a temporary
-      idata via the public ``model.predictive_idata()`` (``inplace=False``) —
-      the stored ``result.idata`` is never mutated.
-    * Generates a **marginal posterior** plot via ``arviz.plot_dist`` — the
-      ArviZ 1.1 replacement for the removed ``plot_posterior`` /
-      ``plot_density``.
+    * a **posterior predictive check** via ``arviz.plot_ppc_dist()``. If the
+      idata has no ``posterior_predictive`` group, it is computed on a copy
+      with ``model.predictive_idata()``; ``result.idata`` is not modified.
+    * the **marginal posteriors** via ``arviz.plot_dist()``.
 
-    Plots are best-effort: a failure is recorded in ``plot_errors``.
+    A plot that fails is recorded in ``plot_errors``.
 
-    When ≥ 2 models are passed they must be fitted to the same observations
-    (checked against ``observed_data``); ``"loo"`` then also yields a
-    **comparison table** via ``arviz.compare()`` (LOO-based stacking weights)
-    and a **comparison plot** via ``arviz.plot_compare()``.
+    Two or more models must be fitted to the same observations. With
+    ``"loo"``, they also get a **comparison table** (``arviz.compare()``,
+    with stacking weights) and a **comparison plot**
+    (``arviz.plot_compare()``).
 
-    ``loo``, ``bayes_factor`` and ``prior_sensitivity`` mirror the input
-    container:
+    ``loo``, ``bayes_factor`` and ``prior_sensitivity`` follow the shape of
+    the input:
 
-    * ``compare_models(model)`` → a bare value (e.g. ``arviz.ELPDData``).
-    * ``compare_models([model])`` → a ``dict`` keyed by ``"model_0"`` (the
-      list form always returns a dict, even with a single element).
-    * ``compare_models([m0, m1, ...])`` → a ``dict`` keyed by ``"model_0"``,
-      ``"model_1"``, etc.
+    * ``compare_models(model)`` returns a single value, such as an
+      ``arviz.ELPDData``.
+    * ``compare_models([model])`` returns a ``dict`` keyed ``"model_0"``.
+    * ``compare_models([m0, m1, ...])`` returns a ``dict`` keyed
+      ``"model_0"``, ``"model_1"``, and so on.
 
     Args:
         models: A single fitted model or a list of fitted models.
-        metrics: Metrics to compute: ``"loo"`` (default) and/or ``"bf"``.
-            Any other metric — including ``"waic"``, removed from ArviZ ≥0.20 in
-            favour of PSIS-LOO-CV — raises ``NotImplementedError`` rather than
-            being silently ignored.  An empty list raises ``ValueError``.
-        n_draws_ppc: Number of posterior predictive draws for the pp-check
-            plot.  Must be a positive integer (default 100).
+        metrics: ``"loo"`` (default), ``"bf"``, or both. Any other metric,
+            including ``"waic"``, raises ``NotImplementedError``. An empty
+            list raises ``ValueError``.
+        n_draws_ppc: Number of posterior predictive draws in the posterior
+            predictive check plot; a positive integer (default 100).
         run_prior_sensitivity: Compute power-scaling prior sensitivity.
         sensitivity_vars: Posterior variables for the sensitivity table.
             Default: scalar and group-level parameters.  Requires
@@ -410,7 +402,7 @@ def compare_models(
             ``n_draws_ppc`` is not a positive integer, ``sensitivity_vars`` is
             given without ``run_prior_sensitivity``, the models were fitted to
             different observations, or a model's idata lacks the
-            ``log_likelihood`` group required by ``az.loo()``.
+            ``log_likelihood`` group that LOO needs.
         NotImplementedError: If an unsupported metric is requested.
         ModelNotFittedError: If any model in *models* has not been fitted.
         ImportError: If ``arviz`` is not installed.

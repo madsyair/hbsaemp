@@ -19,15 +19,15 @@ __all__: list[str] = ["Prior", "validate_priors"]
 
 @dataclass(frozen=True)
 class Prior:
-    """Prior specification — structurally validated at construction.
+    """Prior specification, validated when it is created.
 
-    Attribute rebinding is blocked, but the `params` dict itself is not
-    deep-frozen; treat it as read-only by convention.
+    Attributes cannot be reassigned. The `params` dict itself is not frozen;
+    treat it as read-only.
 
     Args:
-        dist: PyMC distribution name (e.g. `"Normal"`, `"HalfNormal"`).
+        dist: PyMC distribution name, e.g. `"Normal"` or `"HalfNormal"`.
             Must be a non-empty string. Whether the distribution exists is
-            resolved by the backend at `fit()` time, not here.
+            checked by the backend at `fit()`.
         **params: Distribution parameters forwarded to `bambi.Prior`.
             At least one must be supplied; values are not type-checked.
 

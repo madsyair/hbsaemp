@@ -1,0 +1,160 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/09-estimate-areas.md:11
+msgid "9 · Estimate the areas"
+msgstr "9 · Mengestimasi area"
+
+#: ../../source/python/how-to/09-estimate-areas.md:13
+msgid "Turn the chosen model into per-area estimates with their uncertainty."
+msgstr "Ubah model yang terpilih menjadi estimasi per area beserta ketidakpastiannya."
+
+#: ../../source/python/how-to/09-estimate-areas.md:15
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/09-estimate-areas.md:17
+#, python-brace-format
+msgid "You need the model that passed {doc}`05-check-convergence`, {doc}`07-check-fit-and-compare` and {doc}`08-prior-sensitivity`:"
+msgstr "Anda membutuhkan model yang lolos {doc}`05-check-convergence`, {doc}`07-check-fit-and-compare`, dan {doc}`08-prior-sensitivity`:"
+
+#: ../../source/python/how-to/09-estimate-areas.md:30
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/09-estimate-areas.md:38
+msgid "The R-style alias `hbsae` is the same function. `est.mean_rse` and `est.mean_mse` give the averages across areas."
+msgstr "Alias gaya R `hbsae` adalah fungsi yang sama. `est.mean_rse` dan `est.mean_mse` memberikan rata-rata antararea."
+
+#: ../../source/python/how-to/09-estimate-areas.md:41
+msgid "Change the interval width with `ci_prob` (default 0.95):"
+msgstr "Ubah lebar interval dengan `ci_prob` (bawaan 0.95):"
+
+#: ../../source/python/how-to/09-estimate-areas.md:47
+msgid "Areas without survey data"
+msgstr "Area tanpa data survei"
+
+#: ../../source/python/how-to/09-estimate-areas.md:49
+msgid "Pass `new_data=` to estimate areas outside the fitting data. The frame needs only the auxiliary variables and the area column. An area label not seen during fitting is a non-sampled area: at each posterior draw, its random effect is taken from a randomly chosen fitted area, as brms does with `sample_new_levels = \"uncertainty\"`. Its interval is therefore wider. The draws use the model's `random_seed`, so repeated calls agree."
+msgstr "Berikan `new_data=` untuk mengestimasi area di luar data fitting. Frame itu hanya membutuhkan variabel penyerta dan kolom area. Label area yang tidak ditemui saat fitting adalah area non-sampel: di setiap draw posterior, efek acaknya diambil dari satu area ter-fit yang dipilih acak, seperti `sample_new_levels = \"uncertainty\"` di brms. Karena itu intervalnya lebih lebar. Draw tersebut memakai `random_seed` model, sehingga pemanggilan berulang memberikan hasil yang sama."
+
+#: ../../source/python/how-to/09-estimate-areas.md:55
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/09-estimate-areas.md:57
+msgid "One row per area, with these columns:"
+msgstr "Satu baris per area, dengan kolom-kolom berikut:"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "Column"
+msgstr "Kolom"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "Meaning"
+msgstr "Arti"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "`mean`, `sd`"
+msgstr "`mean`, `sd`"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "Posterior mean and standard deviation of the area quantity"
+msgstr "Rata-rata dan simpangan baku posterior dari besaran area"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "`mse`, `rmse`"
+msgstr "`mse`, `rmse`"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "Posterior variance and its square root"
+msgstr "Varians posterior dan akar kuadratnya"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "`rse_pct`"
+msgstr "`rse_pct`"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "Relative standard error, `sd / |mean| × 100`"
+msgstr "Relative standard error, `sd / |mean| × 100`"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "`ci_lower`, `ci_upper`"
+msgstr "`ci_lower`, `ci_upper`"
+
+#: ../../source/python/how-to/09-estimate-areas.md
+msgid "Highest-density interval at `ci_prob`"
+msgstr "Highest-density interval pada `ci_prob`"
+
+#: ../../source/python/how-to/09-estimate-areas.md:66
+msgid "If an area label repeats in the data, the model was fitted on unit-level rows. The table is then one row per observation, and a warning is logged."
+msgstr "Jika label area berulang di data, model di-fit pada baris tingkat unit. Tabelnya kemudian satu baris per observasi, dan sebuah peringatan dicatat."
+
+#: ../../source/python/how-to/09-estimate-areas.md:69
+#, python-brace-format
+msgid "**Shrinkage.** Compare `mean` with the direct estimate. A model-based estimate lies between the direct estimate and the value predicted by the auxiliary variables, and moves furthest where the sampling variance is largest. If every estimate equals its direct estimate, the model adds nothing; recheck {doc}`02-specify-model`."
+msgstr "**Penyusutan (shrinkage).** Bandingkan `mean` dengan estimasi langsung. Estimasi berbasis model berada di antara estimasi langsung dan nilai yang diprediksi variabel penyerta, dan bergeser paling jauh di area dengan varians sampling terbesar. Jika setiap estimasi sama dengan estimasi langsungnya, model tidak menambahkan apa pun; periksa kembali {doc}`02-specify-model`."
+
+#: ../../source/python/how-to/09-estimate-areas.md:74
+msgid "**RSE.** `rse_pct` is the usual criterion for publication. Report areas whose RSE is still high with that caveat."
+msgstr "**RSE.** `rse_pct` adalah kriteria publikasi yang lazim. Laporkan area yang RSE-nya masih tinggi disertai catatan tersebut."
+
+#: ../../source/python/how-to/09-estimate-areas.md:78
+#, python-brace-format
+msgid "The estimates summarise the posterior of the area means, not the posterior predictive distribution. {doc}`../explanation/hb-sae` explains why."
+msgstr "Estimasi ini merangkum posterior rata-rata area, bukan distribusi prediktif posterior. {doc}`../explanation/hb-sae` menjelaskan alasannya."
+
+#: ../../source/python/how-to/09-estimate-areas.md:82
+msgid "This is the last stage of the workflow."
+msgstr "Ini adalah tahap terakhir alur kerja."
+
+#: ../../source/python/how-to/09-estimate-areas.md:84
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/09-estimate-areas.md:86
+msgid "**`ModelNotFittedError`.** Fit the model first. This error is not wrapped in `EstimationError`."
+msgstr "**`ModelNotFittedError`.** Lakukan fitting model terlebih dahulu. Galat ini tidak dibungkus dalam `EstimationError`."
+
+#: ../../source/python/how-to/09-estimate-areas.md:89
+msgid "**`DataValidationError` naming a column.** `new_data` lacks an auxiliary variable or the area column, or every row is missing a value in one of them."
+msgstr "**`DataValidationError` yang menyebutkan sebuah kolom.** `new_data` tidak memiliki variabel penyerta atau kolom area, atau setiap barisnya memiliki nilai hilang di salah satunya."
+
+#: ../../source/python/how-to/09-estimate-areas.md:92
+msgid "**`EstimationError`.** The message gives the family, the shape of `new_data` and `ci_prob`."
+msgstr "**`EstimationError`.** Pesannya memuat family, bentuk `new_data`, dan `ci_prob`."
+
+#: ../../source/python/how-to/09-estimate-areas.md:94
+msgid "**`ValueError` about `ci_prob`.** It must lie strictly between 0 and 1."
+msgstr "**`ValueError` tentang `ci_prob`.** Nilainya harus di antara 0 dan 1, tidak termasuk kedua batasnya."
+
+#: ../../source/python/how-to/09-estimate-areas.md:96
+msgid "**Fewer rows than your input.** Rows with missing values are dropped before estimation. Compare with `model.check_data()`, not with the raw DataFrame. For `new_data`, only a missing auxiliary or area value drops a row."
+msgstr "**Jumlah baris lebih sedikit dari input Anda.** Baris dengan nilai hilang dibuang sebelum estimasi. Bandingkan dengan `model.check_data()`, bukan dengan DataFrame mentah. Untuk `new_data`, baris hanya dibuang jika nilai variabel penyerta atau areanya hilang."
+
+#: ../../source/python/how-to/09-estimate-areas.md:100
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/09-estimate-areas.md:102
+#, python-brace-format
+msgid "Why small-area estimates are pulled towards the model: {doc}`../explanation/hb-sae`."
+msgstr "Mengapa estimasi area kecil ditarik ke arah model: {doc}`../explanation/hb-sae`."
+

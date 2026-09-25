@@ -21,10 +21,11 @@ __all__: list[str] = ["DataValidator"]
 class DataValidator:
     """Validate a DataFrame before model fitting.
 
-    Concrete checks — types, NaN, and family-specific domains.
+    Checks column types, missing values and the family's response domain.
 
     Args:
-        handle_missing: Strategy for NaN values. ``"deleted"`` = dropna (v1).
+        handle_missing: Strategy for missing values. Only ``"deleted"`` (drop
+            the row) is supported.
     """
 
     def __init__(self, handle_missing: str = "deleted") -> None:
@@ -46,12 +47,11 @@ class DataValidator:
         group: str | None = None,
         **pipeline_fields: Any,
     ) -> None:
-        """Validate *data* in place; raises on failure, otherwise returns ``None``.
+        """Validate *data*; raise on the first failure.
 
-        Read-only — *data* is never mutated.  Caller owns any copies needed
-        (the downstream :class:`DataPreprocessor` already takes a fresh copy).
+        *data* is never modified.
 
-        Checks (in order):
+        Checks, in order:
 
         1. *data* is a non-empty :class:`pandas.DataFrame`.
         2. *family* is supported.
@@ -65,19 +65,11 @@ class DataValidator:
             predictors: Predictor column names.
             family: Distribution family for domain checks.
             group: Optional grouping column (non-numeric allowed).
-            **pipeline_fields: The family's own fields, exactly as declared in
-                ``FAMILY_SPECS[family].pipeline_fields`` and assembled by
-                ``BaseModel._extra_pipeline_kwargs()`` — e.g. ``n_col`` and
-                ``deff_col`` (Beta), ``sampling_var_col`` (Gaussian FH),
-                ``trials_col`` (Binomial), ``squeeze`` (Beta). String values
-                are read as data-column names and checked for existence and
-                numeric dtype; other values are settings. Passed through
-                unchanged to the family's ``response_check``. Taken as
-                ``**kwargs`` on purpose: a family that declares a new field
-                must not have to edit this signature.
-
-        Returns:
-            ``None``.  All failures surface as :class:`DataValidationError`.
+            **pipeline_fields: The family's own fields, as declared in its
+                :class:`~hbsaemp.FamilySpec`: ``n_col``, ``deff_col`` and
+                ``squeeze`` (Beta), ``sampling_var_col`` (Gaussian FH),
+                ``trials_col`` (Binomial). String values are column names and
+                must exist and be numeric; other values are settings.
 
         Raises:
             DataValidationError: On any structural or domain failure.

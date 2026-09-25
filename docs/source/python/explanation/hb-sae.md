@@ -1,128 +1,109 @@
 # What hierarchical Bayes small area estimation is
 
-Why a direct estimate is unreliable for a small area, and what borrowing strength does
-about it.
+Why a direct estimate is unreliable for a small area, and how borrowing strength helps.
 
 ## The question
 
-A survey is designed to produce reliable national figures. Break the same sample down by
-district and each district keeps only a handful of respondents. The estimate for that
-district is still *unbiased* — it is the right calculation — but its variance is so
-large that the number is useless for making a decision.
+A survey is designed for reliable national figures. Broken down by district, each district
+keeps only a few respondents. The district's direct estimate is still unbiased, but its
+variance is too large to support a decision.
 
-The obvious responses both fail. Waiting for a bigger sample is unaffordable. Publishing
-the noisy number anyway means publishing a ranking of districts that is mostly noise:
-next year's "worst district" will be somewhere else, for no reason other than sampling.
+A bigger sample is too expensive. Publishing the noisy number means publishing a ranking
+that is mostly noise: next year's "worst district" will be another one, by chance alone.
 
-Small area estimation is the third response. It asks what else is known about a district
-besides the few people who happened to be sampled there.
+Small area estimation asks what else is known about a district besides its few sampled
+respondents.
 
 ## Background
 
-Write the direct estimate for area $i$ as $y_i$, and the quantity you actually want as
-$\theta_i$. The survey gives you
+Write the direct estimate for area $i$ as $y_i$ and the true value as $\theta_i$. The survey
+gives
 
 $$y_i = \theta_i + e_i, \qquad e_i \sim N(0, D_i)$$
 
-where $D_i$ is the **sampling variance**, known from the survey design rather than
-estimated from the model. This is the crucial asymmetry: a small area has a large $D_i$,
-and you know it is large.
+where $D_i$ is the **sampling variance**, known from the survey design. A small area has a
+large $D_i$, and you know it.
 
-The model half says the true values are not unrelated to each other. Areas with similar
-characteristics tend to have similar outcomes:
+The model links the true values through auxiliary variables $x_i$, such as administrative
+records or a census, available for every area:
 
 $$\theta_i = x_i^\top \beta + u_i, \qquad u_i \sim N(0, \sigma_u^2)$$
 
-Here $x_i$ holds auxiliary variables — administrative records, a census, satellite
-data — known for *every* area, not just the sampled ones. The term $u_i$ admits that the
-regression will not be perfect and leaves room for genuine area-specific variation.
+The random effect $u_i$ allows for area-specific variation the regression does not explain.
 
-Those two equations together are the Fay-Herriot model (Fay & Herriot, 1979), the
-area-level foundation this package's Gaussian family implements. Rao & Molina (2015) is
-the standard treatment of the field.
+Together these two equations are the Fay-Herriot model (Fay & Herriot, 1979), which the
+Gaussian family of this package implements. Rao & Molina (2015) is the standard reference.
 
 ## The reasoning
 
-The model has two independent sources of information about $\theta_i$: the survey, whose
-precision is $1/D_i$, and the regression, whose precision is $1/\sigma_u^2$. Bayes' rule
-combines them in proportion to their precision. For the Fay-Herriot model the posterior
-mean works out to a weighted average:
+The model has two sources of information about $\theta_i$: the survey, with precision
+$1/D_i$, and the regression, with precision $1/\sigma_u^2$. Bayes' rule weights them by
+precision. For the Fay-Herriot model the posterior mean is
 
 $$\hat\theta_i = \gamma_i \, y_i + (1 - \gamma_i) \, x_i^\top \beta,
 \qquad \gamma_i = \frac{\sigma_u^2}{\sigma_u^2 + D_i}$$
 
-Everything worth understanding is in $\gamma_i$.
+- **Small $D_i$** (a well-sampled area): $\gamma_i$ is close to 1, and the estimate stays
+  close to the direct estimate.
+- **Large $D_i$** (few respondents): $\gamma_i$ is close to 0, and the estimate moves towards
+  $x_i^\top \beta$, the value the auxiliary variables predict.
 
-When $D_i$ is small — a well-sampled area — $\gamma_i$ approaches 1 and the estimate is
-essentially the direct estimate. The model barely intervenes, because the survey already
-knows the answer.
+This is **borrowing strength**: a poorly sampled area borrows from the pattern across all
+areas. The weight is not tuned by hand. It follows from two variances, one known from the
+design and one estimated from the data.
 
-When $D_i$ is large — few respondents — $\gamma_i$ approaches 0 and the estimate is
-pulled towards $x_i^\top \beta$, the value the auxiliary variables predict. The survey's
-contribution is discounted in proportion to how noisy it is.
+### Why shrinkage reduces error
 
-This is **borrowing strength**: the badly-sampled area borrows from the pattern
-established across all the areas. Nothing is invented. The weight is not a tuning
-parameter either — it falls out of the two variances, one known from the design and one
-estimated from the data.
-
-### Why shrinkage is not cheating
-
-The direct estimate is unbiased and the shrunk estimate is not. That sounds like a step
-backwards until you notice which quantity matters. Decisions are made worse by *error*,
-and error has two parts:
+The direct estimate is unbiased; the shrunk estimate is not. What matters for a decision is
+the total error:
 
 $$\text{MSE} = \text{bias}^2 + \text{variance}$$
 
-Shrinkage trades a small, controlled amount of bias for a large reduction in variance.
-When $D_i$ is large the variance term dominates so heavily that accepting some bias
-lowers the total. That is why the trade is worth making precisely where the direct
-estimate is weakest, and why it barely happens where the direct estimate is strong.
-
-Unbiasedness is a property of a procedure repeated infinitely often. You are publishing
-one number for one district, once.
+Shrinkage accepts a small bias for a large reduction in variance. When $D_i$ is large, the
+variance dominates, so the total error falls. The trade happens mostly where the direct
+estimate is weakest.
 
 ### Why hierarchical, and why Bayesian
 
-*Hierarchical* is the structure: individual areas at one level, the parameters
-$\beta$ and $\sigma_u^2$ they share at the level above. Those shared parameters are what
-lets one area's data inform another's estimate.
+*Hierarchical* is the structure: areas at one level, and the parameters they share,
+$\beta$ and $\sigma_u^2$, at the level above. The shared parameters let one area's data
+inform another area's estimate.
 
-*Bayesian* is how the uncertainty is handled. $\sigma_u^2$ is not known; it is estimated
-from the same data. Classical approaches plug in an estimate and then have to correct the
-resulting intervals, because pretending an estimated variance is known makes intervals
-too narrow. Sampling from the joint posterior propagates that uncertainty automatically —
-the credible interval for $\theta_i$ already accounts for not knowing $\sigma_u^2$.
+*Bayesian* is how uncertainty is handled. $\sigma_u^2$ is estimated from the same data.
+Plugging in an estimate and treating it as known makes intervals too narrow. Sampling from
+the joint posterior carries that uncertainty into the credible interval of every
+$\theta_i$.
 
-The cost is that the posterior has no closed form for most families, so it is
-approximated by MCMC. That is why every estimate in this package arrives with
-convergence diagnostics attached, and why they are not optional.
+The posterior has no closed form for most families, so it is approximated by MCMC. That is
+why every estimate comes with convergence diagnostics.
+
+### Why the estimate summarises $\theta_i$, not $y_i$
+
+The target is the true value $\theta_i$. The posterior predictive distribution describes a
+new direct estimate $y_i$, which adds the sampling error $e_i$ back in. Summarising it would
+restore the noise the model was built to remove, so the area estimates summarise the
+posterior of $\theta_i$.
 
 ## Consequences
 
-**Your estimates will not match the direct estimates, and should not.** If they do, the
-model contributed nothing. Compare the two and look for the pattern: the gap should be
-widest for the areas with the largest sampling variance.
+**The estimates differ from the direct estimates.** If they match, the model contributed
+nothing. The gap should be widest where the sampling variance is largest.
 
-**Auxiliary variables carry the whole benefit.** If $x_i$ does not predict $\theta_i$,
-then $\sigma_u^2$ is large, $\gamma_i$ stays near 1, and you get the direct estimates
-back with extra steps. Choosing auxiliary variables that are genuinely related to the
-outcome *and* available for every area is the substantive work; the fitting is
-mechanical.
+**The auxiliary variables carry the benefit.** If $x_i$ does not predict $\theta_i$,
+$\sigma_u^2$ is large, $\gamma_i$ stays near 1, and the direct estimates come back. Choosing
+auxiliary variables related to the outcome and available for every area is the substantive
+work.
 
-**A published estimate needs its uncertainty next to it.** Shrinkage narrows the interval
-but does not abolish it. An area with a small sample still deserves a caveat, which is
-why the estimation output carries the relative standard error alongside the mean.
+**Every published estimate needs its uncertainty.** Shrinkage narrows the interval but does
+not remove it. The estimation output therefore reports the relative standard error with the
+mean.
 
-**Known sampling variances have to be real.** $D_i$ is treated as known rather than
-estimated. Supplying a rough guess in its place quietly changes how much each area
-borrows, and nothing in the output will say so.
+**The sampling variances must be real.** $D_i$ is treated as known. A rough guess changes
+how much each area borrows, and the output does not show it.
 
 ## Related
 
-The procedure for turning a fitted model into a table of area estimates, including which
-columns to read and how to check that shrinkage actually happened, is in
-{doc}`../how-to/05-estimate-areas`.
+How to produce the area estimates and check the shrinkage: {doc}`../how-to/09-estimate-areas`.
 
 ## References
 

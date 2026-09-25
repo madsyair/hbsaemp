@@ -1,0 +1,133 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/04-fit-model.md:11
+msgid "4 · Fit the model"
+msgstr "4 · Melakukan fitting model"
+
+#: ../../source/python/how-to/04-fit-model.md:13
+msgid "Run the sampler and choose the number of draws, chains and tuning steps."
+msgstr "Jalankan sampler dan tentukan jumlah draw, rantai, dan langkah tuning."
+
+#: ../../source/python/how-to/04-fit-model.md:15
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/04-fit-model.md:17
+#, python-brace-format
+msgid "You need a model whose priors passed {doc}`03-check-priors`. Fitting is the slow step: it takes minutes, while every earlier step takes seconds."
+msgstr "Anda membutuhkan model yang prior-nya lolos {doc}`03-check-priors`. Fitting adalah langkah yang lambat: butuh beberapa menit, sedangkan setiap langkah sebelumnya hanya beberapa detik."
+
+#: ../../source/python/how-to/04-fit-model.md:20
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/04-fit-model.md:22
+msgid "Sampler settings go in a `ModelConfig`. The defaults are:"
+msgstr "Pengaturan sampler ditaruh di `ModelConfig`. Nilai bawaannya:"
+
+#: ../../source/python/how-to/04-fit-model.md:31
+msgid "Pass a config when you build the model, then call `fit()`:"
+msgstr "Berikan config saat membangun model, lalu panggil `fit()`:"
+
+#: ../../source/python/how-to/04-fit-model.md:42
+msgid "`progressbar=False` keeps these pages short. Leave it out to see the sampler's progress. `fit()` returns a `ModelResult` and also stores it as `model.result`."
+msgstr "`progressbar=False` menjaga halaman ini tetap ringkas. Hilangkan untuk melihat kemajuan sampler. `fit()` mengembalikan `ModelResult` dan juga menyimpannya sebagai `model.result`."
+
+#: ../../source/python/how-to/04-fit-model.md:45
+msgid "How much to spend"
+msgstr "Seberapa besar yang perlu dihabiskan"
+
+#: ../../source/python/how-to/04-fit-model.md
+msgid "Model"
+msgstr "Model"
+
+#: ../../source/python/how-to/04-fit-model.md
+msgid "Settings"
+msgstr "Pengaturan"
+
+#: ../../source/python/how-to/04-fit-model.md
+msgid "Simple area-level model"
+msgstr "Model level area sederhana"
+
+#: ../../source/python/how-to/04-fit-model.md
+msgid "`ModelConfig()`, the default"
+msgstr "`ModelConfig()`, bawaan"
+
+#: ../../source/python/how-to/04-fit-model.md
+msgid "Fay-Herriot offset, one grouping"
+msgstr "Offset Fay-Herriot, satu pengelompokan"
+
+#: ../../source/python/how-to/04-fit-model.md
+msgid "`draws=2000, tune=1000, chains=4, target_accept=0.95`"
+msgstr "`draws=2000, tune=1000, chains=4, target_accept=0.95`"
+
+#: ../../source/python/how-to/04-fit-model.md
+msgid "Nested groups, many hyperparameters"
+msgstr "Grup bersarang, banyak hiperparameter"
+
+#: ../../source/python/how-to/04-fit-model.md
+msgid "`draws=4000, tune=2000, chains=4, target_accept=0.95`"
+msgstr "`draws=4000, tune=2000, chains=4, target_accept=0.95`"
+
+#: ../../source/python/how-to/04-fit-model.md:53
+msgid "Use 4 chains, or at least 2. R-hat compares chains, so a single chain cannot be checked."
+msgstr "Gunakan 4 rantai, atau minimal 2. R-hat membandingkan antarrantai, sehingga satu rantai saja tidak dapat diperiksa."
+
+#: ../../source/python/how-to/04-fit-model.md:55
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/04-fit-model.md:62
+#, python-brace-format
+msgid "A finished run is not yet a usable one. Check it in {doc}`05-check-convergence`."
+msgstr "Run yang selesai belum tentu dapat dipakai. Periksa di {doc}`05-check-convergence`."
+
+#: ../../source/python/how-to/04-fit-model.md:64
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/04-fit-model.md:66
+msgid "**A setting is out of range.** `ModelConfig` raises `ValueError` as soon as it is created:"
+msgstr "**Pengaturan di luar rentang.** `ModelConfig` memunculkan `ValueError` begitu dibuat:"
+
+#: ../../source/python/how-to/04-fit-model.md:76
+#, python-brace-format
+msgid "**The data is rejected.** The message names the column. See the errors in {doc}`02-specify-model`."
+msgstr "**Data ditolak.** Pesannya menyebutkan kolomnya. Lihat galat di {doc}`02-specify-model`."
+
+#: ../../source/python/how-to/04-fit-model.md:79
+#, python-brace-format
+msgid "**Sampling is slow or reports divergences.** More draws will not fix this. Raise `target_accept` as described in {doc}`05-check-convergence`."
+msgstr "**Sampling lambat atau melaporkan divergensi.** Menambah draw tidak memperbaikinya. Naikkan `target_accept` seperti dijelaskan di {doc}`05-check-convergence`."
+
+#: ../../source/python/how-to/04-fit-model.md:82
+msgid "**The log shows `ERROR pymc.stats.convergence`.** PyMC reports a low effective sample size per chain. Treat it as a signal to raise the sampler settings; do not silence it."
+msgstr "**Log menampilkan `ERROR pymc.stats.convergence`.** PyMC melaporkan ukuran sampel efektif per rantai yang rendah. Perlakukan sebagai sinyal untuk menaikkan pengaturan sampler; jangan dibungkam."
+
+#: ../../source/python/how-to/04-fit-model.md:85
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/04-fit-model.md:87
+#, python-brace-format
+msgid "Why fitting comes after the prior check: {doc}`../explanation/workflow-order`."
+msgstr "Mengapa fitting dilakukan setelah pemeriksaan prior: {doc}`../explanation/workflow-order`."
+

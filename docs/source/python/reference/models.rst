@@ -1,18 +1,16 @@
 Models
 ======
 
-Model constructors for the three interface tiers, the objects they return, and
-the family registry that drives them.
+The three model interfaces, the objects they return, and the family registry.
 
 .. currentmodule:: hbsaemp
 
 Constructors
 ------------
 
-The three tiers cascade: a tier 1 shortcut (the beginner interface, such as
-:func:`hbm_gaussian`) calls :func:`hbm_flex` (tier 2, the intermediate
-interface), which calls :func:`create_model` (tier 3, the advanced interface).
-Pick the tier that matches how much you want to spell out.
+A beginner shortcut such as :func:`hbm_gaussian` calls :func:`hbm_flex` (the
+intermediate interface), which calls :func:`create_model` (the advanced
+interface).
 
 .. autosummary::
    :toctree: generated/
@@ -54,10 +52,6 @@ Family registry
 Module constants
 ----------------
 
-Described here rather than generated, because a bare ``dict`` or ``list``
-carries no docstring of its own and autodoc would fall back to the built-in
-type's documentation.
-
 .. data:: DEFAULT_CONFIG
    :type: ModelConfig
 
@@ -73,9 +67,8 @@ type's documentation.
 R aliases
 ---------
 
-The package mirrors the naming of the R package ``hbsaems``. Each alias is the
-same object under a second name, so it takes the same arguments and returns the
-same result.
+Each R-style alias, named after the R package ``hbsaems``, is the same
+function as its Python name.
 
 .. list-table::
    :header-rows: 1

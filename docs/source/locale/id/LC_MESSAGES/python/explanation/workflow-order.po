@@ -1,0 +1,198 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/explanation/workflow-order.md:1
+msgid "Why the Bayesian workflow has this order"
+msgstr "Mengapa alur kerja Bayesian memiliki urutan ini"
+
+#: ../../source/python/explanation/workflow-order.md:3
+msgid "Each stage makes the next one interpretable, so the order carries statistical meaning."
+msgstr "Setiap tahap membuat tahap berikutnya dapat ditafsirkan, sehingga urutannya bermakna secara statistik."
+
+#: ../../source/python/explanation/workflow-order.md:5
+msgid "The question"
+msgstr "Pertanyaannya"
+
+#: ../../source/python/explanation/workflow-order.md:7
+msgid "The How-to guides are numbered. It is tempting to treat the numbering as a convenience: fit the model, read the estimates, and check the diagnostics only if something looks odd."
+msgstr "Halaman How-to guides bernomor. Godaannya adalah menganggap penomoran itu sekadar kemudahan: lakukan fitting, baca estimasinya, dan periksa diagnostik hanya jika ada yang tampak janggal."
+
+#: ../../source/python/explanation/workflow-order.md:10
+msgid "That shortcut produces confident numbers that mean nothing. Output from stages run out of order looks exactly like correct output."
+msgstr "Jalan pintas itu menghasilkan angka meyakinkan yang tidak bermakna. Output dari tahap yang dijalankan tidak berurutan tampak persis seperti output yang benar."
+
+#: ../../source/python/explanation/workflow-order.md:13
+msgid "Background"
+msgstr "Latar belakang"
+
+#: ../../source/python/explanation/workflow-order.md:15
+msgid "This package follows the workflow used in applied Bayesian analysis:"
+msgstr "Paket ini mengikuti alur kerja yang dipakai dalam analisis Bayesian terapan:"
+
+#: ../../source/python/explanation/workflow-order.md:17
+msgid "**Load the data**, one row per area."
+msgstr "**Muat data**, satu baris per area."
+
+#: ../../source/python/explanation/workflow-order.md:18
+msgid "**Specify the model**: family, auxiliary variables, area identifier and priors."
+msgstr "**Spesifikasikan model**: family, variabel penyerta, identitas area, dan prior."
+
+#: ../../source/python/explanation/workflow-order.md:19
+msgid "**Check the priors.** If the data they imply is implausible, return to 2."
+msgstr "**Periksa prior.** Jika data yang tersirat darinya tidak masuk akal, kembali ke 2."
+
+#: ../../source/python/explanation/workflow-order.md:20
+msgid "**Fit the model.**"
+msgstr "**Lakukan fitting model.**"
+
+#: ../../source/python/explanation/workflow-order.md:21
+msgid "**Check convergence.** If the chains have not converged, refit (6) and check again."
+msgstr "**Periksa konvergensi.** Jika rantai belum konvergen, lakukan fitting ulang (6) dan periksa lagi."
+
+#: ../../source/python/explanation/workflow-order.md:22
+msgid "**Update the model**, as the remedy for 5."
+msgstr "**Perbarui model**, sebagai jalan keluar untuk 5."
+
+#: ../../source/python/explanation/workflow-order.md:23
+msgid "**Check the fit and compare models.** If the model does not reproduce the data, return to 2."
+msgstr "**Periksa kecocokan dan bandingkan model.** Jika model tidak mereproduksi data, kembali ke 2."
+
+#: ../../source/python/explanation/workflow-order.md:25
+msgid "**Check prior sensitivity.**"
+msgstr "**Periksa sensitivitas prior.**"
+
+#: ../../source/python/explanation/workflow-order.md:26
+msgid "**Estimate the areas.**"
+msgstr "**Estimasi area.**"
+
+#: ../../source/python/explanation/workflow-order.md:28
+msgid "MCMC does not report failure. A sampler that explored only part of the posterior still returns draws, and their means, intervals and rankings look like trustworthy ones. Only the checks tell them apart."
+msgstr "MCMC tidak melaporkan kegagalan. Sampler yang baru menjelajahi sebagian posterior tetap mengembalikan draw, dan rata-rata, interval, serta peringkatnya tampak seperti yang dapat dipercaya. Hanya pemeriksaan yang dapat membedakannya."
+
+#: ../../source/python/explanation/workflow-order.md:32
+msgid "The reasoning"
+msgstr "Penalarannya"
+
+#: ../../source/python/explanation/workflow-order.md:34
+msgid "Priors are checked before fitting"
+msgstr "Prior diperiksa sebelum fitting"
+
+#: ../../source/python/explanation/workflow-order.md:36
+msgid "A prior predictive check simulates data from the priors alone. If the model considers a morbidity rate of 300% plausible, you should know before fitting."
+msgstr "Prior predictive check menyimulasikan data dari prior saja. Jika model menganggap angka morbiditas 300% masuk akal, Anda perlu tahu sebelum fitting."
+
+#: ../../source/python/explanation/workflow-order.md:39
+msgid "The check must come first. Once you have seen the posterior, any prior you choose is partly chosen to reproduce it. The check is only honest while the result is unknown."
+msgstr "Pemeriksaan ini harus didahulukan. Begitu Anda melihat posterior, prior apa pun yang Anda pilih sebagian dipilih untuk mereproduksinya. Pemeriksaan ini hanya jujur selama hasilnya belum diketahui."
+
+#: ../../source/python/explanation/workflow-order.md:42
+msgid "Convergence is checked before any result is read"
+msgstr "Konvergensi diperiksa sebelum hasil apa pun dibaca"
+
+#: ../../source/python/explanation/workflow-order.md:44
+msgid "R-hat compares chains that started in different places; effective sample size counts how many independent draws the chains are worth. Both describe the sampling, and neither is visible in the estimates."
+msgstr "R-hat membandingkan rantai-rantai yang dimulai di tempat berbeda; ukuran sampel efektif menghitung berapa draw independen yang setara dengan rantai tersebut. Keduanya menggambarkan sampling, dan keduanya tidak terlihat dalam estimasi."
+
+#: ../../source/python/explanation/workflow-order.md:48
+msgid "An estimate read before this check may describe where the sampler got stuck rather than the posterior. Reading the estimates first also biases you: you now know which verdict you want from the diagnostics."
+msgstr "Estimasi yang dibaca sebelum pemeriksaan ini mungkin menggambarkan tempat sampler tersangkut, bukan posteriornya. Membaca estimasi lebih dulu juga membuat Anda bias: Anda sudah tahu hasil diagnostik mana yang Anda harapkan."
+
+#: ../../source/python/explanation/workflow-order.md:52
+msgid "A refit returns to the convergence check"
+msgstr "Fitting ulang kembali ke pemeriksaan konvergensi"
+
+#: ../../source/python/explanation/workflow-order.md:54
+msgid "New sampler settings or new data give a new posterior. The earlier verdict applied to the old one, so a refit goes back to stage 5."
+msgstr "Pengaturan sampler baru atau data baru menghasilkan posterior baru. Hasil pemeriksaan sebelumnya berlaku untuk posterior lama, sehingga fitting ulang kembali ke tahap 5."
+
+#: ../../source/python/explanation/workflow-order.md:57
+msgid "The fit is checked before models are compared"
+msgstr "Kecocokan diperiksa sebelum model dibandingkan"
+
+#: ../../source/python/explanation/workflow-order.md:59
+msgid "A posterior predictive check asks whether the model can reproduce the data it was fitted to. A model that cannot is misspecified, and ranking it against others ranks the wrong candidates. The fix is a different specification, so the workflow returns to stage 2."
+msgstr "Posterior predictive check bertanya apakah model dapat mereproduksi data yang dipakai untuk fitting. Model yang tidak mampu berarti salah spesifikasi, dan mengurutkannya terhadap model lain berarti mengurutkan kandidat yang keliru. Perbaikannya adalah spesifikasi yang berbeda, sehingga alur kerja kembali ke tahap 2."
+
+#: ../../source/python/explanation/workflow-order.md:63
+msgid "Comparison scores how well each candidate predicts data it has not seen. It must come after convergence, because comparing unreliable draws gives a reliable-looking ranking of nothing, and before estimation, because choosing the model whose estimates you like fits the analyst's expectations instead of the data."
+msgstr "Perbandingan menilai seberapa baik setiap kandidat memprediksi data yang belum dilihatnya. Perbandingan harus dilakukan setelah konvergensi, karena membandingkan draw yang tidak andal menghasilkan peringkat yang tampak andal atas sesuatu yang tidak bermakna, dan sebelum estimasi, karena memilih model yang estimasinya Anda sukai berarti mencocokkan harapan analis, bukan data."
+
+#: ../../source/python/explanation/workflow-order.md:68
+msgid "Prior sensitivity is checked on the chosen model"
+msgstr "Sensitivitas prior diperiksa pada model yang dipilih"
+
+#: ../../source/python/explanation/workflow-order.md:70
+msgid "The prior check in stage 3 asks whether the priors are plausible. The sensitivity check asks whether they matter: how far the posterior moves when the prior is scaled. It needs a posterior, so it comes after fitting, and it is run on the model that will be reported."
+msgstr "Pemeriksaan prior di tahap 3 bertanya apakah prior masuk akal. Pemeriksaan sensitivitas bertanya apakah prior berpengaruh: seberapa jauh posterior bergeser ketika prior diskalakan. Pemeriksaan ini membutuhkan posterior, sehingga dilakukan setelah fitting, pada model yang akan dilaporkan."
+
+#: ../../source/python/explanation/workflow-order.md:74
+msgid "Estimation comes last"
+msgstr "Estimasi dilakukan terakhir"
+
+#: ../../source/python/explanation/workflow-order.md:76
+msgid "An area estimate relies on every earlier stage: plausible priors, a converged sampler, an adequate and preferred model, and a known influence of the prior. The estimate is only as good as that chain of checks."
+msgstr "Estimasi area bergantung pada setiap tahap sebelumnya: prior yang masuk akal, sampler yang konvergen, model yang memadai dan terpilih, serta pengaruh prior yang diketahui. Estimasi hanya sebaik rangkaian pemeriksaan itu."
+
+#: ../../source/python/explanation/workflow-order.md:80
+msgid "Consequences"
+msgstr "Konsekuensi"
+
+#: ../../source/python/explanation/workflow-order.md:82
+msgid "**A slow stage is still a required one.** Convergence checking produces no publishable output, which is why it gets skipped. The package makes each check an explicit call, so skipping one is a decision."
+msgstr "**Tahap yang lambat tetap wajib.** Pemeriksaan konvergensi tidak menghasilkan output yang dapat diterbitkan, itulah sebabnya sering dilewati. Paket ini menjadikan setiap pemeriksaan sebagai pemanggilan eksplisit, sehingga melewatkannya adalah sebuah keputusan."
+
+#: ../../source/python/explanation/workflow-order.md:86
+msgid "**Warnings are signals.** A `ConvergenceWarning` is the check doing its job. Silencing it removes the only sign that a posterior is unusable."
+msgstr "**Peringatan adalah sinyal.** `ConvergenceWarning` berarti pemeriksaan sedang menjalankan tugasnya. Membungkamnya menghapus satu-satunya tanda bahwa sebuah posterior tidak dapat dipakai."
+
+#: ../../source/python/explanation/workflow-order.md:89
+msgid "**Escalate in a fixed order.** When convergence fails, raise `target_accept`, then `tune`, then `draws`: fix how the sampler explores before buying more of the same draws."
+msgstr "**Naikkan pengaturan dengan urutan tetap.** Jika konvergensi gagal, naikkan `target_accept`, lalu `tune`, lalu `draws`: perbaiki cara sampler menjelajah sebelum menambah draw yang sama."
+
+#: ../../source/python/explanation/workflow-order.md:92
+msgid "**Going back is normal.** Poor priors and an inadequate model return you to stage 2; poor convergence returns you to the sampler settings. Each stage must be passed before the next is trusted, however many times you pass through it."
+msgstr "**Kembali ke tahap sebelumnya itu wajar.** Prior yang buruk dan model yang tidak memadai mengembalikan Anda ke tahap 2; konvergensi yang buruk mengembalikan Anda ke pengaturan sampler. Setiap tahap harus lolos sebelum tahap berikutnya dipercaya, berapa kali pun Anda melewatinya."
+
+#: ../../source/python/explanation/workflow-order.md:96
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/explanation/workflow-order.md:98
+#, python-brace-format
+msgid "The stages, one page each: {doc}`../how-to/index`."
+msgstr "Tahap-tahapnya, satu halaman per tahap: {doc}`../how-to/index`."
+
+#: ../../source/python/explanation/workflow-order.md:99
+#, python-brace-format
+msgid "Choosing sampler settings: {doc}`../how-to/04-fit-model`."
+msgstr "Memilih pengaturan sampler: {doc}`../how-to/04-fit-model`."
+
+#: ../../source/python/explanation/workflow-order.md:101
+msgid "References"
+msgstr "Referensi"
+
+#: ../../source/python/explanation/workflow-order.md:103
+msgid "Rao, J.N.K. & Molina, I. (2015). *Small Area Estimation* (2nd ed.). Wiley."
+msgstr "Rao, J.N.K. & Molina, I. (2015). *Small Area Estimation* (2nd ed.). Wiley."
+
+#: ../../source/python/explanation/workflow-order.md:104
+msgid "Capretto, T. et al. (2022). Bambi: A simple interface for fitting Bayesian linear models in Python. *Journal of Statistical Software*, 103(15)."
+msgstr "Capretto, T. et al. (2022). Bambi: A simple interface for fitting Bayesian linear models in Python. *Journal of Statistical Software*, 103(15)."
+

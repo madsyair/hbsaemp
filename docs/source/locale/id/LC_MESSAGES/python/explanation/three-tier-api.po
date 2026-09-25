@@ -1,0 +1,177 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/explanation/three-tier-api.md:1
+msgid "Why there are three ways to build the same model"
+msgstr "Mengapa ada tiga cara membangun model yang sama"
+
+#: ../../source/python/explanation/three-tier-api.md:3
+msgid "Each interface asks for one decision fewer than the one above it."
+msgstr "Setiap antarmuka meminta satu keputusan lebih sedikit daripada antarmuka di atasnya."
+
+#: ../../source/python/explanation/three-tier-api.md:5
+msgid "The question"
+msgstr "Pertanyaannya"
+
+#: ../../source/python/explanation/three-tier-api.md:7
+msgid "Three functions build the same model. `hbm_gaussian()` takes a response and a list of auxiliary variables. `hbm_flex()` takes the same plus a family. `create_model()` takes a formula. Which one is the real API, and what are the others for?"
+msgstr "Tiga fungsi membangun model yang sama. `hbm_gaussian()` menerima respons dan daftar variabel penyerta. `hbm_flex()` menerima hal yang sama ditambah family. `create_model()` menerima formula. Mana API yang sesungguhnya, dan untuk apa yang lain?"
+
+#: ../../source/python/explanation/three-tier-api.md:11
+msgid "Background"
+msgstr "Latar belakang"
+
+#: ../../source/python/explanation/three-tier-api.md:13
+msgid "The R package offers a single entry point in the style of `caret::train()`: one function, with a family argument selecting the model."
+msgstr "Paket R menawarkan satu titik masuk bergaya `caret::train()`: satu fungsi, dengan argumen family yang memilih modelnya."
+
+#: ../../source/python/explanation/three-tier-api.md:16
+msgid "That design assumes the caller writes model formulas. Someone who knows they have a proportion, three auxiliary variables and a district column may not know the formula language, and should not need it."
+msgstr "Rancangan itu mengasumsikan pemanggil menulis formula model. Orang yang tahu bahwa ia punya proporsi, tiga variabel penyerta, dan kolom kabupaten/kota mungkin tidak menguasai bahasa formula, dan semestinya tidak perlu."
+
+#: ../../source/python/explanation/three-tier-api.md:20
+msgid "The reasoning"
+msgstr "Penalarannya"
+
+#: ../../source/python/explanation/three-tier-api.md:22
+msgid "The three interfaces form one chain, each link removing a decision:"
+msgstr "Ketiga antarmuka membentuk satu rantai, dengan setiap mata rantai menghilangkan satu keputusan:"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "Interface"
+msgstr "Antarmuka"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "You supply"
+msgstr "Yang Anda berikan"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "It decides for you"
+msgstr "Yang diputuskan untuk Anda"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "Beginner: `hbm_beta`, `hbm_gaussian`, `hbm_binomial`"
+msgstr "Pemula: `hbm_beta`, `hbm_gaussian`, `hbm_binomial`"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "response, auxiliary list, the family's own columns"
+msgstr "respons, daftar variabel penyerta, kolom milik family itu sendiri"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "the family and the formula"
+msgstr "family dan formula"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "Intermediate: `hbm_flex`"
+msgstr "Menengah: `hbm_flex`"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "response, auxiliary list, family"
+msgstr "respons, daftar variabel penyerta, family"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "the formula"
+msgstr "formulanya"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "Advanced: `create_model` / `hbm`"
+msgstr "Mahir: `create_model` / `hbm`"
+
+#: ../../source/python/explanation/three-tier-api.md
+msgid "nothing"
+msgstr "tidak ada"
+
+#: ../../source/python/explanation/three-tier-api.md:34
+msgid "`create_model` starts with `formula`, `family`, `data`. `hbm_flex` replaces the formula with `response` and `auxiliary`. `hbm_gaussian` also drops `family` and exposes `sampling_var`, the extra column a Gaussian small area model needs."
+msgstr "`create_model` dimulai dengan `formula`, `family`, `data`. `hbm_flex` mengganti formula dengan `response` dan `auxiliary`. `hbm_gaussian` juga menghilangkan `family` dan menyediakan `sampling_var`, kolom tambahan yang dibutuhkan model area kecil Gaussian."
+
+#: ../../source/python/explanation/three-tier-api.md:38
+msgid "Where a family's own arguments live"
+msgstr "Tempat argumen khas sebuah family"
+
+#: ../../source/python/explanation/three-tier-api.md:40
+msgid "Only the beginner interface names a family's columns: `hbm_beta` takes `n` and `deff`, and `hbm_binomial` takes `trials`. `hbm_flex` passes them through two generic arguments:"
+msgstr "Hanya antarmuka tingkat pemula yang menyebut kolom milik family: `hbm_beta` menerima `n` dan `deff`, dan `hbm_binomial` menerima `trials`. `hbm_flex` menyalurkannya melalui dua argumen umum:"
+
+#: ../../source/python/explanation/three-tier-api.md:51
+msgid "`addition_var` is the column the likelihood needs beside the response, and `aux_args` holds the rest. A new family declares its columns in the registry and reaches `hbm_flex` through these two arguments, so `hbm_flex` never changes. At the beginner interface the names stay explicit, so a typo is an immediate `TypeError`."
+msgstr "`addition_var` adalah kolom yang dibutuhkan likelihood di samping respons, dan `aux_args` memuat sisanya. Family baru mendeklarasikan kolomnya di registri dan mencapai `hbm_flex` melalui kedua argumen ini, sehingga `hbm_flex` tidak pernah berubah. Di antarmuka tingkat pemula nama-namanya tetap eksplisit, sehingga salah ketik langsung menjadi `TypeError`."
+
+#: ../../source/python/explanation/three-tier-api.md:56
+msgid "Why each interface delegates"
+msgstr "Mengapa setiap antarmuka mendelegasikan"
+
+#: ../../source/python/explanation/three-tier-api.md:58
+msgid "Each interface calls the one after it. The beginner interface fixes the family and calls `hbm_flex`, which builds the formula and calls `create_model`, where validation, group injection and construction happen."
+msgstr "Setiap antarmuka memanggil antarmuka sesudahnya. Antarmuka tingkat pemula menetapkan family lalu memanggil `hbm_flex`, yang membangun formula lalu memanggil `create_model`, tempat validasi, penyisipan grup, dan konstruksi terjadi."
+
+#: ../../source/python/explanation/three-tier-api.md:62
+msgid "Three separate implementations would be three places for behaviour to drift. A validation rule added to `create_model` but not to `hbm_beta` would make the same model behave differently depending on the function used. Delegation rules that out."
+msgstr "Tiga implementasi terpisah berarti tiga tempat bagi perilaku untuk saling menjauh. Aturan validasi yang ditambahkan ke `create_model` tetapi tidak ke `hbm_beta` akan membuat model yang sama berperilaku berbeda tergantung fungsi yang dipakai. Delegasi mencegah hal itu."
+
+#: ../../source/python/explanation/three-tier-api.md:66
+msgid "Why the signatures are narrow"
+msgstr "Mengapa signature-nya sempit"
+
+#: ../../source/python/explanation/three-tier-api.md:68
+msgid "No interface accepts a catch-all `**kwargs`. Every argument is named, and each shortcut exposes only its own family's arguments."
+msgstr "Tidak ada antarmuka yang menerima `**kwargs` penampung segala. Setiap argumen dinamai, dan setiap pintasan hanya menyediakan argumen milik family-nya sendiri."
+
+#: ../../source/python/explanation/three-tier-api.md:71
+msgid "`hbm_gaussian(..., trials=\"n\")` is therefore a `TypeError` raised by Python at the call, naming the argument. A permissive signature would pass the mistake several layers down, or ignore it and build a different model from the one requested."
+msgstr "Karena itu `hbm_gaussian(..., trials=\"n\")` adalah `TypeError` yang dimunculkan Python pada saat pemanggilan, dengan menyebutkan argumennya. Signature yang longgar akan meneruskan kesalahan itu beberapa lapis ke dalam, atau mengabaikannya dan membangun model yang berbeda dari yang diminta."
+
+#: ../../source/python/explanation/three-tier-api.md:75
+msgid "Why the advanced interface still exists"
+msgstr "Mengapa antarmuka tingkat mahir tetap ada"
+
+#: ../../source/python/explanation/three-tier-api.md:77
+msgid "The beginner and intermediate interfaces can add only one random-effect term: the random intercept `(1|area)`, through `area_var=`. Any other term, such as a random slope `(x1|group)`, needs a formula, and a formula needs `create_model`. Transformations and interactions are computed as columns at every interface."
+msgstr "Antarmuka tingkat pemula dan menengah hanya dapat menambahkan satu suku efek acak: intersep acak `(1|area)`, melalui `area_var=`. Suku lain, misalnya kemiringan acak `(x1|group)`, membutuhkan formula, dan formula membutuhkan `create_model`. Transformasi dan interaksi dihitung sebagai kolom di semua antarmuka."
+
+#: ../../source/python/explanation/three-tier-api.md:82
+msgid "Consequences"
+msgstr "Konsekuensi"
+
+#: ../../source/python/explanation/three-tier-api.md:84
+msgid "**Start with the simplest interface that can express your model.** It has the fewest arguments to get wrong. Move to the next one when you need something it cannot express."
+msgstr "**Mulailah dengan antarmuka paling sederhana yang dapat menyatakan model Anda.** Antarmuka itu memiliki paling sedikit argumen yang bisa salah. Pindah ke antarmuka berikutnya ketika Anda membutuhkan sesuatu yang tidak dapat dinyatakannya."
+
+#: ../../source/python/explanation/three-tier-api.md:87
+msgid "**A translated R script uses the advanced interface.** `hbm()` is `create_model()`, so an `hbsaems` call carries over unchanged."
+msgstr "**Skrip R yang diterjemahkan memakai antarmuka tingkat mahir.** `hbm()` adalah `create_model()`, sehingga pemanggilan `hbsaems` terbawa tanpa perubahan."
+
+#: ../../source/python/explanation/three-tier-api.md:90
+msgid "**`model.formula` is the formula that is fitted.** Whatever the interface, it shows the resolved formula, including the group term added for you."
+msgstr "**`model.formula` adalah formula yang di-fit.** Apa pun antarmukanya, atribut ini menampilkan formula yang sudah diselesaikan, termasuk suku grup yang ditambahkan untuk Anda."
+
+#: ../../source/python/explanation/three-tier-api.md:93
+msgid "**Family-specific columns are checked against the family** at every interface, so a stray argument fails the same way everywhere."
+msgstr "**Kolom khusus family diperiksa terhadap family-nya** di setiap antarmuka, sehingga argumen yang salah tempat gagal dengan cara yang sama di mana pun."
+
+#: ../../source/python/explanation/three-tier-api.md:96
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/explanation/three-tier-api.md:98
+#, python-brace-format
+msgid "How to specify a model with each interface: {doc}`../how-to/02-specify-model`."
+msgstr "Cara menspesifikasikan model dengan setiap antarmuka: {doc}`../how-to/02-specify-model`."
+

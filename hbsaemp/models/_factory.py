@@ -271,33 +271,32 @@ def create_model(
             `{"x1": Prior("Normal", mu=0, sigma=1)}`.
         group: Grouping column for random effects.
         handle_missing: Only `"deleted"` is supported in v1.
-        trials: Binomial — column with trial counts (required).
-        n: Beta — survey sample-size column; use with `deff` (together they
-            give phi = n/deff - 1).
-        deff: Beta — design-effect column; use with `n` (together they give
-            phi = n/deff - 1).
-        sampling_var: Gaussian FH — column with known sampling variances D_i,
-            enables the FH offset.
-        link: Override default link.
-        squeeze: Beta — apply Smithson-Verkuilen squeeze `(y*(n-1)+0.5)/n`.
-            Only when data has y=0 or y=1 (requires n+deff).
-        fixed_params: `{parameter: column name or number}` pinning a
+        trials: Binomial: column of trial counts (required).
+        n: Beta: survey sample-size column, used with `deff` to give
+            phi = n/deff - 1.
+        deff: Beta: design-effect column, used with `n` to give
+            phi = n/deff - 1.
+        sampling_var: Gaussian Fay-Herriot: column of known sampling
+            variances D_i; enables the FH offset.
+        link: Override the default link.
+        squeeze: Beta: apply the Smithson-Verkuilen squeeze
+            `(y*(n-1)+0.5)/n`. Only for data with y=0 or y=1; requires `n`
+            and `deff`.
+        fixed_params: `{parameter: column name or number}` fixing a
             distributional parameter to known values instead of sampling it,
-            e.g. `{"sigma": "sd_col"}` or `{"sigma": 2.0}`. The value is the
-            parameter itself, not its linear predictor — hbsaemp applies the
-            link. Only parameters the family declares as pinnable are
-            accepted, and a parameter already pinned through the survey-design
-            arguments (`sampling_var`, `n`+`deff`) is refused rather than
-            silently overridden.
-        addition_var: Column for the family's addition term, named without
-            knowing the family's own vocabulary — `addition_var="n"` on a
-            Binomial is `trials="n"`. Refused for a family that takes none.
-        aux_args: `{parameter: value}` for the family's own parameters, using
-            the same names as the keyword arguments above
-            (`{"n": "n", "deff": "deff"}` is `n="n", deff="deff"`). The two
-            forms are interchangeable for the families listed here; for a
+            e.g. `{"sigma": "sd_col"}` or `{"sigma": 2.0}`. Give the value on
+            the parameter's own scale; hbsaemp applies the link. Only
+            parameters the family declares pinnable are accepted, and a
+            parameter already pinned by `sampling_var` or `n`+`deff` raises.
+        addition_var: Column for the family's addition term, under a
+            family-neutral name: `addition_var="n"` on a Binomial is
+            `trials="n"`. Raises for a family that has none.
+        aux_args: `{parameter: value}` for the family's own parameters, with
+            the same names as the keyword arguments above:
+            `{"n": "n", "deff": "deff"}` equals `n="n", deff="deff"`. For a
             family whose parameters this signature does not name, `aux_args`
-            is the way to pass them. Keys are checked against the family spec.
+            is the only way to pass them. Keys are checked against the
+            family spec.
 
     Returns:
         Unfitted `BaseModel` subclass.

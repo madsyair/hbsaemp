@@ -1,0 +1,122 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/index.md:1
+msgid "How-to guides"
+msgstr "How-to guides"
+
+#: ../../source/python/how-to/index.md:3
+msgid "One page per stage of the Bayesian workflow, in the order you run them."
+msgstr "Satu halaman untuk setiap tahap alur kerja Bayesian, sesuai urutan pengerjaannya."
+
+#: ../../source/python/how-to/index.md
+msgid "Page"
+msgstr "Halaman"
+
+#: ../../source/python/how-to/index.md
+msgid "Next"
+msgstr "Lanjut ke"
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`01-load-data`"
+msgstr "{doc}`01-load-data`"
+
+#: ../../source/python/how-to/index.md
+msgid "2"
+msgstr "2"
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`02-specify-model`"
+msgstr "{doc}`02-specify-model`"
+
+#: ../../source/python/how-to/index.md
+msgid "3"
+msgstr "3"
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`03-check-priors`"
+msgstr "{doc}`03-check-priors`"
+
+#: ../../source/python/how-to/index.md
+msgid "Priors reasonable: 4. Otherwise back to 2."
+msgstr "Prior wajar: 4. Jika tidak, kembali ke 2."
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`04-fit-model`"
+msgstr "{doc}`04-fit-model`"
+
+#: ../../source/python/how-to/index.md
+msgid "5"
+msgstr "5"
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`05-check-convergence`"
+msgstr "{doc}`05-check-convergence`"
+
+#: ../../source/python/how-to/index.md
+msgid "Converged: 7. Otherwise 6."
+msgstr "Konvergen: 7. Jika tidak, 6."
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`06-update-model`"
+msgstr "{doc}`06-update-model`"
+
+#: ../../source/python/how-to/index.md
+msgid "Back to 5."
+msgstr "Kembali ke 5."
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`07-check-fit-and-compare`"
+msgstr "{doc}`07-check-fit-and-compare`"
+
+#: ../../source/python/how-to/index.md
+msgid "Model adequate: 8. Otherwise back to 2."
+msgstr "Model memadai: 8. Jika tidak, kembali ke 2."
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`08-prior-sensitivity`"
+msgstr "{doc}`08-prior-sensitivity`"
+
+#: ../../source/python/how-to/index.md
+msgid "9"
+msgstr "9"
+
+#: ../../source/python/how-to/index.md
+#, python-brace-format
+msgid "{doc}`09-estimate-areas`"
+msgstr "{doc}`09-estimate-areas`"
+
+#: ../../source/python/how-to/index.md
+msgid "Done."
+msgstr "Selesai."
+
+#: ../../source/python/how-to/index.md:17
+#, python-brace-format
+msgid "Moving from the R package? See {doc}`migrate-from-hbsaems`."
+msgstr "Beralih dari paket R? Lihat {doc}`migrate-from-hbsaems`."
+

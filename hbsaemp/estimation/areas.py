@@ -72,28 +72,26 @@ def estimate_areas(
 ) -> AreaEstimatesResult:
     """Compute per-area HB estimates from the posterior of the latent parameter.
 
-    For each area, draws are taken via `predict(kind="response_params")` —
-    posterior of mu (Gaussian/Beta) or p (Binomial) — never the
-    posterior predictive (which would re-add sampling variance and destroy
-    shrinkage; for Binomial it would also return counts not probabilities).
+    The draws come from `predict(kind="response_params")`: the posterior of
+    mu (Gaussian, Beta) or p (Binomial). The posterior predictive is not
+    used, because it adds the sampling variance back and undoes the
+    shrinkage; for Binomial it would also give counts, not probabilities.
 
-    Metrics per area (from `(total_draws, n_obs)` array):
-    `mean`, `sd`, `ci_lower`/`ci_upper` (HDI at `ci_prob`), `rse_pct =
-    sd / |mean| * 100`, `mse` (posterior variance), `rmse`.
+    Columns per area: `mean`, `sd`, `ci_lower` and `ci_upper` (HDI at
+    `ci_prob`), `rse_pct = sd / |mean| * 100`, `mse` (posterior variance)
+    and `rmse`.
 
-    Each row is one area (area-level data). Unit-level rows are summarised
-    per observation, not aggregated per area; a warning is logged when group
-    labels repeat. A `group` column is prepended when the model was fitted
-    with grouping.
+    Each row is one area. Unit-level rows are summarised per observation,
+    not per area, and a warning is logged when group labels repeat. A
+    `group` column is prepended when the model has a grouping column.
 
-    Out-of-sample rows need only the predictor and group columns: the
-    response and the survey-design columns (`sampling_var`, `n`/`deff`,
-    `trials`) do not enter the mean parameter. A row whose group label was
-    not seen during fitting is a non-sampled area. At each posterior draw its
-    area effect is taken from a randomly chosen fitted area (Bambi
-    `sample_new_groups=True`, equivalent to brms
-    `sample_new_levels="uncertainty"`), so its interval is wider than a
-    sampled area's. These draws are seeded by `config.random_seed`.
+    `new_data` needs only the predictor and group columns; the response and
+    the survey-design columns (`sampling_var`, `n`/`deff`, `trials`) do not
+    enter the mean. A group label not seen during fitting is a non-sampled
+    area: at each posterior draw, its area effect is taken from a randomly
+    chosen fitted area (Bambi `sample_new_groups=True`, brms
+    `sample_new_levels="uncertainty"`), so its interval is wider. These draws
+    are seeded by `config.random_seed`.
 
     Args:
         model: Fitted `BaseModel`.

@@ -1,6 +1,6 @@
 # Python API
 
-Write the analysis as code. This track is self-contained: everything you need is here.
+Write the analysis as code.
 
 ::::{grid} 1 1 2 2
 :gutter: 3
@@ -14,7 +14,7 @@ A guided lesson through one complete piece of work.
 :::{grid-item-card} How-to guides
 :link: how-to/index
 :link-type: doc
-One page per stage of the Bayesian workflow.
+One page per stage of the Bayesian workflow, in order.
 :::
 
 :::{grid-item-card} Reference

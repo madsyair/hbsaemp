@@ -14,8 +14,23 @@ copyright = f"2026, {author}"
 version = hbsaemp.__version__
 release = version
 
-language = "en"
 master_doc = "index"
+
+# -- Languages ------------------------------------------------------------
+# English is the source; the Indonesian site is built from the same sources
+# with DOCS_LANG=id (docs/i18n.py does both). An environment variable rather
+# than `-D language=id`, because strings set in this file, such as the search
+# placeholder below, have to follow the language too.
+#
+# Translations live in locale/id/LC_MESSAGES/, one .po per page
+# (gettext_compact = False keeps them reviewable). A sentence with no
+# translation falls back to English, which is how the API reference and the
+# GUI track, deliberately left untranslated, still appear on the Indonesian
+# site. locale/id/LC_MESSAGES/sphinx.po also covers the theme's own strings,
+# because pydata-sphinx-theme ships no Indonesian catalogue.
+language = os.environ.get("DOCS_LANG", "en")
+locale_dirs = ["locale/"]
+gettext_compact = False
 
 # -- Extensions -----------------------------------------------------------
 extensions = [
@@ -50,12 +65,16 @@ myst_heading_anchors = 3  # direct links to sub-headings
 
 # -- Notebook execution ---------------------------------------------------
 # Notebooks — the tutorial and the how-to pages that sample — are executed so
-# their outputs are always real. CI uses "force": a cache would make it quick but
-# hide code that has already broken, which is exactly what this check exists to
-# catch. A local build uses "cache", so a preview shows the same outputs while
-# re-running only the notebooks that changed. Set CI=1 locally to reproduce CI.
-on_ci = bool(os.environ.get("CI", ""))
-nb_execution_mode = "force" if on_ci else "cache"
+# their outputs are always real, through a cache that both language builds
+# share: the English build runs each notebook, the Indonesian build reuses the
+# result, since translation touches the prose and never the code.
+#
+# A notebook re-runs when its code changes. CI also keeps the cache between
+# runs, keyed on the package source, its dependencies and the week, so a change
+# to the package empties the cache and every notebook runs again: code that has
+# broken still fails the build, while a change to the prose alone runs nothing.
+nb_execution_mode = "cache"
+nb_execution_cache_path = os.path.join(os.path.dirname(__file__), "..", "_build", ".jupyter_cache")
 nb_execution_allow_errors = False
 nb_execution_raise_on_error = True
 nb_execution_timeout = 900
@@ -143,13 +162,18 @@ html_theme_options = {
     "show_nav_level": 1,
     "navigation_depth": 3,
     "show_toc_level": 2,
-    "search_bar_text": "Search the hbsaemp docs...",
+    "search_bar_text": {
+        "en": "Search the hbsaemp docs...",
+        "id": "Cari di dokumentasi hbsaemp...",
+    }[language],
     # `html_context` below supplies the repository coordinates, but the theme
     # only renders the "Edit this page" link when this switch is on as well.
     "use_edit_page_button": True,
-    # A two-state light/dark button (_templates/theme-toggle.html) in place of
-    # the theme's light/dark/system menu; light stays the default below.
-    "navbar_end": ["theme-toggle", "navbar-icon-links"],
+    # A link to the same page in the other language (_templates/
+    # language-switcher.html), and a two-state light/dark button
+    # (_templates/theme-toggle.html) in place of the theme's light/dark/system
+    # menu; light stays the default below.
+    "navbar_end": ["language-switcher", "theme-toggle", "navbar-icon-links"],
     # Credits the developers and links the project pages under about/.
     "footer_start": ["developed-by"],
     "footer_end": ["sphinx-version", "theme-version"],
