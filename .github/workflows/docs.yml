@@ -21,8 +21,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # The tutorials call the diagnostics helpers, which plot. Without a headless
-  # backend a CI runner has no display and the notebook execution dies.
+  # The tutorials and the sampling doctests call the diagnostics helpers, which
+  # plot. Without a headless backend a CI runner has no display and they die.
   MPLBACKEND: Agg
 
 jobs:
@@ -68,9 +68,11 @@ jobs:
         with:
           path: docs/_build/html
 
-  # Runs the code examples that are cheap and deterministic. Anything that
-  # samples is marked +SKIP in the pages themselves; proof that MCMC still
-  # works comes from the executed tutorials in `build`, not from here.
+  # Runs every `testcode` block in the pages, including the ones that sample.
+  # `doctest_global_setup` in conf.py shrinks each fit to 100 draws after 300
+  # tuning steps on 2 chains, so this proves the calls work end to end, not
+  # that the draws converge. Output that depends on the draws is matched with
+  # +ELLIPSIS; the structure around it is still checked.
   doctest:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
@@ -80,6 +82,13 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      # The sampling blocks compile models too; same cache as `build`.
+      - name: Cache PyTensor compiledir
+        uses: actions/cache@v5
+        with:
+          path: ~/.pytensor
+          key: pytensor-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml') }}
+          restore-keys: pytensor-${{ runner.os }}-py3.12-
       - name: Install package and documentation toolchain
         run: pip install -e ".[bambi]" -r docs/requirements-docs.txt
       - name: Run documentation doctests

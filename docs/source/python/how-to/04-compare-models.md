@@ -15,7 +15,13 @@ untrustworthy draws produces a trustworthy-looking ranking of nothing.
 
 ## Do it
 
-```python
+```{testsetup}
+from hbsaemp import create_model, load_dataset
+
+df = load_dataset("data_fhnorm")
+```
+
+```{testcode}
 from hbsaemp import compare_models
 
 m1 = create_model("y ~ x1", family="gaussian", data=df,
@@ -29,11 +35,20 @@ cmp = compare_models([m1, m2])
 print(cmp.summary())
 ```
 
+```{testoutput}
+:hide:
+:options: +ELLIPSIS
+
+ComparisonResult
+  LOO  : {model_0: ..., model_1: ...}
+...
+```
+
 The R-style alias `hbmc` is the same function.
 
 Two optional analyses run per model on request:
 
-```python
+```{testcode}
 cmp = compare_models([m1, m2], metrics=["loo", "bf"], run_prior_sensitivity=True)
 cmp.bayes_factor["model_1"]        # BF10 / BF01 per coefficient
 cmp.prior_sensitivity["model_1"]   # prior / likelihood sensitivity per parameter

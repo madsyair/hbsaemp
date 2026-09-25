@@ -71,10 +71,10 @@ hbsaemp/
 ├── models/
 │   ├── _config.py           ModelConfig  (= trainControl)
 │   ├── _base.py             BaseModel ABC · ModelResult dataclass
-│   ├── _factory.py          create_model() / hbm()  · MODEL_REGISTRY
+│   ├── _factory.py          create_model() / hbm() (tier 3) · MODEL_REGISTRY
 │   ├── _family_spec.py      FamilySpec · FAMILY_SPECS (single source of truth)
 │   ├── _flex.py             hbm_flex (tier 2)
-│   ├── _shortcuts.py        hbm_{gaussian,beta,binomial} (tier 3)
+│   ├── _shortcuts.py        hbm_{gaussian,beta,binomial} (tier 1)
 │   ├── _prior.py            Prior value object
 │   └── _gaussian.py · _beta.py · _binomial.py   family hooks
 ├── data/

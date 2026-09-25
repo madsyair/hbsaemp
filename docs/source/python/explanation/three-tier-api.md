@@ -1,7 +1,7 @@
 # Why there are three ways to build the same model
 
 The same model can be written three ways, and each tier hides one more decision than the
-tier below it.
+tier above it.
 
 ## The question
 
@@ -31,9 +31,9 @@ hbm_gaussian()  →  hbm_flex()  →  create_model()  →  the model object
 
 | Tier | You supply | It decides for you |
 | --- | --- | --- |
-| 3 — `hbm_beta`, `hbm_gaussian`, `hbm_binomial` | response, auxiliary list, the family's own columns | the family, and the formula |
-| 2 — `hbm_flex` | response, auxiliary list, family | the formula |
-| 1 — `create_model` / `hbm` | the formula itself | nothing |
+| 1 — beginner interface: `hbm_beta`, `hbm_gaussian`, `hbm_binomial` | response, auxiliary list, the family's own columns | the family, and the formula |
+| 2 — intermediate interface: `hbm_flex` | response, auxiliary list, family | the formula |
+| 3 — advanced interface: `create_model` / `hbm` | the formula itself | nothing |
 
 Compare the signatures and the pattern is visible without reading any prose.
 `create_model` opens with `formula`, `family`, `data`. `hbm_flex` replaces the formula
@@ -42,14 +42,14 @@ exposes `sampling_var` — the one extra column a Gaussian small area model actu
 
 ### Where a family's own vocabulary lives
 
-Tier 3 is the only tier that names a family's columns. `hbm_beta` takes `n` and `deff`;
+Tier 1 is the only tier that names a family's columns. `hbm_beta` takes `n` and `deff`;
 `hbm_binomial` takes `trials`. Tier 2 takes neither — it routes them through two generic
 arguments instead:
 
 ```python
-hbm_binomial("y", ["x1"], df, trials="n")                   # tier 3
+hbm_binomial("y", ["x1"], df, trials="n")                   # tier 1
 hbm_flex("y", ["x1"], df, family="binomial", addition_var="n")   # the same model
-hbm_beta("y", ["x1"], df, n="n", deff="deff")               # tier 3
+hbm_beta("y", ["x1"], df, n="n", deff="deff")               # tier 1
 hbm_flex("y", ["x1"], df, family="beta",
          aux_args={"n": "n", "deff": "deff"})               # the same model
 ```
@@ -57,13 +57,13 @@ hbm_flex("y", ["x1"], df, family="beta",
 `addition_var` is whatever column the likelihood needs beside the response, and
 `aux_args` carries the rest. The payoff is that adding a distribution never edits
 `hbm_flex` — a new family declares its columns in the registry and reaches tier 2
-through the same two doors every other family uses. The names stay spelled out at tier 3,
+through the same two doors every other family uses. The names stay spelled out at tier 1,
 where a typo is still an immediate `TypeError`.
 
 ### Why delegation rather than three implementations
 
-Each tier calls the one below it. Tier 3 assembles nothing itself; it fixes the family
-and hands over to tier 2, which builds the formula and hands over to tier 1, where the
+Each tier calls the one above it. Tier 1 assembles nothing itself; it fixes the family
+and hands over to tier 2, which builds the formula and hands over to tier 3, where the
 validation, the group injection and the construction live.
 
 The alternative — three functions that each build a model their own way — would mean
@@ -86,21 +86,21 @@ the one you asked for.
 A narrow signature is the cheapest possible validation: it costs nothing at runtime and
 the error message writes itself.
 
-### Why tier 1 still exists
+### Why tier 3 still exists
 
-Tier 3 cannot express everything. Interactions, an intercept you want suppressed, a
+Tier 1 cannot express everything. Interactions, an intercept you want suppressed, a
 random slope rather than a random intercept — these need the formula language, and the
-formula language needs tier 1. Removing it would trade a small gain in tidiness for a
+formula language needs tier 3. Removing it would trade a small gain in tidiness for a
 ceiling on what the package can express.
 
 ## Consequences
 
-**Pick the highest tier that can say what you mean.** Higher tiers have fewer ways to go
-wrong, because there are fewer things to get wrong. Drop a tier when you hit something it
-cannot express, not on principle.
+**Start at the lowest tier that can say what you mean.** Lower tiers have fewer ways to go
+wrong, because there are fewer things to get wrong. Move up a tier when you hit something
+it cannot express, not on principle.
 
-**A translated R script lands on tier 1.** `hbm()` is the same function as
-`create_model()`, so an `hbsaems` call carries over unchanged. Tier 2 and 3 are additions
+**A translated R script lands on tier 3.** `hbm()` is the same function as
+`create_model()`, so an `hbsaems` call carries over unchanged. Tiers 1 and 2 are additions
 this port makes available, not replacements.
 
 **The formula you get is the formula that is used.** Whichever tier you enter through,

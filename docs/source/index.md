@@ -7,9 +7,11 @@ Pick one; each track is complete on its own.
 
 ## Install
 
+hbsaemp is not on PyPI; install it straight from the GitHub repository.
+
 ```bash
-pip install hbsaemp          # Python API
-pip install hbsaemp[gui]     # adds the graphical interface
+pip install "hbsaemp[bambi] @ git+https://github.com/madsyair/hbsaemp"   # Python API
+pip install "hbsaemp[gui] @ git+https://github.com/madsyair/hbsaemp"     # adds the graphical interface
 ```
 
 ## Choose a track

@@ -29,7 +29,7 @@ _DRAWS = 20
 
 
 # ---------------------------------------------------------------------------
-# Unfitted model builders — one per family (tier 3, the GUI's entry point)
+# Unfitted model builders — one per family (tier 1, the GUI's entry point)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")

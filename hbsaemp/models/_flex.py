@@ -1,4 +1,4 @@
-"""Tier 2 — `hbm_flex()`: family-agnostic wrapper that builds the formula.
+"""Tier 2 (intermediate interface) — `hbm_flex()`, which builds the formula.
 
 User supplies `response` (str) and `auxiliary` (list of column names)
 instead of a full R-style formula. The constructed formula is forwarded
@@ -9,7 +9,7 @@ Family-agnostic is literal: no argument here names a family's own vocabulary.
 A family's parameters arrive through `aux_args`, its addition term through
 `addition_var`, and its pinned parameters through `fixed_params` — the same
 three channels hbsaems' `hbm_flex()` uses. Adding a family therefore does not
-touch this signature. Tier 3 (`_shortcuts.py`) is where the per-family names
+touch this signature. Tier 1 (`_shortcuts.py`) is where the per-family names
 live, so a typo there is still a Python `TypeError`.
 """
 
@@ -61,7 +61,7 @@ def hbm_flex(
 ) -> BaseModel:
     """Build an unfitted model from response + auxiliary list (no formula).
 
-    Tier 2 of the 3-tier API. The formula
+    Tier 2 (intermediate interface) of the 3-tier API. The formula
     ``"{response} ~ {' + '.join(auxiliary)}"`` is assembled internally and
     forwarded to `create_model()`. Family validation, group auto-injection,
     and prior checks all happen downstream in `create_model()` — this

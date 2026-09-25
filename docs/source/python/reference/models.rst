@@ -9,8 +9,10 @@ the family registry that drives them.
 Constructors
 ------------
 
-The three tiers cascade: a tier 3 shortcut calls :func:`hbm_flex`, which calls
-:func:`create_model`. Pick the tier that matches how much you want to spell out.
+The three tiers cascade: a tier 1 shortcut (the beginner interface, such as
+:func:`hbm_gaussian`) calls :func:`hbm_flex` (tier 2, the intermediate
+interface), which calls :func:`create_model` (tier 3, the advanced interface).
+Pick the tier that matches how much you want to spell out.
 
 .. autosummary::
    :toctree: generated/

@@ -256,6 +256,9 @@ def create_model(
 ) -> BaseModel:
     """Build an unfitted model (single entry point); call `.fit()` to sample.
 
+    Tier 3 (advanced interface) of the 3-tier API; `hbm_flex()` and the
+    `hbm_<family>()` shortcuts delegate here.
+
     Args:
         formula: R/lme4-style formula, e.g. `"y ~ x1 + x2 + (1|group)"`.
             If `group` is also supplied and `(1|group)` is not in the

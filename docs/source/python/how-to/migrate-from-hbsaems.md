@@ -121,7 +121,13 @@ unfitted model and you call `fit()` yourself. That split is what makes
 {doc}`01-specify-model` cheap to check, and what allows a prior predictive check before
 any sampling time is spent.
 
-```python
+```{testsetup}
+from hbsaemp import load_dataset
+
+df = load_dataset("data_fhnorm")
+```
+
+```{testcode}
 model = hbm("y ~ x1 + x2", family="gaussian", data=df, group="group")
 model.fit()
 ```
