@@ -1,0 +1,139 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/01-load-data.md:1
+msgid "1 · Load the data"
+msgstr "1 · Memuat data"
+
+#: ../../source/python/how-to/01-load-data.md:3
+msgid "Get a table with one row per small area into a `pandas.DataFrame`."
+msgstr "Masukkan tabel dengan satu baris per area kecil ke dalam `pandas.DataFrame`."
+
+#: ../../source/python/how-to/01-load-data.md:5
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/01-load-data.md:7
+msgid "A model reads four kinds of column:"
+msgstr "Model membaca empat jenis kolom:"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "Column"
+msgstr "Kolom"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "In `data_fhnorm`"
+msgstr "Di `data_fhnorm`"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "Response: the direct estimate per area"
+msgstr "Respons: estimasi langsung per area"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "`y`"
+msgstr "`y`"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "Auxiliary variables"
+msgstr "Variabel penyerta"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "`x1`, `x2`, `x3`"
+msgstr "`x1`, `x2`, `x3`"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "Area identifier"
+msgstr "Identitas area"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "`group`"
+msgstr "`group`"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "Survey-design columns required by the family"
+msgstr "Kolom desain survei yang dibutuhkan family"
+
+#: ../../source/python/how-to/01-load-data.md
+msgid "`D`, the sampling variance"
+msgstr "`D`, varians sampling"
+
+#: ../../source/python/how-to/01-load-data.md:16
+msgid "The survey-design columns depend on the family. Gaussian needs the sampling variance, Beta needs the sample size and the design effect, and Binomial needs the number of trials."
+msgstr "Kolom desain survei bergantung pada family. Gaussian membutuhkan varians sampling, Beta membutuhkan ukuran sampel dan efek desain, dan Binomial membutuhkan jumlah percobaan."
+
+#: ../../source/python/how-to/01-load-data.md:19
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/01-load-data.md:21
+msgid "Load a bundled dataset by name:"
+msgstr "Muat dataset bawaan berdasarkan namanya:"
+
+#: ../../source/python/how-to/01-load-data.md:36
+msgid "Two lists name the bundled datasets:"
+msgstr "Dua daftar memuat nama dataset bawaan:"
+
+#: ../../source/python/how-to/01-load-data.md:50
+#, python-brace-format
+msgid "The synthetic datasets in `AVAILABLE_DATASETS` are ready to model. The real Papua datasets in `REAL_DATASETS` load as published and need preparing first, as shown in {doc}`../tutorials/case-study-papua`."
+msgstr "Dataset sintetis di `AVAILABLE_DATASETS` siap dimodelkan. Dataset Papua yang nyata di `REAL_DATASETS` dimuat apa adanya seperti yang dipublikasikan dan perlu disiapkan terlebih dahulu, seperti ditunjukkan di {doc}`../tutorials/case-study-papua`."
+
+#: ../../source/python/how-to/01-load-data.md:54
+msgid "For your own data, read the file with pandas:"
+msgstr "Untuk data Anda sendiri, baca berkasnya dengan pandas:"
+
+#: ../../source/python/how-to/01-load-data.md:62
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/01-load-data.md:64
+msgid "Count the missing values:"
+msgstr "Hitung nilai yang hilang:"
+
+#: ../../source/python/how-to/01-load-data.md:74
+msgid "A row with a missing value in any column the model uses is dropped when the model is built. Real data often has some:"
+msgstr "Baris yang memiliki nilai hilang di kolom mana pun yang dipakai model dibuang saat model dibangun. Data nyata sering memilikinya:"
+
+#: ../../source/python/how-to/01-load-data.md:86
+msgid "The synthetic datasets also contain the values used to generate them, such as `theta_true` and `u`. Use them only to check estimates against the truth, never as auxiliary variables."
+msgstr "Dataset sintetis juga memuat nilai yang dipakai untuk membangkitkannya, seperti `theta_true` dan `u`. Gunakan hanya untuk membandingkan estimasi dengan nilai sebenarnya, jangan pernah sebagai variabel penyerta."
+
+#: ../../source/python/how-to/01-load-data.md:89
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/01-load-data.md:91
+msgid "**The dataset name is unknown.** The message lists every valid name:"
+msgstr "**Nama dataset tidak dikenal.** Pesannya mencantumkan semua nama yang valid:"
+
+#: ../../source/python/how-to/01-load-data.md:104
+#, python-brace-format
+msgid "**An area spans several rows.** hbsaemp models area-level data. Aggregate unit-level records to one row per area first, for example with `df.groupby(...)`. Otherwise {doc}`09-estimate-areas` returns one row per observation and logs a warning."
+msgstr "**Satu area tersebar di beberapa baris.** hbsaemp memodelkan data tingkat area. Agregasikan dulu catatan tingkat unit menjadi satu baris per area, misalnya dengan `df.groupby(...)`. Jika tidak, {doc}`09-estimate-areas` menghasilkan satu baris per observasi dan mencatat peringatan."
+
+#: ../../source/python/how-to/01-load-data.md:108
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/01-load-data.md:110
+#, python-brace-format
+msgid "Every column of every bundled dataset is described in {doc}`../reference/datasets`."
+msgstr "Setiap kolom dari setiap dataset bawaan dijelaskan di {doc}`../reference/datasets`."
+

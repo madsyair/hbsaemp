@@ -1,0 +1,28 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/explanation/index.md:1
+msgid "Explanation"
+msgstr "Explanation"
+
+#: ../../source/python/explanation/index.md:3
+msgid "Context and reasoning. These pages answer *why*, and contain no steps to follow."
+msgstr "Konteks dan penalaran. Halaman-halaman ini menjawab *mengapa*, dan tidak memuat langkah yang harus diikuti."
+

@@ -1,0 +1,191 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/explanation/hb-sae.md:1
+msgid "What hierarchical Bayes small area estimation is"
+msgstr "Apa itu small area estimation dengan hierarchical Bayes"
+
+#: ../../source/python/explanation/hb-sae.md:3
+msgid "Why a direct estimate is unreliable for a small area, and how borrowing strength helps."
+msgstr "Mengapa estimasi langsung tidak dapat diandalkan untuk area kecil, dan bagaimana borrowing strength membantu."
+
+#: ../../source/python/explanation/hb-sae.md:5
+msgid "The question"
+msgstr "Pertanyaannya"
+
+#: ../../source/python/explanation/hb-sae.md:7
+msgid "A survey is designed for reliable national figures. Broken down by district, each district keeps only a few respondents. The district's direct estimate is still unbiased, but its variance is too large to support a decision."
+msgstr "Sebuah survei dirancang untuk angka nasional yang andal. Jika dipecah menurut kabupaten/kota, setiap kabupaten/kota hanya menyisakan sedikit responden. Estimasi langsungnya tetap tak bias, tetapi variansnya terlalu besar untuk mendukung keputusan."
+
+#: ../../source/python/explanation/hb-sae.md:11
+msgid "A bigger sample is too expensive. Publishing the noisy number means publishing a ranking that is mostly noise: next year's \"worst district\" will be another one, by chance alone."
+msgstr "Sampel yang lebih besar terlalu mahal. Menerbitkan angka yang penuh derau berarti menerbitkan peringkat yang sebagian besar hanyalah derau: \"kabupaten/kota terburuk\" tahun depan bisa berbeda, semata karena kebetulan."
+
+#: ../../source/python/explanation/hb-sae.md:14
+msgid "Small area estimation asks what else is known about a district besides its few sampled respondents."
+msgstr "Small area estimation bertanya apa lagi yang diketahui tentang sebuah kabupaten/kota selain segelintir responden yang tersampel."
+
+#: ../../source/python/explanation/hb-sae.md:17
+msgid "Background"
+msgstr "Latar belakang"
+
+#: ../../source/python/explanation/hb-sae.md:19
+msgid "Write the direct estimate for area $i$ as $y_i$ and the true value as $\\theta_i$. The survey gives"
+msgstr "Tuliskan estimasi langsung untuk area $i$ sebagai $y_i$ dan nilai sebenarnya sebagai $\\theta_i$. Survei memberikan"
+
+#: ../../source/python/explanation/hb-sae.md:22
+msgid "y_i = \\theta_i + e_i, \\qquad e_i \\sim N(0, D_i)"
+msgstr "y_i = \\theta_i + e_i, \\qquad e_i \\sim N(0, D_i)"
+
+#: ../../source/python/explanation/hb-sae.md:24
+msgid "where $D_i$ is the **sampling variance**, known from the survey design. A small area has a large $D_i$, and you know it."
+msgstr "dengan $D_i$ adalah **varians sampling**, yang diketahui dari desain survei. Area kecil memiliki $D_i$ yang besar, dan Anda mengetahuinya."
+
+#: ../../source/python/explanation/hb-sae.md:27
+msgid "The model links the true values through auxiliary variables $x_i$, such as administrative records or a census, available for every area:"
+msgstr "Model menghubungkan nilai-nilai sebenarnya melalui variabel penyerta $x_i$, misalnya catatan administratif atau sensus, yang tersedia untuk setiap area:"
+
+#: ../../source/python/explanation/hb-sae.md:30
+msgid "\\theta_i = x_i^\\top \\beta + u_i, \\qquad u_i \\sim N(0, \\sigma_u^2)"
+msgstr "\\theta_i = x_i^\\top \\beta + u_i, \\qquad u_i \\sim N(0, \\sigma_u^2)"
+
+#: ../../source/python/explanation/hb-sae.md:32
+msgid "The random effect $u_i$ allows for area-specific variation the regression does not explain."
+msgstr "Efek acak $u_i$ memberi ruang bagi variasi khas area yang tidak dijelaskan regresi."
+
+#: ../../source/python/explanation/hb-sae.md:34
+msgid "Together these two equations are the Fay-Herriot model (Fay & Herriot, 1979), which the Gaussian family of this package implements. Rao & Molina (2015) is the standard reference."
+msgstr "Kedua persamaan itu bersama-sama adalah model Fay-Herriot (Fay & Herriot, 1979), yang diimplementasikan family Gaussian di paket ini. Rao & Molina (2015) adalah rujukan standarnya."
+
+#: ../../source/python/explanation/hb-sae.md:37
+msgid "The reasoning"
+msgstr "Penalarannya"
+
+#: ../../source/python/explanation/hb-sae.md:39
+msgid "The model has two sources of information about $\\theta_i$: the survey, with precision $1/D_i$, and the regression, with precision $1/\\sigma_u^2$. Bayes' rule weights them by precision. For the Fay-Herriot model the posterior mean is"
+msgstr "Model memiliki dua sumber informasi tentang $\\theta_i$: survei, dengan presisi $1/D_i$, dan regresi, dengan presisi $1/\\sigma_u^2$. Aturan Bayes membobotinya menurut presisi. Untuk model Fay-Herriot, rata-rata posteriornya adalah"
+
+#: ../../source/python/explanation/hb-sae.md:43
+#, python-brace-format
+msgid ""
+"\\hat\\theta_i = \\gamma_i \\, y_i + (1 - \\gamma_i) \\, x_i^\\top \\beta,\n"
+"\\qquad \\gamma_i = \\frac{\\sigma_u^2}{\\sigma_u^2 + D_i}"
+msgstr ""
+"\\hat\\theta_i = \\gamma_i \\, y_i + (1 - \\gamma_i) \\, x_i^\\top \\beta,\n"
+"\\qquad \\gamma_i = \\frac{\\sigma_u^2}{\\sigma_u^2 + D_i}"
+
+#: ../../source/python/explanation/hb-sae.md:46
+msgid "**Small $D_i$** (a well-sampled area): $\\gamma_i$ is close to 1, and the estimate stays close to the direct estimate."
+msgstr "**$D_i$ kecil** (area yang tersampel baik): $\\gamma_i$ mendekati 1, dan estimasinya tetap dekat dengan estimasi langsung."
+
+#: ../../source/python/explanation/hb-sae.md:48
+msgid "**Large $D_i$** (few respondents): $\\gamma_i$ is close to 0, and the estimate moves towards $x_i^\\top \\beta$, the value the auxiliary variables predict."
+msgstr "**$D_i$ besar** (sedikit responden): $\\gamma_i$ mendekati 0, dan estimasinya bergeser ke arah $x_i^\\top \\beta$, nilai yang diprediksi variabel penyerta."
+
+#: ../../source/python/explanation/hb-sae.md:51
+msgid "This is **borrowing strength**: a poorly sampled area borrows from the pattern across all areas. The weight is not tuned by hand. It follows from two variances, one known from the design and one estimated from the data."
+msgstr "Inilah **borrowing strength**: area yang tersampel buruk meminjam dari pola di seluruh area. Bobotnya tidak disetel manual. Bobot itu mengikuti dua varians, satu diketahui dari desain dan satu diestimasi dari data."
+
+#: ../../source/python/explanation/hb-sae.md:55
+msgid "Why shrinkage reduces error"
+msgstr "Mengapa penyusutan mengurangi galat"
+
+#: ../../source/python/explanation/hb-sae.md:57
+msgid "The direct estimate is unbiased; the shrunk estimate is not. What matters for a decision is the total error:"
+msgstr "Estimasi langsung tak bias; estimasi yang disusutkan tidak. Yang penting bagi keputusan adalah galat totalnya:"
+
+#: ../../source/python/explanation/hb-sae.md:60
+#, python-brace-format
+msgid "\\text{MSE} = \\text{bias}^2 + \\text{variance}"
+msgstr "\\text{MSE} = \\text{bias}^2 + \\text{variance}"
+
+#: ../../source/python/explanation/hb-sae.md:62
+msgid "Shrinkage accepts a small bias for a large reduction in variance. When $D_i$ is large, the variance dominates, so the total error falls. The trade happens mostly where the direct estimate is weakest."
+msgstr "Penyusutan menerima sedikit bias demi penurunan varians yang besar. Ketika $D_i$ besar, varians mendominasi, sehingga galat totalnya turun. Pertukaran ini terutama terjadi di tempat estimasi langsung paling lemah."
+
+#: ../../source/python/explanation/hb-sae.md:66
+msgid "Why hierarchical, and why Bayesian"
+msgstr "Mengapa hierarkis, dan mengapa Bayesian"
+
+#: ../../source/python/explanation/hb-sae.md:68
+msgid "*Hierarchical* is the structure: areas at one level, and the parameters they share, $\\beta$ and $\\sigma_u^2$, at the level above. The shared parameters let one area's data inform another area's estimate."
+msgstr "*Hierarkis* adalah strukturnya: area di satu tingkat, dan parameter yang mereka bagi, $\\beta$ dan $\\sigma_u^2$, di tingkat di atasnya. Parameter bersama itu memungkinkan data satu area memberi informasi bagi estimasi area lain."
+
+#: ../../source/python/explanation/hb-sae.md:72
+msgid "*Bayesian* is how uncertainty is handled. $\\sigma_u^2$ is estimated from the same data. Plugging in an estimate and treating it as known makes intervals too narrow. Sampling from the joint posterior carries that uncertainty into the credible interval of every $\\theta_i$."
+msgstr "*Bayesian* adalah cara ketidakpastian ditangani. $\\sigma_u^2$ diestimasi dari data yang sama. Memasukkan sebuah estimasi dan memperlakukannya sebagai diketahui membuat interval terlalu sempit. Sampling dari posterior gabungan membawa ketidakpastian itu ke interval kredibel setiap $\\theta_i$."
+
+#: ../../source/python/explanation/hb-sae.md:77
+msgid "The posterior has no closed form for most families, so it is approximated by MCMC. That is why every estimate comes with convergence diagnostics."
+msgstr "Posterior tidak memiliki bentuk tertutup untuk sebagian besar family, sehingga didekati dengan MCMC. Itulah sebabnya setiap estimasi datang bersama diagnostik konvergensi."
+
+#: ../../source/python/explanation/hb-sae.md:80
+msgid "Why the estimate summarises $\\theta_i$, not $y_i$"
+msgstr "Mengapa estimasi merangkum $\\theta_i$, bukan $y_i$"
+
+#: ../../source/python/explanation/hb-sae.md:82
+msgid "The target is the true value $\\theta_i$. The posterior predictive distribution describes a new direct estimate $y_i$, which adds the sampling error $e_i$ back in. Summarising it would restore the noise the model was built to remove, so the area estimates summarise the posterior of $\\theta_i$."
+msgstr "Targetnya adalah nilai sebenarnya $\\theta_i$. Distribusi prediktif posterior menggambarkan estimasi langsung $y_i$ yang baru, yang menambahkan kembali galat sampling $e_i$. Merangkumnya akan mengembalikan derau yang ingin dihilangkan model, sehingga estimasi area merangkum posterior $\\theta_i$."
+
+#: ../../source/python/explanation/hb-sae.md:87
+msgid "Consequences"
+msgstr "Konsekuensi"
+
+#: ../../source/python/explanation/hb-sae.md:89
+msgid "**The estimates differ from the direct estimates.** If they match, the model contributed nothing. The gap should be widest where the sampling variance is largest."
+msgstr "**Estimasinya berbeda dari estimasi langsung.** Jika sama, model tidak memberikan kontribusi apa pun. Selisihnya semestinya paling lebar di area dengan varians sampling terbesar."
+
+#: ../../source/python/explanation/hb-sae.md:92
+msgid "**The auxiliary variables carry the benefit.** If $x_i$ does not predict $\\theta_i$, $\\sigma_u^2$ is large, $\\gamma_i$ stays near 1, and the direct estimates come back. Choosing auxiliary variables related to the outcome and available for every area is the substantive work."
+msgstr "**Variabel penyerta membawa manfaatnya.** Jika $x_i$ tidak memprediksi $\\theta_i$, $\\sigma_u^2$ besar, $\\gamma_i$ tetap dekat 1, dan estimasi langsung kembali muncul. Memilih variabel penyerta yang berkaitan dengan hasil dan tersedia untuk setiap area adalah pekerjaan substantifnya."
+
+#: ../../source/python/explanation/hb-sae.md:97
+msgid "**Every published estimate needs its uncertainty.** Shrinkage narrows the interval but does not remove it. The estimation output therefore reports the relative standard error with the mean."
+msgstr "**Setiap estimasi yang diterbitkan membutuhkan ketidakpastiannya.** Penyusutan mempersempit interval tetapi tidak menghapusnya. Karena itu output estimasi melaporkan relative standard error bersama rata-ratanya."
+
+#: ../../source/python/explanation/hb-sae.md:101
+msgid "**The sampling variances must be real.** $D_i$ is treated as known. A rough guess changes how much each area borrows, and the output does not show it."
+msgstr "**Varians sampling harus nyata.** $D_i$ diperlakukan sebagai diketahui. Tebakan kasar mengubah seberapa banyak setiap area meminjam, dan output tidak menunjukkannya."
+
+#: ../../source/python/explanation/hb-sae.md:104
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/explanation/hb-sae.md:106
+#, python-brace-format
+msgid "How to produce the area estimates and check the shrinkage: {doc}`../how-to/09-estimate-areas`."
+msgstr "Cara menghasilkan estimasi area dan memeriksa penyusutannya: {doc}`../how-to/09-estimate-areas`."
+
+#: ../../source/python/explanation/hb-sae.md:108
+msgid "References"
+msgstr "Referensi"
+
+#: ../../source/python/explanation/hb-sae.md:110
+msgid "Fay, R.E. & Herriot, R.A. (1979). Estimates of income for small places: an application of James-Stein procedures to census data. *Journal of the American Statistical Association*, 74(366), 269–277."
+msgstr "Fay, R.E. & Herriot, R.A. (1979). Estimates of income for small places: an application of James-Stein procedures to census data. *Journal of the American Statistical Association*, 74(366), 269–277."
+
+#: ../../source/python/explanation/hb-sae.md:113
+msgid "Rao, J.N.K. & Molina, I. (2015). *Small Area Estimation* (2nd ed.). Wiley."
+msgstr "Rao, J.N.K. & Molina, I. (2015). *Small Area Estimation* (2nd ed.). Wiley."
+
+#: ../../source/python/explanation/hb-sae.md:114
+msgid "Choir, A.S. et al. (2025). *hbsaems: Hierarchical Bayesian SAE Models*. R package."
+msgstr "Choir, A.S. et al. (2025). *hbsaems: Hierarchical Bayesian SAE Models*. R package."
+

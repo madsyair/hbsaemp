@@ -1,0 +1,28 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/about/license.md:5
+msgid "License"
+msgstr "Lisensi"
+
+#: ../../source/about/license.md:7
+msgid "hbsaemp is released under the GNU General Public License, version 3 or later (`GPL-3.0-or-later`) — the same terms as the R package hbsaems it is ported from, GPL (>= 3). The full text follows."
+msgstr "hbsaemp dirilis di bawah GNU General Public License versi 3 atau yang lebih baru (`GPL-3.0-or-later`) — ketentuan yang sama dengan paket R hbsaems yang menjadi asal porting-nya, GPL (>= 3). Teks lengkapnya (dalam bahasa Inggris) berikut ini."
+

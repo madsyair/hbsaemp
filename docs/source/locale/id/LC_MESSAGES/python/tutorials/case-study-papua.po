@@ -1,0 +1,588 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:10002
+msgid "Case study: morbidity rates in Papua"
+msgstr "Studi kasus: angka morbiditas di Papua"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:10004
+msgid "Estimate the 2023 morbidity rate of every district and city on Papua Island precisely enough to publish, from the published survey figures to a table ready to hand over."
+msgstr "Estimasi angka morbiditas 2023 untuk setiap kabupaten/kota di Pulau Papua dengan presisi yang cukup untuk dipublikasikan, dari angka survei yang telah terbit hingga tabel yang siap diserahkan."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:10007
+msgid "The analysis follows Prayoga, Pusponegoro, Sukim and Budiarti (2024), *Small area estimation for morbidity rate prediction*, Commun. Math. Biol. Neurosci. 2024:62 ([doi:10.28919/cmbn/8845](https://doi.org/10.28919/cmbn/8845)), which fits a hierarchical Bayes (HB) Beta-logistic model to the same data. It follows the six phases of CRISP-DM:"
+msgstr "Analisis ini mengikuti Prayoga, Pusponegoro, Sukim, dan Budiarti (2024), *Small area estimation for morbidity rate prediction*, Commun. Math. Biol. Neurosci. 2024:62 ([doi:10.28919/cmbn/8845](https://doi.org/10.28919/cmbn/8845)), yang melakukan fitting model hierarchical Bayes (HB) Beta-logistik pada data yang sama. Analisis mengikuti enam fase CRISP-DM:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "Phase"
+msgstr "Fase"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "hbsaemp"
+msgstr "hbsaemp"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "Other libraries"
+msgstr "Pustaka lain"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+#: ../../source/python/tutorials/case-study-papua.ipynb:30002
+msgid "1 · Business understanding"
+msgstr "1 · Business understanding"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "none"
+msgstr "tidak ada"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+#: ../../source/python/tutorials/case-study-papua.ipynb:40002
+msgid "2 · Data understanding"
+msgstr "2 · Data understanding"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "`load_dataset`, `REAL_DATASETS`"
+msgstr "`load_dataset`, `REAL_DATASETS`"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "pandas, NumPy, matplotlib"
+msgstr "pandas, NumPy, matplotlib"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+#: ../../source/python/tutorials/case-study-papua.ipynb:220002
+msgid "3 · Data preparation"
+msgstr "3 · Data preparation"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "pandas, NumPy, SciPy, matplotlib"
+msgstr "pandas, NumPy, SciPy, matplotlib"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+#: ../../source/python/tutorials/case-study-papua.ipynb:370002
+msgid "4 · Modeling"
+msgstr "4 · Modeling"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "`get_family_spec`, `ModelConfig`, `hbm_beta`, `check_data`, `check_prior`, `fit`"
+msgstr "`get_family_spec`, `ModelConfig`, `hbm_beta`, `check_data`, `check_prior`, `fit`"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+#: ../../source/python/tutorials/case-study-papua.ipynb:480002
+msgid "5 · Evaluation"
+msgstr "5 · Evaluation"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "`check_convergence`, `update_model`, `compare_models`, `estimate_areas`"
+msgstr "`check_convergence`, `update_model`, `compare_models`, `estimate_areas`"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "NumPy, pandas, matplotlib"
+msgstr "NumPy, pandas, matplotlib"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+#: ../../source/python/tutorials/case-study-papua.ipynb:760002
+msgid "6 · Deployment"
+msgstr "6 · Deployment"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "the `estimate_areas` result; `update_model` for the next round"
+msgstr "hasil `estimate_areas`; `update_model` untuk putaran berikutnya"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "pandas, matplotlib"
+msgstr "pandas, matplotlib"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:10022
+#, python-brace-format
+msgid "You need the package installed with its modelling extra, as shown on the {doc}`home page <../../index>`. Two models are sampled, so the notebook takes a few minutes to run."
+msgstr "Anda memerlukan paket yang terpasang beserta extra pemodelannya, seperti ditunjukkan di {doc}`beranda <../../index>`. Dua model di-sampling, sehingga notebook ini memerlukan beberapa menit untuk dijalankan."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:30004
+msgid "**The problem.** The morbidity rate is the percentage of the population with a health complaint in the past month that disrupted their daily activities. It is one of the indicators behind non-communicable disease control, which Law No. 17 of 2023 makes a regional priority, so each district needs a rate of its own."
+msgstr "**Masalahnya.** Angka morbiditas adalah persentase penduduk yang mengalami keluhan kesehatan dalam sebulan terakhir yang mengganggu kegiatan sehari-hari. Angka ini salah satu indikator di balik pengendalian penyakit tidak menular, yang dijadikan prioritas daerah oleh Undang-Undang Nomor 17 Tahun 2023, sehingga setiap kabupaten/kota memerlukan angkanya sendiri."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:30009
+msgid "The rate is estimated directly from the National Socio-Economic Survey (Susenas). In a district with few sampled households the direct estimate loses precision, and Prayoga et al. single out Papua Island as the region where this happens: in 2023, 7 of its 42 districts and cities have a relative standard error (RSE) above 25%."
+msgstr "Angka ini diestimasi secara langsung dari Survei Sosial Ekonomi Nasional (Susenas). Di kabupaten/kota dengan sedikit rumah tangga tersampel, estimasi langsung kehilangan presisinya, dan Prayoga dkk. menyoroti Pulau Papua sebagai wilayah tempat hal ini terjadi: pada 2023, 7 dari 42 kabupaten/kotanya memiliki relative standard error (RSE) di atas 25%."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:30014
+msgid "**The objective.** A 2023 morbidity rate for all 42 districts and cities, each precise enough to publish."
+msgstr "**Tujuannya.** Angka morbiditas 2023 untuk seluruh 42 kabupaten/kota, masing-masing cukup presisi untuk dipublikasikan."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:30017
+msgid "**The success criterion.** Statistics Indonesia (BPS) grades an estimate by its RSE:"
+msgstr "**Kriteria keberhasilannya.** Badan Pusat Statistik (BPS) menilai sebuah estimasi berdasarkan RSE-nya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "RSE"
+msgstr "RSE"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "Reading"
+msgstr "Tafsiran"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "≤ 25%"
+msgstr "≤ 25%"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "precise; publish as is"
+msgstr "presisi; dapat dipublikasikan apa adanya"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "25% – 50%"
+msgstr "25% – 50%"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "usable, with caution in interpretation"
+msgstr "dapat dipakai, dengan kehati-hatian dalam penafsiran"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "> 50%"
+msgstr "> 50%"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb
+msgid "imprecise"
+msgstr "tidak presisi"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:30025
+msgid "The objective is met when every district lands in the first class."
+msgstr "Tujuan tercapai ketika setiap kabupaten/kota masuk ke kelas pertama."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:30027
+msgid "**The approach.** Small area estimation borrows strength from auxiliary variables available for every district, here village infrastructure counted by the 2021 Village Potential Data Collection (Podes), through a hierarchical Bayes model. The rate is a proportion, so the model is a Beta likelihood with a logit link: the HB Beta-logistic model of Prayoga et al."
+msgstr "**Pendekatannya.** Small area estimation meminjam kekuatan (borrowing strength) dari variabel penyerta yang tersedia untuk setiap kabupaten/kota, di sini infrastruktur desa yang dicacah oleh Pendataan Potensi Desa (Podes) 2021, melalui model hierarchical Bayes. Angkanya berupa proporsi, sehingga modelnya memakai likelihood Beta dengan link logit: model HB Beta-logistik dari Prayoga dkk."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:40004
+msgid "*hbsaemp in this phase:* `load_dataset`, `REAL_DATASETS`."
+msgstr "*hbsaemp pada fase ini:* `load_dataset`, `REAL_DATASETS`."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:40006
+msgid "Collect the data"
+msgstr "Mengumpulkan data"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:40008
+#, python-brace-format
+msgid "Both sources ship with the package, exactly as published. `REAL_DATASETS` lists them. Their data dictionary, with the sources, the units and the definition of each Podes variable, is in {doc}`../reference/datasets`."
+msgstr "Kedua sumber data disertakan dalam paket, persis seperti yang diterbitkan. `REAL_DATASETS` mendaftarnya. Kamus datanya, berisi sumber, satuan, dan definisi setiap variabel Podes, ada di {doc}`../reference/datasets`."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:60002
+msgid "`susenas2023_papua` holds the direct estimates: one morbidity rate per district, in percent, with its standard error and RSE."
+msgstr "`susenas2023_papua` memuat estimasi langsung: satu angka morbiditas per kabupaten/kota, dalam persen, beserta galat baku dan RSE-nya."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:80002
+msgid "`podes2021_papua` holds ten auxiliary variables, `X1` to `X10`, for the same districts: three on sanitation and water (percentages of villages), three on public schools, and four on health facilities and workers (averages per village). The first columns identify the district and its province before and after the 2022 provincial split."
+msgstr "`podes2021_papua` memuat sepuluh variabel penyerta, `X1` sampai `X10`, untuk kabupaten/kota yang sama: tiga tentang sanitasi dan air (persentase desa), tiga tentang sekolah negeri, dan empat tentang fasilitas dan tenaga kesehatan (rata-rata per desa). Kolom-kolom pertamanya mengidentifikasi kabupaten/kota dan provinsinya sebelum dan sesudah pemekaran provinsi 2022."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:100002
+msgid "Describe the data"
+msgstr "Mendeskripsikan data"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:100004
+msgid "Start with the variable of interest. One district has no rate:"
+msgstr "Mulailah dari variabel yang diminati. Satu kabupaten/kota tidak memiliki angka:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:130002
+msgid "Classify the direct estimates by the success criterion. The helper is reused in the evaluation phase:"
+msgstr "Klasifikasikan estimasi langsung menurut kriteria keberhasilan. Fungsi pembantunya dipakai lagi pada fase evaluasi:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:150002
+msgid "35 districts are precise, 6 need caution and 1 is imprecise: the same counts as the direct-estimation column of Prayoga et al. (2024), Table 4. The imprecise one is Deiyai, the district without a rate."
+msgstr "35 kabupaten/kota presisi, 6 perlu kehati-hatian, dan 1 tidak presisi: jumlah yang sama dengan kolom estimasi langsung pada Prayoga dkk. (2024), Tabel 4. Yang tidak presisi adalah Deiyai, kabupaten yang tidak memiliki angka."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:170002
+msgid "Then the auxiliary variables:"
+msgstr "Lalu variabel penyertanya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:190002
+#, python-format
+msgid "`X3` barely varies: in every district, at least 98% of villages bathe and wash with water from a decent source. It carries little information about differences between districts."
+msgstr "`X3` hampir tidak bervariasi: di setiap kabupaten/kota, sedikitnya 98% desa mandi dan mencuci dengan air dari sumber yang layak. Variabel ini hanya membawa sedikit informasi tentang perbedaan antarkabupaten/kota."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:190005
+msgid "Verify data quality"
+msgstr "Memverifikasi kualitas data"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:190007
+msgid "Before combining the two frames, check that their district codes agree:"
+msgstr "Sebelum menggabungkan kedua frame, periksa apakah kode kabupaten/kotanya cocok:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:210002
+msgid "Two problems, both to be fixed in the next phase:"
+msgstr "Ada dua masalah, keduanya diperbaiki pada fase berikutnya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:210004
+msgid "**Kota Jayapura** is published as 9437 in Susenas but has the official code 9471 in Podes, so a merge on the code would silently drop it."
+msgstr "**Kota Jayapura** diterbitkan sebagai 9437 di Susenas tetapi memiliki kode resmi 9471 di Podes, sehingga penggabungan berdasarkan kode akan diam-diam membuangnya."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:210006
+msgid "**Deiyai** has no morbidity rate and no standard error."
+msgstr "**Deiyai** tidak memiliki angka morbiditas maupun galat baku."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:210008
+#, python-brace-format
+msgid "A third point is documented rather than fixed: four village records carry the value 99 in a health-worker item, which feeds `X9` for Biak Numfor and `X10` for three other districts. Whether 99 is a real count could not be verified, so the aggregates are used as recorded (see the note in {doc}`../reference/datasets`)."
+msgstr "Hal ketiga didokumentasikan, bukan diperbaiki: empat catatan desa berisi nilai 99 pada satu butir tenaga kesehatan, yang masuk ke `X9` untuk Biak Numfor dan `X10` untuk tiga kabupaten lain. Apakah 99 merupakan hitungan yang sebenarnya belum dapat diverifikasi, sehingga agregatnya dipakai sebagaimana tercatat (lihat catatan di {doc}`../reference/datasets`)."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:220004
+msgid "*hbsaemp in this phase:* none. pandas, NumPy and SciPy produce the frame the model will read."
+msgstr "*hbsaemp pada fase ini:* tidak ada. pandas, NumPy, dan SciPy menghasilkan frame yang akan dibaca model."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:220007
+msgid "Clean"
+msgstr "Membersihkan"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:220009
+msgid "Recode Kota Jayapura to its official code. For Deiyai, use the value Prayoga et al. (2024) model: their Table 1 gives a minimum rate of 0.2958%, which is Deiyai's, since every other district is above 1%. Its standard error then follows from the RSE that *is* published, 60.63%."
+msgstr "Ubah kode Kota Jayapura ke kode resminya. Untuk Deiyai, gunakan nilai yang dimodelkan Prayoga dkk. (2024): Tabel 1 mereka memberikan angka minimum 0,2958%, yang merupakan milik Deiyai, karena setiap kabupaten/kota lain berada di atas 1%. Galat bakunya kemudian diturunkan dari RSE yang *memang* diterbitkan, yaitu 60,63%."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:240002
+msgid "With Deiyai in place, the descriptive statistics reproduce those of the paper, up to the two decimals the published rates are rounded to:"
+msgstr "Dengan Deiyai terisi, statistik deskriptifnya mereproduksi statistik di paper, hingga dua desimal pembulatan angka yang diterbitkan:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:260002
+msgid "Treating Deiyai as a district with no direct estimate at all would be the alternative: leave it out of the fit and predict it afterwards with `estimate_areas(new_data=...)`. This tutorial keeps the 42 districts of the paper instead."
+msgstr "Alternatifnya adalah memperlakukan Deiyai sebagai kabupaten tanpa estimasi langsung sama sekali: keluarkan dari fitting lalu prediksi sesudahnya dengan `estimate_areas(new_data=...)`. Tutorial ini justru mempertahankan 42 kabupaten/kota seperti di paper."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:260006
+msgid "Integrate"
+msgstr "Mengintegrasikan"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:280002
+msgid "Construct"
+msgstr "Mengonstruksi"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:280004
+msgid "The model needs the rate as a proportion, $\\hat\\theta_i$, and the precision of each direct estimate, $\\phi_i$. The Beta sampling model of Prayoga et al. (their Eq. 7) is"
+msgstr "Model memerlukan angkanya dalam bentuk proporsi, $\\hat\\theta_i$, dan presisi setiap estimasi langsung, $\\phi_i$. Model sampling Beta dari Prayoga dkk. (Persamaan 7 mereka) adalah"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:280007
+#, python-brace-format
+msgid ""
+"\n"
+"\\hat\\theta_i \\mid \\theta_i \\sim \\text{Beta}\\big(\\theta_i \\phi_i,\\; (1-\\theta_i)\\phi_i\\big),\n"
+"\\qquad\n"
+"\\operatorname{Var}(\\hat\\theta_i) = \\frac{\\theta_i (1-\\theta_i)}{\\phi_i + 1},\n"
+msgstr ""
+"\n"
+"\\hat\\theta_i \\mid \\theta_i \\sim \\text{Beta}\\big(\\theta_i \\phi_i,\\; (1-\\theta_i)\\phi_i\\big),\n"
+"\\qquad\n"
+"\\operatorname{Var}(\\hat\\theta_i) = \\frac{\\theta_i (1-\\theta_i)}{\\phi_i + 1},\n"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:280013
+#, python-brace-format
+msgid "where the paper takes $\\phi_i = n_i / \\text{deff}_i - 1$ from the sample size and design effect. The published tables give neither, only the standard error. Solving the variance for $\\phi_i$, with the direct estimate in place of $\\theta_i$, gives"
+msgstr "dengan paper mengambil $\\phi_i = n_i / \\text{deff}_i - 1$ dari ukuran sampel dan efek desain. Tabel yang diterbitkan tidak memuat keduanya, hanya galat baku. Menyelesaikan persamaan varians untuk $\\phi_i$, dengan estimasi langsung menggantikan $\\theta_i$, menghasilkan"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:280017
+msgid ""
+"\n"
+"\\phi_i = \\frac{\\hat\\theta_i (1-\\hat\\theta_i)}{\\mathrm{SE}_i^2} - 1 .\n"
+msgstr ""
+"\n"
+"\\phi_i = \\frac{\\hat\\theta_i (1-\\hat\\theta_i)}{\\mathrm{SE}_i^2} - 1 .\n"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:300002
+msgid "Select the auxiliary variables"
+msgstr "Memilih variabel penyerta"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:300004
+msgid "Look at each auxiliary variable against the rate first (compare Figure 1 of the paper):"
+msgstr "Lihat dulu setiap variabel penyerta terhadap angka morbiditas (bandingkan dengan Gambar 1 di paper):"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:320002
+msgid "Then test each correlation, next to the values the paper reports:"
+msgstr "Lalu uji setiap korelasi, berdampingan dengan nilai yang dilaporkan paper:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:340002
+#, python-brace-format, python-format
+msgid "The same seven variables, `X4` to `X10`, are significant at the 5% level as in the paper, and six coefficients agree with it to three or four decimals. Four do not: `X2`, `X7`, `X8` and `X9`. The paper does not report how it aggregated the village records, so the cause of the difference cannot be established here; the definitions used in this data are in {doc}`../reference/datasets`."
+msgstr "Tujuh variabel yang sama, `X4` sampai `X10`, signifikan pada taraf 5% seperti di paper, dan enam koefisien korelasi sama dengan paper hingga tiga atau empat desimal. Empat tidak sama: `X2`, `X7`, `X8`, dan `X9`. Paper tidak melaporkan cara mengagregasi catatan desa, sehingga penyebab perbedaannya tidak dapat dipastikan di sini; definisi yang dipakai pada data ini ada di {doc}`../reference/datasets`."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:340008
+msgid "Choose among the seven by stepwise selection on AIC, as the paper does. The two functions below reproduce R's `extractAIC()` for a linear model and `step()` in both directions:"
+msgstr "Pilih di antara ketujuhnya dengan seleksi stepwise berbasis AIC, seperti yang dilakukan paper. Dua fungsi di bawah mereproduksi `extractAIC()` milik R untuk model linear dan `step()` dua arah:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:360002
+msgid "Starting from the full model, as R's `step()` is usually applied, keeps `X5`, `X8` and `X9`. Starting from the empty model keeps `X5` alone at a slightly lower AIC: stepwise selection depends on where it starts. The paper's choice, `X7`, `X8` and `X9`, is not what this data selects."
+msgstr "Memulai dari model penuh, sebagaimana `step()` di R biasanya dipakai, mempertahankan `X5`, `X8`, dan `X9`. Memulai dari model kosong hanya mempertahankan `X5` dengan AIC yang sedikit lebih rendah: seleksi stepwise bergantung pada titik awalnya. Pilihan paper, `X7`, `X8`, dan `X9`, bukan yang dipilih oleh data ini."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:360007
+msgid "This tutorial takes the selection from the full model as its main model, and carries the paper's variables forward as a second model, so the evaluation phase can compare the two."
+msgstr "Tutorial ini memakai hasil seleksi dari model penuh sebagai model utama, dan membawa variabel pilihan paper sebagai model kedua, sehingga fase evaluasi dapat membandingkan keduanya."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:370004
+msgid "*hbsaemp in this phase:* `get_family_spec`, `ModelConfig`, `hbm_beta`, `check_data`, `check_prior`, `fit`."
+msgstr "*hbsaemp pada fase ini:* `get_family_spec`, `ModelConfig`, `hbm_beta`, `check_data`, `check_prior`, `fit`."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:370007
+msgid "Select the modeling technique"
+msgstr "Memilih teknik pemodelan"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:370009
+msgid "The Beta family is the one for proportions. Its registry entry confirms the logit link of the paper's Eq. 8 as the default, and that its precision can be pinned to known values. Bambi calls the precision `kappa`; the paper calls it $\\phi$:"
+msgstr "Family Beta adalah family untuk proporsi. Entri registrinya menegaskan link logit dari Persamaan 8 paper sebagai bawaan, dan bahwa presisinya dapat dipatok ke nilai yang diketahui. Bambi menamai presisi itu `kappa`; paper menamainya $\\phi$:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:390002
+msgid "Build the models"
+msgstr "Membangun model"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:390004
+#, python-brace-format
+msgid "`hbm_beta` is the beginner interface: a response, a list of auxiliary variables and the Beta family's own arguments, with the formula written for you (see {doc}`../explanation/three-tier-api`). `area_var` adds the district random effect $v_i$ of the paper's model,"
+msgstr "`hbm_beta` adalah antarmuka tingkat pemula: respons, daftar variabel penyerta, dan argumen khusus family Beta, dengan formula yang dituliskan untuk Anda (lihat {doc}`../explanation/three-tier-api`). `area_var` menambahkan efek acak kabupaten/kota $v_i$ dari model paper,"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:390009
+#, python-brace-format
+msgid ""
+"\n"
+"\\operatorname{logit}(\\theta_i) = \\mathbf{x}_i^\\top \\boldsymbol\\beta + v_i,\n"
+"\\qquad v_i \\sim N(0, \\sigma_v^2),\n"
+msgstr ""
+"\n"
+"\\operatorname{logit}(\\theta_i) = \\mathbf{x}_i^\\top \\boldsymbol\\beta + v_i,\n"
+"\\qquad v_i \\sim N(0, \\sigma_v^2),\n"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:390014
+msgid "and `fixed_params` pins each district's $\\phi_i$ to the column built above instead of estimating it. Both models share one sampler configuration: the default draws, tuning steps and acceptance target, four chains run in parallel, and a fixed seed so the run can be repeated:"
+msgstr "dan `fixed_params` mematok $\\phi_i$ setiap kabupaten/kota ke kolom yang dibangun di atas alih-alih mengestimasinya. Kedua model memakai satu konfigurasi sampler yang sama: jumlah draw, langkah tuning, dan target penerimaan default, empat rantai yang berjalan paralel, dan seed tetap agar prosesnya dapat diulang:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:410002
+msgid "Check the frame the model will actually use before paying for any sampling. The pinned precision becomes one extra column, an offset on the log scale:"
+msgstr "Periksa frame yang benar-benar akan dipakai model sebelum mengeluarkan biaya sampling apa pun. Presisi yang dipatok menjadi satu kolom tambahan, sebuah offset pada skala log:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:430002
+msgid "Check the priors"
+msgstr "Memeriksa prior"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:430004
+#, python-brace-format
+msgid "The coefficients and $\\sigma_v$ keep hbsaemp's default priors (Bambi's weakly informative ones). The paper's priors cannot be reproduced exactly: it gives an \"initial value\" of $N(0, 1)$ for $\\boldsymbol\\beta$ and a gamma prior on $\\sigma_v^{-2}$ without its hyperparameters. The check is therefore whether the defaults allow the rates this data can plausibly take. A prior predictive check samples from the priors alone, without fitting (see {doc}`../how-to/03-check-priors`):"
+msgstr "Koefisien dan $\\sigma_v$ memakai prior bawaan hbsaemp (prior Bambi yang informatif lemah). Prior di paper tidak dapat direproduksi persis: paper memberikan \"nilai awal\" $N(0, 1)$ untuk $\\boldsymbol\\beta$ dan prior gamma untuk $\\sigma_v^{-2}$ tanpa hiperparameternya. Karena itu yang diperiksa adalah apakah prior bawaan mengizinkan angka yang secara masuk akal dapat diambil data ini. Prior predictive check melakukan sampling dari prior saja, tanpa fitting (lihat {doc}`../how-to/03-check-priors`):"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:450002
+msgid "The draws from the priors (blue) spread over the whole unit interval, while the observed rates (black) sit below 0.15. The default priors are vague: they allow the data without favouring it, and leave the estimates to the likelihood."
+msgstr "Draw dari prior (biru) menyebar di seluruh interval satuan, sedangkan angka yang diamati (hitam) berada di bawah 0,15. Prior default ini samar: prior tersebut mengizinkan data tanpa mengunggulkannya, dan menyerahkan estimasinya pada likelihood."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:460002
+msgid "Fit"
+msgstr "Fitting"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:460004
+msgid "Sampling is the expensive step:"
+msgstr "Sampling adalah langkah yang mahal:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:480004
+msgid "*hbsaemp in this phase:* `check_convergence`, `update_model`, `compare_models`, `estimate_areas`."
+msgstr "*hbsaemp pada fase ini:* `check_convergence`, `update_model`, `compare_models`, `estimate_areas`."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:480007
+msgid "Convergence"
+msgstr "Konvergensi"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:480009
+msgid "Nothing downstream is trustworthy until the chains have converged. `check_convergence` reports R-hat, effective sample sizes and the NUTS sampler checks, and warns on any failure:"
+msgstr "Tidak ada hasil di tahap berikutnya yang dapat dipercaya sebelum rantai konvergen. `check_convergence` melaporkan R-hat, ukuran sampel efektif, dan pemeriksaan sampler NUTS, serta memberi peringatan pada setiap kegagalan:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:500002
+msgid "Read the status line of each summary. Divergent transitions mean the sampler failed to follow the posterior somewhere, so the draws near there are biased; the remedy is a smaller step size, through a higher `target_accept`. An R-hat above 1.01 means the chains do not yet agree; more tuning and more draws is the remedy for that."
+msgstr "Baca baris status setiap ringkasan. Transisi divergen berarti sampler gagal mengikuti posterior di suatu tempat, sehingga draw di sekitarnya bias; obatnya adalah ukuran langkah yang lebih kecil, melalui `target_accept` yang lebih tinggi. R-hat di atas 1.01 berarti rantai-rantainya belum sepakat; obatnya adalah tuning yang lebih panjang dan draw yang lebih banyak."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:500007
+msgid "`update_model` refits in place, changing only the settings you pass. Apply both remedies to both models, so they stay comparable:"
+msgstr "`update_model` melakukan fitting ulang di tempat, dan hanya mengubah pengaturan yang Anda berikan. Terapkan kedua obat itu pada kedua model, agar keduanya tetap sebanding:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:520002
+msgid "Check again. This time keep the trace and autocorrelation plots, the diagnostics of the paper's Figure 2:"
+msgstr "Periksa lagi. Kali ini tampilkan plot trace dan autokorelasi, yaitu diagnostik pada Gambar 2 di paper:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:540002
+msgid "Chains that have converged overlap without drifting in the trace plot, and their autocorrelation dies out within a few lags. `kappa_Intercept` is the intercept of the pinned precision, held at zero by a tight prior. That is how the pin is enforced, so it is expected to stay there."
+msgstr "Rantai yang sudah konvergen saling tumpang tindih tanpa bergeser dalam plot trace, dan autokorelasinya menghilang dalam beberapa lag. `kappa_Intercept` adalah intersep dari presisi yang dipatok, yang ditahan di nol oleh prior yang ketat. Begitulah cara pematokan ditegakkan, sehingga memang semestinya tetap di sana."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:550002
+msgid "Coefficients"
+msgstr "Koefisien"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:550004
+#, python-format
+msgid "Summarise each coefficient by its posterior mean, standard deviation and 95% credible interval, as the paper's Table 3 does:"
+msgstr "Ringkas setiap koefisien dengan rata-rata posterior, simpangan baku, dan interval kredibel 95%, seperti Tabel 3 di paper:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:570002
+#, python-format
+msgid "`eti95_lb` and `eti95_ub` bound the central 95% credible interval, and `1|nama_kab_sigma` is $\\sigma_v$, the standard deviation of the district effects. A coefficient whose interval lies entirely on one side of zero has a clear direction; one whose interval spans zero is not distinguishable from no effect at this sample size."
+msgstr "`eti95_lb` dan `eti95_ub` membatasi interval kredibel 95% bagian tengah, dan `1|nama_kab_sigma` adalah $\\sigma_v$, simpangan baku efek kabupaten/kota. Koefisien yang intervalnya seluruhnya berada di satu sisi nol memiliki arah yang jelas; koefisien yang intervalnya mencakup nol tidak dapat dibedakan dari tanpa efek pada ukuran sampel ini."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:580002
+msgid "For the model with the paper's variables, the paper's own estimates sit alongside:"
+msgstr "Untuk model dengan variabel pilihan paper, estimasi dari paper sendiri ditampilkan berdampingan:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:600002
+msgid "The posterior standard deviations here are far larger than the paper's. The two analyses differ in several ways, and the paper alone does not show which of them accounts for it:"
+msgstr "Simpangan baku posterior di sini jauh lebih besar daripada di paper. Kedua analisis berbeda dalam beberapa hal, dan paper saja tidak menunjukkan mana yang menjadi penyebabnya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:600005
+msgid "the values of `X7`, `X8` and `X9` (their correlations differ, as shown in data preparation);"
+msgstr "nilai `X7`, `X8`, dan `X9` (korelasinya berbeda, seperti ditunjukkan pada persiapan data);"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:600007
+msgid "the precision $\\phi_i$, derived here from the standard error and in the paper from the sample size and design effect;"
+msgstr "presisi $\\phi_i$, yang di sini diturunkan dari galat baku dan di paper dari ukuran sampel dan efek desain;"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:600009
+msgid "the sampler, NUTS (PyMC) here and Metropolis-Hastings within Gibbs over 100,000 iterations in the paper;"
+msgstr "sampler, yaitu NUTS (PyMC) di sini dan Metropolis-Hastings within Gibbs dengan 100.000 iterasi di paper;"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:600011
+msgid "the priors, as described under *Check the priors*."
+msgstr "prior, seperti dijelaskan di bagian *Memeriksa prior*."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:600013
+msgid "Compare the two models"
+msgstr "Membandingkan kedua model"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:600015
+msgid "`compare_models` ranks the models by leave-one-out cross-validation (PSIS-LOO), and on request adds a Bayes factor for every coefficient and a prior sensitivity check:"
+msgstr "`compare_models` memeringkat model dengan leave-one-out cross-validation (PSIS-LOO), dan bila diminta menambahkan faktor Bayes untuk setiap koefisien serta pemeriksaan sensitivitas prior:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:620002
+msgid "`model_0` is the main model and `model_1` the one with the paper's variables. The first plot is a posterior predictive check of `model_0`: the observed rates (black) should run inside the rates simulated from the fitted model (blue). The second plot places the two models on the ELPD scale; higher is better."
+msgstr "`model_0` adalah model utama dan `model_1` model dengan variabel pilihan paper. Plot pertama adalah posterior predictive check untuk `model_0`: angka yang diamati (hitam) semestinya berada di dalam angka-angka yang disimulasikan dari model ter-fit (biru). Plot kedua menempatkan kedua model pada skala ELPD; makin tinggi makin baik."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:620007
+#, python-brace-format
+msgid "An ELPD difference smaller than about twice its standard error means this data cannot tell the models apart. Pareto *k* values above the threshold flag observations whose leave-one-out estimate is unreliable. This is common when every district has one observation and its own random effect; when most observations are flagged, treat the ranking as indicative only (see {doc}`../how-to/07-check-fit-and-compare`)."
+msgstr "Selisih ELPD yang lebih kecil dari kira-kira dua kali galat bakunya berarti data ini tidak dapat membedakan kedua model. Nilai Pareto *k* di atas ambang menandai observasi yang estimasi leave-one-out-nya tidak dapat diandalkan. Hal ini lazim ketika setiap kabupaten/kota memiliki satu observasi dan efek acaknya sendiri; ketika sebagian besar observasi ditandai, anggap peringkatnya hanya sebagai indikasi (lihat {doc}`../how-to/07-check-fit-and-compare`)."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:620013
+msgid "The Bayes factor tests each coefficient against zero within its model. A vague prior, such as the defaults here, tilts it toward zero:"
+msgstr "Faktor Bayes menguji setiap koefisien terhadap nol di dalam modelnya. Prior yang samar, seperti bawaan di sini, mendorongnya ke arah nol:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:640002
+#, python-brace-format
+msgid "The prior sensitivity check power-scales the prior and the likelihood and reports how much each posterior moves (see {doc}`../how-to/08-prior-sensitivity`). The district effects are left out of the table below. Expect `kappa_Intercept` to be flagged as *strong prior / weak likelihood*: its tight prior is the pin itself."
+msgstr "Pemeriksaan sensitivitas prior melakukan power-scaling pada prior dan likelihood dan melaporkan seberapa jauh setiap posterior bergeser (lihat {doc}`../how-to/08-prior-sensitivity`). Efek kabupaten/kota tidak dimasukkan ke tabel di bawah. `kappa_Intercept` diperkirakan ditandai sebagai *strong prior / weak likelihood*: prior ketatnya adalah pematokan itu sendiri."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:660002
+msgid "Estimate the districts"
+msgstr "Mengestimasi kabupaten/kota"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:660004
+msgid "`estimate_areas` turns the posterior into one estimate per district, with its uncertainty:"
+msgstr "`estimate_areas` mengubah posterior menjadi satu estimasi per kabupaten/kota, beserta ketidakpastiannya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:680002
+msgid "Assess the results against the success criterion"
+msgstr "Menilai hasil terhadap kriteria keberhasilan"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:680004
+msgid "Compare the precision classes before and after modelling, next to the paper's result:"
+msgstr "Bandingkan kelas presisi sebelum dan sesudah pemodelan, berdampingan dengan hasil paper:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:710002
+#, python-format
+msgid "Set the two estimators side by side, as the paper's Figure 3 does; the lines mark the provincial rates it reports, 5.73% for Papua and 6.70% for Papua Barat:"
+msgstr "Tempatkan kedua estimator berdampingan, seperti Gambar 3 di paper; garis-garisnya menandai angka provinsi yang dilaporkan paper, 5,73% untuk Papua dan 6,70% untuk Papua Barat:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:730002
+msgid "Unlike the paper's Figure 3, the two boxes are nearly the same: the model estimates are not visibly more homogeneous than the direct ones. The reason is in the data. The precisions $\\phi_i$ implied by the published standard errors are high (see *Construct*), so the model treats most direct estimates as already informative and moves them little."
+msgstr "Tidak seperti Gambar 3 di paper, kedua kotak hampir sama: estimasi model tidak tampak lebih homogen daripada estimasi langsung. Penyebabnya ada pada data. Presisi $\\phi_i$ yang tersirat dari galat baku yang diterbitkan tinggi (lihat *Mengonstruksi*), sehingga model menganggap sebagian besar estimasi langsung sudah informatif dan hanya sedikit menggesernya."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:730007
+msgid "A shrinkage plot shows where it does move them. A district on the diagonal kept its direct estimate; the further a point sits from it, the more the model pulled that district toward what its auxiliary variables predict:"
+msgstr "Plot penyusutan (shrinkage) menunjukkan di mana model benar-benar menggesernya. Kabupaten/kota yang berada di garis diagonal mempertahankan estimasi langsungnya; makin jauh sebuah titik dari garis itu, makin kuat model menarik kabupaten/kota tersebut ke arah prediksi variabel penyertanya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:750002
+msgid "The points pulled furthest are the light ones, the districts whose direct estimate is least precise, Deiyai above all. Borrowing strength helps most where the direct estimate is weakest."
+msgstr "Titik-titik yang paling jauh ditarik adalah yang berwarna terang, yaitu kabupaten/kota dengan estimasi langsung yang paling tidak presisi, terutama Deiyai. Borrowing strength paling membantu di tempat estimasi langsung paling lemah."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:750006
+#, python-format
+msgid "Compare the count of precise districts with the objective set in phase 1. A district still above 25% is not dropped; it is carried into deployment with its precision class."
+msgstr "Bandingkan jumlah kabupaten/kota yang presisi dengan tujuan yang ditetapkan pada fase 1. Kabupaten/kota yang masih di atas 25% tidak dibuang; ia dibawa ke tahap deployment beserta kelas presisinya."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:760004
+msgid "*hbsaemp in this phase:* the `estimate_areas` result; `update_model` when the next survey round arrives."
+msgstr "*hbsaemp pada fase ini:* hasil `estimate_areas`; `update_model` ketika putaran survei berikutnya tersedia."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:760007
+msgid "The deliverable"
+msgstr "Hasil yang diserahkan"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:760009
+msgid "The estimates come from the main model, the one this data selected. The comparison in phase 5 is where a clear reason to prefer the other would have shown: an ELPD difference well beyond twice its standard error."
+msgstr "Estimasinya berasal dari model utama, model yang dipilih oleh data ini. Perbandingan pada fase 5 adalah tempat alasan yang jelas untuk memilih model lain akan terlihat: selisih ELPD yang jauh melebihi dua kali galat bakunya."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:760013
+msgid "One row per district: the direct estimate and the model estimate, each with its precision, and the BPS class that tells a reader how far to trust it:"
+msgstr "Satu baris per kabupaten/kota: estimasi langsung dan estimasi model, masing-masing dengan presisinya, serta kelas BPS yang memberi tahu pembaca seberapa jauh angka itu dapat dipercaya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:780002
+msgid "Districts outside the first class stay in the table: publish them with their precision class rather than presenting them as equally reliable."
+msgstr "Kabupaten/kota di luar kelas pertama tetap ada di tabel: publikasikan beserta kelas presisinya, bukan disajikan seolah sama andalnya."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:780005
+#, python-format
+msgid "The paper maps these estimates (its Figure 4). No boundary files ship with the package, so rank the districts instead, each with its 95% credible interval:"
+msgstr "Paper memetakan estimasi ini (Gambar 4 mereka). Paket ini tidak menyertakan berkas batas wilayah, sehingga kabupaten/kota diperingkat sebagai gantinya, masing-masing dengan interval kredibel 95%-nya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:800002
+msgid "Kepulauan Yapen remains the district with the highest rate, as it is in the paper. The width of each interval is the precision a reader should attach to its point."
+msgstr "Kepulauan Yapen tetap menjadi kabupaten dengan angka tertinggi, seperti di paper. Lebar setiap interval adalah presisi yang semestinya dilekatkan pembaca pada titiknya."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810002
+msgid "Hand it over"
+msgstr "Menyerahkan hasil"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810004
+msgid "Write the table out for whoever publishes it:"
+msgstr "Tuliskan tabelnya untuk siapa pun yang akan memublikasikannya:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810010
+msgid "Keep it current"
+msgstr "Menjaga agar tetap mutakhir"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810012
+msgid "When the next Susenas round is published, prepare its direct estimates exactly as in phase 3 and refit the same specification against them, then repeat phase 5 before using a single number:"
+msgstr "Ketika putaran Susenas berikutnya diterbitkan, siapkan estimasi langsungnya persis seperti pada fase 3 dan lakukan fitting ulang spesifikasi yang sama terhadapnya, lalu ulangi fase 5 sebelum memakai satu angka pun:"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810020
+msgid "`update_model` keeps the formula, the family and the pinned precision; the new frame needs the same columns, including a freshly computed `phi`."
+msgstr "`update_model` mempertahankan formula, family, dan presisi yang dipatok; frame baru memerlukan kolom yang sama, termasuk `phi` yang dihitung ulang."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810023
+msgid "Next"
+msgstr "Selanjutnya"
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810025
+#, python-brace-format
+msgid "{doc}`../how-to/09-estimate-areas`: the estimation step on its own, including districts without a direct estimate."
+msgstr "{doc}`../how-to/09-estimate-areas`: tahap estimasi secara tersendiri, termasuk kabupaten/kota tanpa estimasi langsung."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810027
+#, python-brace-format
+msgid "{doc}`../reference/datasets`: the data dictionary of both datasets."
+msgstr "{doc}`../reference/datasets`: kamus data kedua dataset."
+
+#: ../../source/python/tutorials/case-study-papua.ipynb:810028
+#, python-brace-format
+msgid "{doc}`../explanation/hb-sae`: why borrowing strength reduces the error."
+msgstr "{doc}`../explanation/hb-sae`: mengapa borrowing strength mengurangi galat."
+

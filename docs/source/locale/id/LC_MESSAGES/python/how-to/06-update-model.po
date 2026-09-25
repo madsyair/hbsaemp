@@ -1,0 +1,123 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/06-update-model.md:11
+msgid "6 · Update a model"
+msgstr "6 · Memperbarui model"
+
+#: ../../source/python/how-to/06-update-model.md:13
+msgid "Refit a model with new sampler settings, new data, a changed formula or changed priors."
+msgstr "Lakukan fitting ulang model dengan pengaturan sampler baru, data baru, formula yang diubah, atau prior yang diubah."
+
+#: ../../source/python/how-to/06-update-model.md:15
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/06-update-model.md:17
+msgid "You need a fitted model. `update_model()` refits from scratch and keeps every part of the specification you do not change, as R's `update_hbm()` does."
+msgstr "Anda membutuhkan model yang sudah di-fit. `update_model()` melakukan fitting ulang dari awal dan mempertahankan setiap bagian spesifikasi yang tidak Anda ubah, seperti `update_hbm()` di R."
+
+#: ../../source/python/how-to/06-update-model.md:29
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/06-update-model.md:31
+#, python-brace-format
+msgid "When {doc}`05-check-convergence` fails, refit with stronger sampler settings:"
+msgstr "Jika {doc}`05-check-convergence` gagal, lakukan fitting ulang dengan pengaturan sampler yang lebih kuat:"
+
+#: ../../source/python/how-to/06-update-model.md:38
+msgid "Or change single settings on top of the current configuration: `draws`, `tune`, `chains`, `cores`, `target_accept`, `random_seed`, `max_treedepth`, `progressbar` or `sampler_kwargs`. Passing `config=` together with a single setting raises `ValueError`."
+msgstr "Atau ubah pengaturan satu per satu di atas konfigurasi saat ini: `draws`, `tune`, `chains`, `cores`, `target_accept`, `random_seed`, `max_treedepth`, `progressbar`, atau `sampler_kwargs`. Memberikan `config=` bersama pengaturan tunggal memunculkan `ValueError`."
+
+#: ../../source/python/how-to/06-update-model.md:46
+msgid "The same call refits on new data, keeping the formula, family and priors:"
+msgstr "Pemanggilan yang sama melakukan fitting ulang pada data baru, dengan formula, family, dan prior yang sama:"
+
+#: ../../source/python/how-to/06-update-model.md:53
+msgid "If `new_data` lacks a survey-design column (`sampling_var`, `n`, `deff`, or a column named in `fixed_params`) but has the same number of rows, the column is copied from the current data with a warning. The rows are assumed to be in the same order. With a different number of rows, the call raises."
+msgstr "Jika `new_data` tidak memiliki kolom desain survei (`sampling_var`, `n`, `deff`, atau kolom yang disebut di `fixed_params`) tetapi jumlah barisnya sama, kolom itu disalin dari data saat ini disertai peringatan. Urutan barisnya dianggap sama. Jika jumlah barisnya berbeda, pemanggilan memunculkan galat."
+
+#: ../../source/python/how-to/06-update-model.md:58
+msgid "Change the formula with an R-style template. `.` keeps the current side, `+ term` adds a term and `- term` removes one. An added term is read from the current data unless `new_data` is given."
+msgstr "Ubah formula dengan templat gaya R. `.` mempertahankan sisi formula saat ini, `+ term` menambahkan suku, dan `- term` menghapusnya. Suku yang ditambahkan dibaca dari data saat ini, kecuali `new_data` diberikan."
+
+#: ../../source/python/how-to/06-update-model.md:66
+msgid "New priors are merged into the current ones, and a prior on a removed term is dropped:"
+msgstr "Prior baru digabungkan ke prior saat ini, dan prior pada suku yang dihapus dibuang:"
+
+#: ../../source/python/how-to/06-update-model.md:74
+msgid "The R-style alias `update_hbm` is the same function."
+msgstr "Alias gaya R `update_hbm` adalah fungsi yang sama."
+
+#: ../../source/python/how-to/06-update-model.md:76
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/06-update-model.md:78
+msgid "`update_model()` updates the model in place:"
+msgstr "`update_model()` memperbarui model secara in-place:"
+
+#: ../../source/python/how-to/06-update-model.md:87
+msgid "A second `update_model(model, ...)` starts from this state, so you can raise the settings step by step."
+msgstr "`update_model(model, ...)` berikutnya dimulai dari keadaan ini, sehingga Anda dapat menaikkan pengaturan secara bertahap."
+
+#: ../../source/python/how-to/06-update-model.md:90
+#, python-brace-format
+msgid "Then return to {doc}`05-check-convergence`. The earlier verdict does not apply to the new fit."
+msgstr "Lalu kembali ke {doc}`05-check-convergence`. Hasil pemeriksaan sebelumnya tidak berlaku untuk fit yang baru."
+
+#: ../../source/python/how-to/06-update-model.md:93
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/06-update-model.md:95
+msgid "**`ModelNotFittedError`.** Fit the model first."
+msgstr "**`ModelNotFittedError`.** Lakukan fitting model terlebih dahulu."
+
+#: ../../source/python/how-to/06-update-model.md:97
+msgid "**`TypeError`.** `new_data` must be a DataFrame."
+msgstr "**`TypeError`.** `new_data` harus berupa DataFrame."
+
+#: ../../source/python/how-to/06-update-model.md:99
+msgid "**`ValueError` about `config`.** Pass a whole `ModelConfig` or single settings, not both."
+msgstr "**`ValueError` tentang `config`.** Berikan `ModelConfig` utuh atau pengaturan tunggal, jangan keduanya."
+
+#: ../../source/python/how-to/06-update-model.md:101
+msgid "**`FormulaError`.** The template has no `~`, or a term is not a column name."
+msgstr "**`FormulaError`.** Templat tidak memiliki `~`, atau ada suku yang bukan nama kolom."
+
+#: ../../source/python/how-to/06-update-model.md:103
+msgid "**`DataValidationError`.** The new data fails the family's checks. Build a model on the new data and run `check_data()` to see the problem before sampling."
+msgstr "**`DataValidationError`.** Data baru gagal dalam pemeriksaan family. Bangun model pada data baru itu dan jalankan `check_data()` untuk melihat masalahnya sebelum sampling."
+
+#: ../../source/python/how-to/06-update-model.md:106
+msgid "**The refit converges worse than before.** New data can be harder to fit, for example when some areas now have much smaller samples."
+msgstr "**Fitting ulang konvergen lebih buruk dari sebelumnya.** Data baru bisa lebih sulit di-fit, misalnya ketika beberapa area kini memiliki sampel yang jauh lebih kecil."
+
+#: ../../source/python/how-to/06-update-model.md:109
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/06-update-model.md:111
+#, python-brace-format
+msgid "Why a refit returns to the convergence check: {doc}`../explanation/workflow-order`."
+msgstr "Mengapa fitting ulang kembali ke pemeriksaan konvergensi: {doc}`../explanation/workflow-order`."
+

@@ -1,109 +1,102 @@
 # Why the Bayesian workflow has this order
 
-The stages are a sequence, and the order carries statistical meaning.
+Each stage makes the next one interpretable, so the order carries statistical meaning.
 
 ## The question
 
-The how-to guides are numbered, and the numbering looks like a convention — a tidy way
-to arrange pages rather than a claim about statistics. It is tempting to treat it that
-way: fit the model, look at the estimates, and go back to the diagnostics only if
-something seems odd.
+The How-to guides are numbered. It is tempting to treat the numbering as a convenience: fit
+the model, read the estimates, and check the diagnostics only if something looks odd.
 
-That shortcut is the single most common way to produce a confident number that means
-nothing. The order is not editorial. Each stage answers a question that makes the next
-stage's answer interpretable, and running them out of order produces output that looks
-identical to correct output.
+That shortcut produces confident numbers that mean nothing. Output from stages run out of
+order looks exactly like correct output.
 
 ## Background
 
-The workflow this package follows is the one that has become standard practice for
-applied Bayesian analysis: specify, check the priors, fit, diagnose the sampler, compare
-candidate models, and only then read the estimates. The stages map onto the how-to
-guides one for one.
+This package follows the workflow used in applied Bayesian analysis:
 
-What makes the order binding is that MCMC does not report failure. A sampler that has
-explored only part of the posterior returns draws, and those draws produce means,
-intervals and rankings that are formatted exactly like trustworthy ones. Nothing in the
-output distinguishes them. The diagnostics are the only thing that does.
+1. **Load the data**, one row per area.
+2. **Specify the model**: family, auxiliary variables, area identifier and priors.
+3. **Check the priors.** If the data they imply is implausible, return to 2.
+4. **Fit the model.**
+5. **Check convergence.** If the chains have not converged, refit (6) and check again.
+6. **Update the model**, as the remedy for 5.
+7. **Check the fit and compare models.** If the model does not reproduce the data, return
+   to 2.
+8. **Check prior sensitivity.**
+9. **Estimate the areas.**
+
+MCMC does not report failure. A sampler that explored only part of the posterior still
+returns draws, and their means, intervals and rankings look like trustworthy ones. Only the
+checks tell them apart.
 
 ## The reasoning
 
-### Priors are checked before the data is used
+### Priors are checked before fitting
 
-A prior predictive check asks what the model believes before it has seen any outcome
-data: draw parameters from the prior, generate data from them, and look at what comes
-out. If the model considers a poverty rate of 300% plausible, that is worth knowing
-before fitting rather than after.
+A prior predictive check simulates data from the priors alone. If the model considers a
+morbidity rate of 300% plausible, you should know before fitting.
 
-This has to happen *before* fitting for a reason that is easy to miss. Once you have seen
-the posterior, you cannot un-see it, and any prior you choose afterwards is chosen partly
-to produce the answer you already saw. The check is only meaningful while you are still
-ignorant of the result.
+The check must come first. Once you have seen the posterior, any prior you choose is partly
+chosen to reproduce it. The check is only honest while the result is unknown.
 
-### Convergence is checked before any estimate is read
+### Convergence is checked before any result is read
 
-This is the stage most often skipped, and the one with the sharpest consequence.
+R-hat compares chains that started in different places; effective sample size counts how
+many independent draws the chains are worth. Both describe the sampling, and neither is
+visible in the estimates.
 
-R-hat compares chains that started in different places. If they explored the same
-distribution, their summaries agree and R-hat is near 1. Effective sample size asks how
-many *independent* draws the correlated chain is worth. Both are properties of the
-sampling, not of the model — and both are invisible in the estimates themselves.
+An estimate read before this check may describe where the sampler got stuck rather than the
+posterior. Reading the estimates first also biases you: you now know which verdict you want
+from the diagnostics.
 
-Reading an estimate before checking convergence means you have no idea whether the number
-describes the posterior or describes where the sampler happened to get stuck. If you look
-at the estimates first and the diagnostics second, you have also created a subtler
-problem: you now know which answer you want the diagnostics to permit.
+### A refit returns to the convergence check
 
-### Comparison comes before estimation, not after
+New sampler settings or new data give a new posterior. The earlier verdict applied to the
+old one, so a refit goes back to stage 5.
 
-Model comparison scores how well each candidate predicts data it has not seen. Doing this
-after choosing estimates inverts the logic — you would be selecting the model whose
-estimates you liked, which is a way of fitting the analyst's expectations rather than the
-data.
+### The fit is checked before models are compared
 
-Comparison also has to come after convergence, and for the same reason as everything
-else: comparing two sets of untrustworthy draws yields a trustworthy-looking ranking of
-nothing at all.
+A posterior predictive check asks whether the model can reproduce the data it was fitted
+to. A model that cannot is misspecified, and ranking it against others ranks the wrong
+candidates. The fix is a different specification, so the workflow returns to stage 2.
 
-### Estimation is last because it consumes everything before it
+Comparison scores how well each candidate predicts data it has not seen. It must come after
+convergence, because comparing unreliable draws gives a reliable-looking ranking of
+nothing, and before estimation, because choosing the model whose estimates you like fits the
+analyst's expectations instead of the data.
 
-By the time you read an area estimate you are relying on every earlier stage at once: the
-priors were reasonable, the sampler explored the posterior, and this specification was
-the best of those considered. The estimate is a summary of the posterior, and the
-posterior is only as good as the process that produced it.
+### Prior sensitivity is checked on the chosen model
 
-### Refitting re-enters the sequence, it does not continue it
+The prior check in stage 3 asks whether the priors are plausible. The sensitivity check
+asks whether they matter: how far the posterior moves when the prior is scaled. It needs a
+posterior, so it comes after fitting, and it is run on the model that will be reported.
 
-Changing the sampler settings or the data produces a new posterior, and every diagnostic
-verdict from before applies to the old one. A refit therefore re-enters at the
-diagnostics stage rather than resuming where the previous fit stopped. Carrying an old
-"converged" verdict across a refit is the same mistake as skipping the check, arrived at
-more politely.
+### Estimation comes last
+
+An area estimate relies on every earlier stage: plausible priors, a converged sampler, an
+adequate and preferred model, and a known influence of the prior. The estimate is only as
+good as that chain of checks.
 
 ## Consequences
 
-**A slow stage is not an optional stage.** Convergence checking on a large model takes
-time and produces no publishable output, which is exactly why it gets dropped. The
-package makes it explicit rather than automatic, so skipping it is a decision you make
-rather than one that happens quietly.
+**A slow stage is still a required one.** Convergence checking produces no publishable
+output, which is why it gets skipped. The package makes each check an explicit call, so
+skipping one is a decision.
 
-**Warnings are load-bearing.** A `ConvergenceWarning` is not noise to be filtered; it is
-the stage doing its job. Silencing it removes the only signal that separates a usable
-posterior from an unusable one.
+**Warnings are signals.** A `ConvergenceWarning` is the check doing its job. Silencing it
+removes the only sign that a posterior is unusable.
 
-**Escalate in a fixed order.** When diagnostics fail, raise `target_accept` first, then
-`tune`, then `draws`. That order follows the same logic as the workflow: fix how the
-sampler explores before buying more of what it already produced.
+**Escalate in a fixed order.** When convergence fails, raise `target_accept`, then `tune`,
+then `draws`: fix how the sampler explores before buying more of the same draws.
 
-**Going backwards is normal.** The sequence is not a one-way pipeline. Poor diagnostics
-send you back to the sampler settings, and a comparison that favours a different
-specification sends you back to the beginning. What matters is that each stage is passed
-before the next is trusted, not that you pass through them only once.
+**Going back is normal.** Poor priors and an inadequate model return you to stage 2; poor
+convergence returns you to the sampler settings. Each stage must be passed before the next
+is trusted, however many times you pass through it.
 
 ## Related
 
-The procedure for the fitting stage itself, including how to choose sampler settings and
-what to do when they are not enough, is in {doc}`../how-to/02-fit-model`.
+- The stages, one page each: {doc}`../how-to/index`.
+- Choosing sampler settings: {doc}`../how-to/04-fit-model`.
 
 ## References
 

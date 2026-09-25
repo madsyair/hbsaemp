@@ -1,0 +1,124 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/index.md:1
+msgid "hbsaemp"
+msgstr "hbsaemp"
+
+#: ../../source/index.md:3
+msgid "Hierarchical Bayes small area estimation for Python, built on Bambi, PyMC and ArviZ."
+msgstr "Small area estimation dengan hierarchical Bayes untuk Python, dibangun di atas Bambi, PyMC, dan ArviZ."
+
+#: ../../source/index.md:5
+msgid "There are two ways to use it, and the documentation is split the same way. Pick one; each track is complete on its own."
+msgstr "Ada dua cara memakainya, dan dokumentasinya dibagi dengan cara yang sama. Pilih salah satu; masing-masing jalur lengkap dengan sendirinya."
+
+#: ../../source/index.md:8
+msgid "Install"
+msgstr "Instalasi"
+
+#: ../../source/index.md:10
+msgid "hbsaemp is not on PyPI; install it straight from the GitHub repository."
+msgstr "hbsaemp tidak tersedia di PyPI; pasang langsung dari repositori GitHub."
+
+#: ../../source/index.md:17
+msgid "Choose a track"
+msgstr "Pilih jalur"
+
+#: ../../source/index.md:22
+msgid "Python API"
+msgstr "API Python"
+
+#: ../../source/index.md:26
+msgid "Write the analysis as code. Full control, reproducible scripts and notebooks."
+msgstr "Tulis analisis sebagai kode. Kendali penuh, skrip dan notebook yang dapat direproduksi."
+
+#: ../../source/index.md:29
+msgid "Graphical interface"
+msgstr "Antarmuka grafis"
+
+#: ../../source/index.md:33
+msgid "Work through the analysis by clicking. No Python beyond starting the app."
+msgstr "Kerjakan analisis dengan mengklik. Tidak perlu Python selain untuk menjalankan aplikasinya."
+
+#: ../../source/index.md:37
+msgid "How each track is arranged"
+msgstr "Susunan tiap jalur"
+
+#: ../../source/index.md:39
+msgid "Every track holds the same four kinds of page."
+msgstr "Setiap jalur memuat empat jenis halaman yang sama."
+
+#: ../../source/index.md:41
+msgid "**Tutorials** take you through one whole analysis. Read them when you are new."
+msgstr "**Tutorials** membawa Anda melalui satu analisis utuh. Bacalah ketika Anda masih baru."
+
+#: ../../source/index.md:42
+msgid "**How-to guides** answer one stage at a time. Read them when you are working."
+msgstr "**How-to guides** menjawab satu tahap setiap kali. Bacalah ketika Anda sedang bekerja."
+
+#: ../../source/index.md:43
+msgid "**Reference** states technical facts. Read it when you need a fact."
+msgstr "**Reference** memuat fakta teknis. Bacalah ketika Anda membutuhkan suatu fakta."
+
+#: ../../source/index.md:44
+msgid "**Explanation** gives the reasoning. Read it when you want to understand."
+msgstr "**Explanation** memberikan alasannya. Bacalah ketika Anda ingin memahami."
+
+#: ../../source/index.md:46
+msgid "About the project"
+msgstr "Tentang proyek"
+
+#: ../../source/index.md:51
+msgid "Authors"
+msgstr "Penulis"
+
+#: ../../source/index.md:54
+msgid "Who develops hbsaemp."
+msgstr "Siapa yang mengembangkan hbsaemp."
+
+#: ../../source/index.md:57
+msgid "Citation"
+msgstr "Sitasi"
+
+#: ../../source/index.md:60
+msgid "How to cite it."
+msgstr "Cara mengutipnya."
+
+#: ../../source/index.md:63
+msgid "License"
+msgstr "Lisensi"
+
+#: ../../source/index.md:66
+msgid "GPL-3.0-or-later."
+msgstr "GPL-3.0-or-later."
+
+#: ../../source/index.md:69
+msgid "References"
+msgstr "Referensi"
+
+#: ../../source/index.md:72
+msgid "Works cited in these pages."
+msgstr "Karya yang dikutip di halaman-halaman ini."
+
+#: ../../source/index.md:76
+msgid "The documentation is organised following Diátaxis: Procida, D. (2022, 9 May). *Diátaxis: A systematic approach to technical documentation authoring*. <https://diataxis.fr/>"
+msgstr "Dokumentasi ini disusun mengikuti Diátaxis: Procida, D. (2022, 9 Mei). *Diátaxis: A systematic approach to technical documentation authoring*. <https://diataxis.fr/>"
+

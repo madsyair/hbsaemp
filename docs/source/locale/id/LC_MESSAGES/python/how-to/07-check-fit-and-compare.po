@@ -1,0 +1,164 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:11
+msgid "7 · Check the fit and compare models"
+msgstr "7 · Memeriksa kecocokan dan membandingkan model"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:13
+msgid "Check that a model reproduces the data, then rank the candidate models."
+msgstr "Periksa bahwa model dapat mereproduksi data, lalu urutkan model-model kandidat."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:15
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:17
+#, python-brace-format
+msgid "You need models that passed {doc}`05-check-convergence`. Compared models must be fitted to the same response and the same rows; otherwise `compare_models()` raises `ValueError`."
+msgstr "Anda membutuhkan model yang lolos {doc}`05-check-convergence`. Model yang dibandingkan harus di-fit pada respons dan baris yang sama; jika tidak, `compare_models()` memunculkan `ValueError`."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:34
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:36
+msgid "Posterior predictive check"
+msgstr "Posterior predictive check"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:43
+msgid "The plot shows data replicated from the posterior next to the observed data. It is drawn for one model: the model passed, or the first model of a list. `n_draws_ppc=` sets the number of replicated datasets (default 100)."
+msgstr "Plot menampilkan data replikasi dari posterior di samping data amatan. Plot digambar untuk satu model: model yang diberikan, atau model pertama dalam list. `n_draws_ppc=` menentukan jumlah dataset replikasi (bawaan 100)."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:47
+msgid "Compare models"
+msgstr "Membandingkan model"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:57
+msgid "The R-style alias `hbmc` is the same function."
+msgstr "Alias gaya R `hbmc` adalah fungsi yang sama."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:59
+msgid "`cmp.loo`, `cmp.bayes_factor` and `cmp.prior_sensitivity` follow the shape of the input:"
+msgstr "`cmp.loo`, `cmp.bayes_factor`, dan `cmp.prior_sensitivity` mengikuti bentuk input:"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md
+msgid "Call"
+msgstr "Pemanggilan"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md
+msgid "Returns"
+msgstr "Mengembalikan"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md
+msgid "`compare_models(model)`"
+msgstr "`compare_models(model)`"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md
+msgid "a single result"
+msgstr "satu hasil"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md
+msgid "`compare_models([model])`"
+msgstr "`compare_models([model])`"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md
+msgid "a dict with the key `\"model_0\"`"
+msgstr "dict dengan kunci `\"model_0\"`"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md
+msgid "`compare_models([m1, m2])`"
+msgstr "`compare_models([m1, m2])`"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md
+msgid "a dict with one entry per model"
+msgstr "dict dengan satu entri per model"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:67
+msgid "Test the coefficients"
+msgstr "Menguji koefisien"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:69
+msgid "`metrics=[\"loo\", \"bf\"]` adds a Bayes factor for each coefficient:"
+msgstr "`metrics=[\"loo\", \"bf\"]` menambahkan faktor Bayes untuk setiap koefisien:"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:78
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:80
+msgid "**Posterior predictive check.** The model is adequate when the observed data lies within the replicated data. A systematic gap, such as a shifted centre, a wrong spread or a missing tail, means the model does not reproduce the data."
+msgstr "**Posterior predictive check.** Model memadai jika data amatan berada di dalam data replikasi. Selisih yang sistematis, misalnya pusat yang bergeser, sebaran yang keliru, atau ekor yang hilang, berarti model tidak mereproduksi data."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:84
+msgid "**ELPD** (PSIS-LOO-CV). Higher is better. When the difference between two models (`elpd_diff`) is smaller than about twice its standard error (`dse`), the data cannot tell them apart."
+msgstr "**ELPD** (PSIS-LOO-CV). Makin tinggi makin baik. Jika selisih dua model (`elpd_diff`) lebih kecil dari kira-kira dua kali galat bakunya (`dse`), data tidak dapat membedakan keduanya."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:88
+msgid "**Pareto k.** Observations with *k* above about 0.7 make the LOO estimate unreliable. Fay-Herriot models often have some, because every area has one observation and its own random effect. When many are flagged, treat the ranking as indicative only."
+msgstr "**Pareto k.** Observasi dengan *k* di atas sekitar 0.7 membuat estimasi LOO tidak dapat diandalkan. Model Fay-Herriot sering memilikinya, karena setiap area memiliki satu observasi dan efek acaknya sendiri. Jika banyak observasi ditandai, anggap peringkat hanya sebagai indikasi."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:92
+msgid "**Bayes factor.** `BF10` is the evidence that a coefficient differs from zero (Savage-Dickey). It tests one coefficient within one model, unlike R's `hbmc()`, which compares whole models by bridge sampling. A vague prior on the coefficient inflates the evidence for zero."
+msgstr "**Faktor Bayes.** `BF10` adalah bukti bahwa sebuah koefisien berbeda dari nol (Savage-Dickey). Ini menguji satu koefisien di dalam satu model, berbeda dengan `hbmc()` di R yang membandingkan model utuh dengan bridge sampling. Prior yang samar pada koefisien membesar-besarkan bukti untuk nol."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:96
+#, python-brace-format
+msgid "**Adequate:** continue to {doc}`08-prior-sensitivity`."
+msgstr "**Memadai:** lanjutkan ke {doc}`08-prior-sensitivity`."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:97
+#, python-brace-format
+msgid "**Not adequate:** go back to {doc}`02-specify-model` and change the family, the auxiliary variables or the link."
+msgstr "**Tidak memadai:** kembali ke {doc}`02-specify-model` dan ubah family, variabel penyerta, atau link."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:100
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:102
+msgid "**WAIC is requested.** It is not available; use LOO."
+msgstr "**WAIC diminta.** WAIC tidak tersedia; gunakan LOO."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:111
+msgid "**`ValueError` before anything is computed.** The list of models is empty, `metrics` is empty, `n_draws_ppc` is not a positive integer, or the models were fitted to different data."
+msgstr "**`ValueError` sebelum apa pun dihitung.** List model kosong, `metrics` kosong, `n_draws_ppc` bukan bilangan bulat positif, atau model-model di-fit pada data yang berbeda."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:114
+msgid "**`ModelNotFittedError`.** Fit every model first."
+msgstr "**`ModelNotFittedError`.** Lakukan fitting setiap model terlebih dahulu."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:116
+msgid "**The log-likelihood group is missing.** LOO needs the log-likelihood that `fit()` computes. A model fitted by other means raises `ValueError`."
+msgstr "**Grup log-likelihood tidak ada.** LOO membutuhkan log-likelihood yang dihitung `fit()`. Model yang di-fit dengan cara lain memunculkan `ValueError`."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:119
+msgid "**A plot is missing.** The reason is stored in `cmp.plot_errors`. The table is still returned."
+msgstr "**Plot tidak muncul.** Alasannya disimpan di `cmp.plot_errors`. Tabelnya tetap dikembalikan."
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:122
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/07-check-fit-and-compare.md:124
+#, python-brace-format
+msgid "Why comparison comes after convergence and before estimation: {doc}`../explanation/workflow-order`."
+msgstr "Mengapa perbandingan dilakukan setelah konvergensi dan sebelum estimasi: {doc}`../explanation/workflow-order`."
+

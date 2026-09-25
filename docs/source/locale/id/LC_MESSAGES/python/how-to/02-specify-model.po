@@ -1,0 +1,269 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/02-specify-model.md:1
+msgid "2 · Specify the model"
+msgstr "2 · Menspesifikasikan model"
+
+#: ../../source/python/how-to/02-specify-model.md:3
+msgid "Choose the family, the auxiliary variables, the area identifier and, if needed, the priors."
+msgstr "Pilih family, variabel penyerta, identitas area, dan jika perlu, prior."
+
+#: ../../source/python/how-to/02-specify-model.md:5
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/02-specify-model.md:7
+#, python-brace-format
+msgid "You need a DataFrame from {doc}`01-load-data`. Specifying a model does not sample, so every call on this page returns immediately."
+msgstr "Anda membutuhkan DataFrame dari {doc}`01-load-data`. Menspesifikasikan model tidak melakukan sampling, sehingga setiap pemanggilan di halaman ini langsung selesai."
+
+#: ../../source/python/how-to/02-specify-model.md:10
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/02-specify-model.md:12
+msgid "Three interfaces build the same model. Use the simplest one that can express yours."
+msgstr "Tiga antarmuka membangun model yang sama. Gunakan yang paling sederhana yang dapat menyatakan model Anda."
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "Interface"
+msgstr "Antarmuka"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "Function"
+msgstr "Fungsi"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "You pass"
+msgstr "Yang Anda isi"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "Use it when"
+msgstr "Gunakan ketika"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "Beginner"
+msgstr "Pemula"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "`hbm_gaussian`, `hbm_beta`, `hbm_binomial`"
+msgstr "`hbm_gaussian`, `hbm_beta`, `hbm_binomial`"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "response, auxiliary variables, the family's own columns"
+msgstr "respons, variabel penyerta, kolom khusus family"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "the response fits one of the three families"
+msgstr "respons cocok dengan salah satu dari tiga family"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "Intermediate"
+msgstr "Menengah"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "`hbm_flex`"
+msgstr "`hbm_flex`"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "the same, plus `family=`"
+msgstr "sama, ditambah `family=`"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "the family is chosen in code, for example in a loop"
+msgstr "family dipilih di dalam kode, misalnya dalam perulangan"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "Advanced"
+msgstr "Mahir"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "`create_model` (R alias `hbm`)"
+msgstr "`create_model` (alias R `hbm`)"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "a formula"
+msgstr "sebuah formula"
+
+#: ../../source/python/how-to/02-specify-model.md
+msgid "you need a random-effect term other than `(1|group)`, such as a random slope `(x1|group)`"
+msgstr "Anda membutuhkan suku efek acak selain `(1|group)`, misalnya kemiringan acak `(x1|group)`"
+
+#: ../../source/python/how-to/02-specify-model.md:20
+msgid "The same Fay-Herriot model, built three ways:"
+msgstr "Model Fay-Herriot yang sama, dibangun dengan tiga cara:"
+
+#: ../../source/python/how-to/02-specify-model.md:43
+msgid "The area identifier (`area_var=` or `group=`) adds the area random effect `(1|group)`."
+msgstr "Identitas area (`area_var=` atau `group=`) menambahkan efek acak area `(1|group)`."
+
+#: ../../source/python/how-to/02-specify-model.md:45
+msgid "Each family needs its own survey-design columns:"
+msgstr "Setiap family membutuhkan kolom desain surveinya sendiri:"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "Family"
+msgstr "Family"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "Beginner interface"
+msgstr "Antarmuka tingkat pemula"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "Arguments"
+msgstr "Argumen"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "Gaussian"
+msgstr "Gaussian"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "`hbm_gaussian`"
+msgstr "`hbm_gaussian`"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "`sampling_var=`, the sampling variance"
+msgstr "`sampling_var=`, varians sampling"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "Beta"
+msgstr "Beta"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "`hbm_beta`"
+msgstr "`hbm_beta`"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "`n=` and `deff=`, the sample size and design effect"
+msgstr "`n=` dan `deff=`, ukuran sampel dan efek desain"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "Binomial"
+msgstr "Binomial"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "`hbm_binomial`"
+msgstr "`hbm_binomial`"
+
+#: ../../source/python/how-to/02-specify-model.md:37
+msgid "`trials=`, the number of trials"
+msgstr "`trials=`, jumlah percobaan"
+
+#: ../../source/python/how-to/02-specify-model.md:53
+msgid "Every auxiliary variable must be a column name. Compute transformations and interactions in the DataFrame first:"
+msgstr "Setiap variabel penyerta harus berupa nama kolom. Hitung transformasi dan interaksi di DataFrame terlebih dahulu:"
+
+#: ../../source/python/how-to/02-specify-model.md:68
+msgid "Set priors"
+msgstr "Menetapkan prior"
+
+#: ../../source/python/how-to/02-specify-model.md:70
+msgid "Without `priors=`, Bambi's default priors are used; they are scaled to the data. To set your own, pass a `Prior` per term:"
+msgstr "Tanpa `priors=`, prior bawaan Bambi yang dipakai; prior ini diskalakan terhadap data. Untuk menetapkan prior sendiri, berikan satu `Prior` per suku:"
+
+#: ../../source/python/how-to/02-specify-model.md:80
+#, python-brace-format
+msgid "{doc}`03-check-priors` shows whether the priors are reasonable."
+msgstr "{doc}`03-check-priors` menunjukkan apakah prior tersebut wajar."
+
+#: ../../source/python/how-to/02-specify-model.md:82
+msgid "Pin a known parameter"
+msgstr "Menetapkan parameter yang sudah diketahui"
+
+#: ../../source/python/how-to/02-specify-model.md:84
+#, python-brace-format
+msgid "`fixed_params=` fixes a parameter to a known value instead of estimating it: `{\"sigma\": ...}` for Gaussian, `{\"kappa\": ...}` for Beta. The value is a column name or a number, on the parameter's own scale:"
+msgstr "`fixed_params=` menetapkan sebuah parameter ke nilai yang sudah diketahui alih-alih mengestimasinya: `{\"sigma\": ...}` untuk Gaussian, `{\"kappa\": ...}` untuk Beta. Nilainya berupa nama kolom atau angka, pada skala parameter itu sendiri:"
+
+#: ../../source/python/how-to/02-specify-model.md:99
+msgid "`sampling_var=` already pins `sigma`, so a Gaussian model takes one or the other."
+msgstr "`sampling_var=` sudah menetapkan `sigma`, sehingga model Gaussian hanya menerima salah satunya."
+
+#: ../../source/python/how-to/02-specify-model.md:101
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/02-specify-model.md:103
+msgid "`summary()` describes the model before fitting:"
+msgstr "`summary()` mendeskripsikan model sebelum fitting:"
+
+#: ../../source/python/how-to/02-specify-model.md:117
+msgid "`Formula` is the formula that will be fitted."
+msgstr "`Formula` adalah formula yang akan di-fit."
+
+#: ../../source/python/how-to/02-specify-model.md:118
+msgid "`n` is the number of areas left after rows with missing values are dropped."
+msgstr "`n` adalah jumlah area yang tersisa setelah baris dengan nilai hilang dibuang."
+
+#: ../../source/python/how-to/02-specify-model.md:119
+msgid "`Config` holds the sampler settings."
+msgstr "`Config` memuat pengaturan sampler."
+
+#: ../../source/python/how-to/02-specify-model.md:121
+msgid "`check_data()` runs the data pipeline and returns the frame the model will use:"
+msgstr "`check_data()` menjalankan pipeline data dan mengembalikan frame yang akan dipakai model:"
+
+#: ../../source/python/how-to/02-specify-model.md:134
+msgid "`log_sqrt_D` is the Fay-Herriot offset computed from `sampling_var`."
+msgstr "`log_sqrt_D` adalah offset Fay-Herriot yang dihitung dari `sampling_var`."
+
+#: ../../source/python/how-to/02-specify-model.md:136
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/02-specify-model.md:138
+msgid "Each of these errors is raised before any sampling."
+msgstr "Setiap galat berikut muncul sebelum sampling apa pun."
+
+#: ../../source/python/how-to/02-specify-model.md:140
+msgid "**The family is unknown.**"
+msgstr "**Family tidak dikenali.**"
+
+#: ../../source/python/how-to/02-specify-model.md:155
+msgid "**A formula column is not in the data.** `check_data()` and `fit()` raise it, and `err.context` lists the missing names:"
+msgstr "**Kolom dalam formula tidak ada di data.** `check_data()` dan `fit()` memunculkannya, dan `err.context` mencantumkan nama yang hilang:"
+
+#: ../../source/python/how-to/02-specify-model.md:171
+msgid "**An argument belongs to another family.**"
+msgstr "**Argumen milik family lain.**"
+
+#: ../../source/python/how-to/02-specify-model.md:184
+msgid "**A formula term is not a column name.** With `group=`, construction raises it. Without `group=`, `check_data()` or `fit()` does."
+msgstr "**Suku formula bukan nama kolom.** Dengan `group=`, galat muncul saat konstruksi. Tanpa `group=`, galat muncul di `check_data()` atau `fit()`."
+
+#: ../../source/python/how-to/02-specify-model.md:200
+msgid "**A parameter is pinned twice.**"
+msgstr "**Parameter ditetapkan dua kali.**"
+
+#: ../../source/python/how-to/02-specify-model.md:214
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/02-specify-model.md:216
+#, python-brace-format
+msgid "Why there are three interfaces: {doc}`../explanation/three-tier-api`."
+msgstr "Mengapa ada tiga antarmuka: {doc}`../explanation/three-tier-api`."
+
+#: ../../source/python/how-to/02-specify-model.md:217
+#, python-brace-format
+msgid "Which columns each family accepts: {doc}`../explanation/family-registry`."
+msgstr "Kolom yang diterima setiap family: {doc}`../explanation/family-registry`."
+

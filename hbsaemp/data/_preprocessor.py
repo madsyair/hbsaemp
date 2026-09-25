@@ -27,21 +27,21 @@ __all__: list[str] = ["DataPreprocessor"]
 class DataPreprocessor:
     """Preprocess a validated DataFrame before model fitting.
 
-    Always operates on a copy — the original DataFrame is never modified.
+    Works on a copy; the original DataFrame is never modified.
 
-    Transformations applied per family:
+    Transformations per family:
 
-    * **Beta** — adds ``log_phi = log(n/deff - 1)`` column (when ``n_col``
-      and ``deff_col`` are provided), used by Bambi's distributional formula
-      ``"kappa ~ 1 + offset(log_phi)"``.  Smithson-Verkuilen squeeze
-      ``(y*(n-1)+0.5)/n`` is applied **only** when ``squeeze=True`` (default
-      ``False``); use it only for datasets with boundary values ``y=0``/``y=1``.
+    * **Beta**: adds ``log_phi = log(n/deff - 1)`` when ``n_col`` and
+      ``deff_col`` are given, used by the distributional formula
+      ``"kappa ~ 1 + offset(log_phi)"``. The Smithson-Verkuilen squeeze
+      ``(y*(n-1)+0.5)/n`` is applied only when ``squeeze=True`` (default
+      ``False``), for data with boundary values ``y=0`` or ``y=1``.
 
-    * **Gaussian FH** — adds ``log_sqrt_D = 0.5 * log(D)`` column used by
-      ``"sigma ~ 1 + offset(log_sqrt_D)"`` when ``sampling_var_col`` is
-      provided.
+    * **Gaussian FH**: adds ``log_sqrt_D = 0.5 * log(D)`` when
+      ``sampling_var_col`` is given, used by
+      ``"sigma ~ 1 + offset(log_sqrt_D)"``.
 
-    * **Binomial** — no additional transforms.
+    * **Binomial**: no transformation.
 
     Args:
         handle_missing: ``"deleted"`` (only supported value in v1) drops rows
@@ -75,17 +75,13 @@ class DataPreprocessor:
             response: Response column name.
             predictors: Predictor column names.
             group: Grouping column for random effects (``None`` = no RE).
-            family: Distribution family — determines which transforms apply.
-            **pipeline_fields: The family's own fields, exactly as declared in
-                ``FAMILY_SPECS[family].pipeline_fields`` and assembled by
-                ``BaseModel._extra_pipeline_kwargs()`` — e.g. ``n_col`` and
-                ``deff_col`` (Beta), ``sampling_var_col`` (Gaussian FH),
-                ``trials_col`` (Binomial), ``squeeze`` (Beta). String values
-                are read as data-column names and join the NaN-drop subset;
-                other values are settings. Passed through unchanged to the
-                family's ``preprocess``. Taken as ``**kwargs`` on purpose: a
-                family that declares a new field must not have to edit this
-                signature.
+            family: Distribution family; selects the transformations.
+            **pipeline_fields: The family's own fields, as declared in its
+                :class:`~hbsaemp.FamilySpec`: ``n_col``, ``deff_col`` and
+                ``squeeze`` (Beta), ``sampling_var_col`` (Gaussian FH),
+                ``trials_col`` (Binomial). String values are column names and
+                are included in the missing-value check; other values are
+                settings.
 
         Returns:
             Preprocessed :class:`pandas.DataFrame` ready to pass to Bambi.

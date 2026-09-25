@@ -14,11 +14,13 @@ permissions:
   pages: write
   id-token: write
 
-# Never let two Pages deployments run at once, and never cancel one midway:
-# a cancelled deploy can leave the live site in a half-updated state.
+# A newer push to the same pull request supersedes the build still running for
+# it, so that run is cancelled. Runs on main are never cancelled: one of them
+# may be deploying, and a cancelled deployment can leave the live site in a
+# half-updated state.
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -33,7 +35,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-          cache: pip
+
+      # uv installs the same packages as pip, several times faster, and caches
+      # the downloaded wheels between runs.
+      - uses: astral-sh/setup-uv@v10
 
       # PyTensor compiles C extensions on first use and caches them here.
       # Without this the cost is paid again on every single run.
@@ -44,17 +49,38 @@ jobs:
           key: pytensor-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml') }}
           restore-keys: pytensor-${{ runner.os }}-py3.12-
 
-      # The [bambi] extra is required from v0.2 on: `nb_execution_mode` is
-      # "force" when CI is set, so the tutorials genuinely sample rather than
-      # being rendered as dead text.
+      # The [bambi] extra is required from v0.2 on: the notebooks are executed
+      # on every build, so the tutorials genuinely sample rather than being
+      # rendered as dead text.
       - name: Install package and documentation toolchain
-        run: pip install -e ".[bambi]" -r docs/requirements-docs.txt
+        run: uv pip install --system -e ".[bambi]" -r docs/requirements-docs.txt
 
-      # -W turns every warning into an error. --keep-going is deliberately
-      # absent: it has been the default since Sphinx 8.1. The notebooks run in
-      # ipykernel, whose inline matplotlib backend needs no display.
+      # Executed notebooks are kept between runs. jupyter-cache re-runs a
+      # notebook whose code changed, but it cannot see what the code calls, so
+      # the key also covers the package (the GUI excepted), its declared
+      # dependencies and the ISO week: a change to any of them starts from an
+      # empty cache and every notebook runs again. The week bounds how long a
+      # new release of an unpinned dependency can go unnoticed. The run id
+      # makes each run save its own cache; restore-keys picks the newest one.
+      - name: Compute notebook cache key
+        id: nbkey
+        run: echo "prefix=notebooks-$(date -u +%G-%V)-${{ hashFiles('hbsaemp/**', '!hbsaemp/app/**', 'pyproject.toml', 'docs/requirements-docs.txt') }}-" >> "$GITHUB_OUTPUT"
+
+      - name: Cache executed notebooks
+        uses: actions/cache@v5
+        with:
+          path: docs/_build/.jupyter_cache
+          key: ${{ steps.nbkey.outputs.prefix }}${{ github.run_id }}
+          restore-keys: ${{ steps.nbkey.outputs.prefix }}
+
+      # Builds the English site into docs/_build/html and the Indonesian one
+      # into its id/ folder, both with -W (every warning is an error;
+      # --keep-going has been the default since Sphinx 8.1). Only notebooks
+      # missing from the cache are executed, in ipykernel, whose inline
+      # matplotlib backend needs no display; the Indonesian build reuses the
+      # results.
       - name: Build documentation
-        run: sphinx-build -b html -W docs/source docs/_build/html
+        run: python docs/i18n.py build
 
       # `actions/configure-pages` is deliberately not used. It only supplies a
       # base path for generators that need one, which Sphinx does not, and it
@@ -80,7 +106,7 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-          cache: pip
+      - uses: astral-sh/setup-uv@v10
       # The sampling blocks compile models too; same cache as `build`.
       - name: Cache PyTensor compiledir
         uses: actions/cache@v5
@@ -89,7 +115,7 @@ jobs:
           key: pytensor-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml') }}
           restore-keys: pytensor-${{ runner.os }}-py3.12-
       - name: Install package and documentation toolchain
-        run: pip install -e ".[bambi]" -r docs/requirements-docs.txt
+        run: uv pip install --system -e ".[bambi]" -r docs/requirements-docs.txt
       - name: Run documentation doctests
         run: sphinx-build -b doctest -D nb_execution_mode=off docs/source docs/_build/doctest
 
@@ -103,9 +129,9 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-          cache: pip
+      - uses: astral-sh/setup-uv@v10
       - name: Install package and documentation toolchain
-        run: pip install -e ".[bambi]" -r docs/requirements-docs.txt
+        run: uv pip install --system -e ".[bambi]" -r docs/requirements-docs.txt
       - name: Check external links
         run: sphinx-build -b linkcheck -D nb_execution_mode=off docs/source docs/_build/linkcheck
 
@@ -113,6 +139,10 @@ jobs:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     runs-on: ubuntu-latest
+    # Never let two Pages deployments run at once, and never cancel one midway.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

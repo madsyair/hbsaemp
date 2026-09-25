@@ -61,40 +61,34 @@ def hbm_flex(
 ) -> BaseModel:
     """Build an unfitted model from response + auxiliary list (no formula).
 
-    Tier 2 (intermediate interface) of the 3-tier API. The formula
-    ``"{response} ~ {' + '.join(auxiliary)}"`` is assembled internally and
-    forwarded to `create_model()`. Family validation, group auto-injection,
-    and prior checks all happen downstream in `create_model()` — this
-    function only validates the shape of `response`, `auxiliary`, and
+    Tier 2 (intermediate interface). Builds the formula
+    ``"{response} ~ {' + '.join(auxiliary)}"`` and passes it to
+    `create_model()`, which validates the family, adds the group term and
+    checks the priors. This function checks only `response`, `auxiliary` and
     `area_var`.
 
     Args:
-        response: Response column name (bare identifier).
-        auxiliary: Non-empty sequence of predictor column names (bare
-            identifiers). Use `create_model()` directly for intercept-only
-            or in-formula transforms.
+        response: Response column name.
+        auxiliary: Non-empty sequence of predictor column names. For an
+            intercept-only model, use `create_model()`.
         data: Input `pandas.DataFrame`.
         family: One of `"gaussian"`, `"beta"`, `"binomial"`.
         area_var: Grouping column for the random intercept ``(1|area_var)``;
-            forwarded as `group=` to `create_model()` (which auto-injects).
-        intercept: When `False`, emit ``"y ~ 0 + ..."`` to suppress the
-            fixed intercept.
-        priors: Optional prior dict or `Prior` instances; forwarded.
-        handle_missing: Missing data strategy; only `"deleted"` in v1.
+            passed to `create_model()` as `group=`.
+        intercept: `False` writes ``"y ~ 0 + ..."`` to drop the fixed
+            intercept.
+        priors: Optional prior dict or `Prior` instances.
+        handle_missing: Missing-data strategy; only `"deleted"`.
         config: `ModelConfig` (sampler settings); `None` uses `DEFAULT_CONFIG`.
-        addition_var: Column for the family's addition term — the trial
-            counts for Binomial. Named generically so this layer needs no
-            per-family vocabulary.
+        addition_var: Column for the family's addition term, such as the
+            trial counts for Binomial.
         aux_args: `{parameter: value}` for the family's own parameters, e.g.
             `{"n": "n", "deff": "deff"}` for Beta or `{"squeeze": True}`.
         sampling_var: Column of known sampling variances D_i, for the
-            Fay-Herriot setup. Kept as a named argument rather than folded
-            into `aux_args` because it is the one survey-design quantity SAE
-            reaches for constantly — hbsaems keeps `sampling_variance` at this
-            layer for the same reason.
-        fixed_params: `{parameter: column name or number}` pinning a
+            Fay-Herriot model. The same as `sampling_variance` in hbsaems.
+        fixed_params: `{parameter: column name or number}` fixing a
             distributional parameter to known values.
-        link: Override default link function.
+        link: Override the default link.
 
     Returns:
         Unfitted `BaseModel` subclass.

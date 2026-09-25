@@ -128,42 +128,30 @@ class FamilySpec:
 
     Attributes:
         bambi_family: Family string passed to `bambi.Model(family=...)`.
-        mean_param_key: Key in `idata.posterior` for the latent mean
-            parameter; `"mu"` for Gaussian/Beta, `"p"` for Binomial.
-            Read by `predict(kind="response_params")`.
-        default_link: Default link applied to mu (or p) when no `link=` is
-            given. Read by each subclass constructor via `_default_link`.
-        supported_links: Valid link strings, enforced by
-            `BaseModel._validate_link()` (run from `_pre_fit_checks()`).
-        pipeline_fields: Internal attr names (`self._<name>`) forwarded as
-            kwargs to validator and preprocessor. Read by
-            `BaseModel._extra_pipeline_kwargs()`.
-        user_params: `{internal_attr -> user_kwarg}` mapping accepted by
-            `create_model()`. Keys mirror `self._<key>` on the model.
-        response_check: Domain validator run by `DataValidator.validate()`,
-            or `None` to skip. Raises `DataValidationError` on failure.
-        preprocess: Offset/transform step run by `DataPreprocessor.process()`,
-            or `None` when the family needs no transform.
+        mean_param_key: Name of the mean parameter in `idata.posterior`:
+            `"mu"` for Gaussian and Beta, `"p"` for Binomial.
+        default_link: Link for the mean parameter when no `link=` is given.
+        supported_links: Valid link names.
+        pipeline_fields: Names of the family's own fields, passed to the
+            validator and the preprocessor.
+        user_params: Maps each pipeline field to the keyword argument of
+            `create_model()` that sets it.
+        response_check: Domain check run by `DataValidator.validate()`, or
+            `None`. Raises `DataValidationError` on failure.
+        preprocess: Offset or transformation step run by
+            `DataPreprocessor.process()`, or `None`.
         addition_template: `str.format` template for the formula left-hand
-            side when the family wraps the response (e.g. Binomial
-            `"p({response}, {trials_col})"`), or `None` for a bare response.
-            Formatted by `BaseModel._addition_lhs()` with `response` plus
-            every pipeline field by name, so a template may reference any of
-            them without anyone maintaining a list of format keys.
-        addition_field: Which `pipeline_fields` entry the tier-2 `addition_var`
-            argument fills (`"trials_col"` for Binomial). This is what lets a
-            caller write `addition_var="n"` without knowing the family's own
-            vocabulary. Set it whenever `addition_template` is set; `None`
-            means the family takes no addition variable.
-        fixed_params: Distributional parameters this family computes from the
-            survey design instead of sampling. Empty means every parameter is
-            stochastic — the ordinary Bayesian case. `BaseModel` builds the
-            whole offset-and-pin machinery from these, so a family declares
-            the contract here and writes no formula code of its own.
-        required_params: User-facing kwarg names `create_model()` refuses to
-            go without (Binomial cannot be fitted without `trials`). Params
-            that must be supplied *together* are not listed here — that rule
-            follows from `FixedParam.source_fields`.
+            side when the family wraps the response, e.g. Binomial
+            `"p({response}, {trials_col})"`; `None` for a bare response. It may
+            use `response` and any pipeline field by name.
+        addition_field: The pipeline field that `addition_var` fills
+            (`"trials_col"` for Binomial). Set together with
+            `addition_template`; `None` if the family has no addition term.
+        fixed_params: Distributional parameters computed from the survey
+            design instead of sampled. Empty when every parameter is sampled.
+        required_params: Keyword arguments `create_model()` requires, e.g.
+            `trials` for Binomial. Arguments required together are defined by
+            `FixedParam.source_fields` instead.
     """
 
     bambi_family: str
@@ -217,21 +205,17 @@ class FamilySpec:
     def pinnable_params(self) -> dict[str, str]:
         """Map each parameter this family can pin to that parameter's link.
 
-        Declaring a `FixedParam` is what makes a parameter pinnable at all —
-        the same entry serves both the family's own design-column pin and a
-        value the caller supplies directly through `fixed_params=`. A family
-        with none (Binomial, whose only parameter is the estimand) accepts no
-        user pin either.
+        A parameter is pinnable only if the family declares a `FixedParam`
+        for it. Binomial declares none, so it accepts no `fixed_params=`.
         """
         return {fp.param: fp.link for fp in self.fixed_params}
 
     @property
     def offset_source_fields(self) -> tuple[str, ...]:
-        """Every design column the fixed params are derived from, flattened.
+        """Every design column the fixed parameters are computed from.
 
-        `update_model()` reads this to carry design columns over when
-        replacement data lacks them — the counterpart of hbsaems' hidden
-        `.hbsaems_<par>_fixed` columns.
+        `update_model()` copies these columns over when replacement data
+        lacks them, as hbsaems does with its `.hbsaems_<par>_fixed` columns.
         """
         return tuple(
             name for fp in self.fixed_params for name in fp.source_fields

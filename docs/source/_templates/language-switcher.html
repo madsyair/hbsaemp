@@ -1,0 +1,15 @@
+{# Link to the same page in the other language. The English site is the root of
+   the output and the Indonesian site sits in its id/ folder (docs/i18n.py), so
+   the target is found from the path back to the root alone, with no JavaScript. #}
+{%- set index_file = 'index' ~ file_suffix -%}
+{%- set root = pathto('index')[:(index_file|length) * -1] -%}
+{%- if language == 'id' -%}
+  {%- set target, label, lang = root ~ '../' ~ pagename ~ file_suffix, 'English', 'en' -%}
+{%- else -%}
+  {%- set target, label, lang = root ~ 'id/' ~ pagename ~ file_suffix, 'Bahasa Indonesia', 'id' -%}
+{%- endif %}
+<a class="nav-link pst-navbar-icon language-switcher" href="{{ target }}" hreflang="{{ lang }}"
+   title="{{ label }}" aria-label="{{ label }}">
+  <i class="fa-solid fa-language fa-lg fa-fw"></i>
+  <span class="language-switcher-label">{{ label }}</span>
+</a>

@@ -1,0 +1,201 @@
+# Indonesian translations for hbsaemp.
+# Copyright (C) 2026 the hbsaemp authors
+# This file is distributed under the same license as the hbsaemp project.
+# FIRST AUTHOR <EMAIL@ADDRESS>, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: hbsaemp 1.0.0\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: id\n"
+"Language-Team: id <LL@li.org>\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: ../../source/python/how-to/05-check-convergence.md:11
+msgid "5 · Check convergence"
+msgstr "5 · Memeriksa konvergensi"
+
+#: ../../source/python/how-to/05-check-convergence.md:13
+msgid "Decide whether the chains have converged."
+msgstr "Putuskan apakah rantai sudah konvergen."
+
+#: ../../source/python/how-to/05-check-convergence.md:15
+msgid "Before you start"
+msgstr "Sebelum memulai"
+
+#: ../../source/python/how-to/05-check-convergence.md:17
+#, python-brace-format
+msgid "You need a fitted model from {doc}`04-fit-model`:"
+msgstr "Anda membutuhkan model yang sudah di-fit dari {doc}`04-fit-model`:"
+
+#: ../../source/python/how-to/05-check-convergence.md:28
+msgid "Do it"
+msgstr "Kerjakan"
+
+#: ../../source/python/how-to/05-check-convergence.md:35
+msgid "The R-style alias `hbcc` is the same function. The call also draws trace, density, autocorrelation, R-hat, ESS and energy plots. The pair plot marks divergent transitions; it is slow, so request it explicitly:"
+msgstr "Alias gaya R `hbcc` adalah fungsi yang sama. Pemanggilan ini juga menggambar plot trace, densitas, autokorelasi, R-hat, ESS, dan energi. Pair plot menandai transisi divergen; plot ini lambat, jadi minta secara eksplisit:"
+
+#: ../../source/python/how-to/05-check-convergence.md:43
+msgid "Check it worked"
+msgstr "Periksa hasilnya"
+
+#: ../../source/python/how-to/05-check-convergence.md:45
+msgid "A value outside these limits raises a `ConvergenceWarning`."
+msgstr "Nilai di luar batas berikut memunculkan `ConvergenceWarning`."
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Diagnostic"
+msgstr "Diagnostik"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Acceptable"
+msgstr "Dapat diterima"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "If not"
+msgstr "Jika tidak"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "R-hat"
+msgstr "R-hat"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "≤ 1.01"
+msgstr "≤ 1.01"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "The chains explored different regions"
+msgstr "Rantai menjelajahi wilayah yang berbeda"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Bulk ESS"
+msgstr "Bulk ESS"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "≥ 100 × chains (400 with the default 4)"
+msgstr "≥ 100 × rantai (400 dengan default 4)"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Too few effective draws for the posterior centre"
+msgstr "Terlalu sedikit draw efektif untuk bagian tengah posterior"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Tail ESS"
+msgstr "Tail ESS"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "≥ 100 × chains"
+msgstr "≥ 100 × rantai"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "The credible intervals are unreliable"
+msgstr "Interval kredibel tidak dapat diandalkan"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Divergences"
+msgstr "Divergensi"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "0"
+msgstr "0"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Draws near the divergence are biased"
+msgstr "Draw di sekitar divergensi bias"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Tree depth hits"
+msgstr "Tree depth maksimum tercapai"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "Trajectories were cut short, so exploration is slow"
+msgstr "Lintasan terpotong, sehingga eksplorasi lambat"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "E-BFMI"
+msgstr "E-BFMI"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "≥ 0.3 in every chain"
+msgstr "≥ 0.3 di setiap rantai"
+
+#: ../../source/python/how-to/05-check-convergence.md
+msgid "The sampler moves poorly between energy levels"
+msgstr "Sampler sulit berpindah antartingkat energi"
+
+#: ../../source/python/how-to/05-check-convergence.md:56
+msgid "Check every row. A good R-hat with a poor tail ESS means the point estimate is stable but its interval is not."
+msgstr "Periksa setiap baris. R-hat yang baik dengan tail ESS yang buruk berarti estimasi titiknya stabil tetapi intervalnya tidak."
+
+#: ../../source/python/how-to/05-check-convergence.md:59
+msgid "`diag.rhat_ess` holds the values per parameter, `diag.diagnose` the sampler-level counts, and `diag.ess_threshold` the ESS limit that was applied."
+msgstr "`diag.rhat_ess` memuat nilai per parameter, `diag.diagnose` memuat hitungan tingkat sampler, dan `diag.ess_threshold` memuat batas ESS yang dipakai."
+
+#: ../../source/python/how-to/05-check-convergence.md:62
+msgid "`ConvergenceWarning` is a `UserWarning`, not an `HBSAEError`:"
+msgstr "`ConvergenceWarning` adalah `UserWarning`, bukan `HBSAEError`:"
+
+#: ../../source/python/how-to/05-check-convergence.md:71
+msgid "`except HBSAEError` therefore does not catch it. Use `warnings.catch_warnings` to handle it in code."
+msgstr "Karena itu `except HBSAEError` tidak menangkapnya. Gunakan `warnings.catch_warnings` untuk menanganinya di kode."
+
+#: ../../source/python/how-to/05-check-convergence.md:74
+#, python-brace-format
+msgid "**Converged:** continue to {doc}`07-check-fit-and-compare`."
+msgstr "**Konvergen:** lanjutkan ke {doc}`07-check-fit-and-compare`."
+
+#: ../../source/python/how-to/05-check-convergence.md:75
+#, python-brace-format
+msgid "**Not converged:** refit with {doc}`06-update-model`, then check again."
+msgstr "**Tidak konvergen:** lakukan fitting ulang dengan {doc}`06-update-model`, lalu periksa lagi."
+
+#: ../../source/python/how-to/05-check-convergence.md:77
+msgid "If it fails"
+msgstr "Jika gagal"
+
+#: ../../source/python/how-to/05-check-convergence.md:79
+msgid "Change one setting at a time, in this order, and refit after each change:"
+msgstr "Ubah satu pengaturan setiap kali, dengan urutan ini, dan lakukan fitting ulang setelah setiap perubahan:"
+
+#: ../../source/python/how-to/05-check-convergence.md:81
+msgid "**`target_accept`** to 0.95, then 0.99. The sampler takes smaller steps, which removes divergences."
+msgstr "**`target_accept`** ke 0.95, lalu 0.99. Sampler mengambil langkah yang lebih kecil, sehingga divergensi hilang."
+
+#: ../../source/python/how-to/05-check-convergence.md:83
+msgid "**`tune`**. More warm-up before the draws that count."
+msgstr "**`tune`**. Warm-up lebih panjang sebelum draw yang dihitung."
+
+#: ../../source/python/how-to/05-check-convergence.md:84
+msgid "**`draws`**. Only after the first two."
+msgstr "**`draws`**. Hanya setelah dua langkah pertama."
+
+#: ../../source/python/how-to/05-check-convergence.md:86
+#, python-brace-format
+msgid "If none of these work, the problem is the model: too many hyperparameters for the number of areas, a group with a single observation, or two nearly collinear auxiliary variables. Go back to {doc}`02-specify-model`."
+msgstr "Jika semua itu tidak berhasil, masalahnya ada pada model: terlalu banyak hiperparameter untuk jumlah area yang ada, grup dengan satu observasi saja, atau dua variabel penyerta yang hampir kolinear. Kembali ke {doc}`02-specify-model`."
+
+#: ../../source/python/how-to/05-check-convergence.md:90
+msgid "**A plot is missing.** The reason is stored in `diag.plot_errors`. The diagnostics are still returned."
+msgstr "**Plot tidak muncul.** Alasannya disimpan di `diag.plot_errors`. Hasil diagnostik tetap dikembalikan."
+
+#: ../../source/python/how-to/05-check-convergence.md:93
+msgid "**`ModelNotFittedError`.** Fit the model first."
+msgstr "**`ModelNotFittedError`.** Lakukan fitting model terlebih dahulu."
+
+#: ../../source/python/how-to/05-check-convergence.md:95
+msgid "Related"
+msgstr "Terkait"
+
+#: ../../source/python/how-to/05-check-convergence.md:97
+#, python-brace-format
+msgid "Why convergence is checked before any estimate is read: {doc}`../explanation/workflow-order`."
+msgstr "Mengapa konvergensi diperiksa sebelum estimasi apa pun dibaca: {doc}`../explanation/workflow-order`."
+
