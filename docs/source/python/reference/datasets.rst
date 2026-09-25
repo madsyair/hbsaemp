@@ -1,12 +1,16 @@
 Datasets
 ========
 
-The bundled example datasets, and the data-layer classes that validate and
-transform a frame before a model sees it.
+The bundled datasets, and the data-layer classes that validate and transform a
+frame before a model sees it.
 
-Every dataset has one row per small area, 30 areas, and is generated from a
-fixed seed (42). Loading the same name twice gives the same numbers on any
-machine, which is what makes the tutorials reproducible.
+There are two kinds, both with one row per small area. The **synthetic**
+datasets in :data:`AVAILABLE_DATASETS` have 30 areas and are generated from a
+fixed seed (42): loading the same name twice gives the same numbers on any
+machine. The **real** datasets in :data:`REAL_DATASETS` cover the 42 districts
+and cities of Papua Island and are read from CSV files shipped with the package,
+exactly as published — defects included, so that preparing them is part of the
+case-study tutorial rather than hidden from it.
 
 .. currentmodule:: hbsaemp
 
@@ -33,15 +37,23 @@ Module constants
 .. data:: AVAILABLE_DATASETS
    :type: list[str]
 
-   Names accepted by :func:`load_dataset`:
+   Names of the synthetic datasets:
    ``["data_fhnorm", "data_betalogitnorm", "data_binlogitnorm", "data_lnln"]``.
-   Any other name raises :class:`ValueError`.
+   Every one of them loads ready to model.
 
-Two columns every dataset shares
---------------------------------
+.. data:: REAL_DATASETS
+   :type: list[str]
+
+   Names of the real datasets: ``["susenas2023_papua", "podes2021_papua"]``.
+   :func:`load_dataset` accepts them too. They are kept out of
+   :data:`AVAILABLE_DATASETS` because, as shipped, they need preparing before a
+   model can use them. Any name in neither list raises :class:`ValueError`.
+
+Two columns every synthetic dataset shares
+------------------------------------------
 
 ``group`` and ``sre`` are both the area identifier, numbered 1 to 30, and they
-hold **identical values** in all four datasets. Pass either one as ``group=``.
+hold **identical values** in all four synthetic datasets. Pass either one as ``group=``.
 The second name exists to mirror the R ``hbsaems`` package, where ``sre``
 labels the spatial random effect.
 
@@ -272,3 +284,174 @@ Lognormal-lognormal model. Shape ``(30, 13)``.
      - int64
      - Area identifier
      - [1, 30]
+
+Real data: Papua Island
+-----------------------
+
+Two frames describing the same 42 districts and cities (*kabupaten/kota*) of
+Papua Island, within the two provinces as bounded in 2021, Papua and Papua
+Barat. They are the data of the case-study tutorial, which follows Prayoga,
+Pusponegoro, Sukim and Budiarti (2024), *Small area estimation for morbidity
+rate prediction*, Commun. Math. Biol. Neurosci. 2024:62,
+https://doi.org/10.28919/cmbn/8845.
+
+susenas2023_papua
+~~~~~~~~~~~~~~~~~
+
+Direct estimates of the 2023 morbidity rate: the percentage of the population
+with a health complaint in the past month that disrupted their daily
+activities. Source: Statistics Indonesia (BPS), National Socio-Economic Survey
+(Susenas) March 2023, for the provinces of Papua and Papua Barat. Shape
+``(42, 6)``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 10 46 28
+
+   * - Column
+     - dtype
+     - Meaning
+     - Range as shipped
+   * - ``idkab``
+     - int64
+     - BPS district code, as published
+     - [9101, 9437]
+   * - ``nama_kab``
+     - str
+     - District or city name
+     -
+   * - ``nama_prov``
+     - str
+     - Province, 2021 boundaries
+     - Papua, Papua Barat
+   * - ``morbidity_rate``
+     - float64
+     - Direct estimate of the morbidity rate, in percent
+     - [1.01, 13.77]
+   * - ``se``
+     - float64
+     - Standard error of ``morbidity_rate``, in percentage points
+     - [0.27, 2.41]
+   * - ``rse``
+     - float64
+     - Relative standard error of ``morbidity_rate``, in percent
+     - [9.09, 60.63]
+
+.. warning::
+
+   Two records are shipped exactly as published, and neither is model-ready:
+
+   - **Deiyai** (9436) has no ``morbidity_rate`` and no ``se``, only an
+     ``rse`` of 60.63.
+   - **Kota Jayapura** is coded 9437 here. Its official code, used by
+     ``podes2021_papua``, is 9471, so a merge on ``idkab`` drops it.
+
+podes2021_papua
+~~~~~~~~~~~~~~~
+
+Auxiliary variables from the 2021 Village Potential Data Collection (Podes
+2021, BPS), aggregated from the village records — *desa* and *kelurahan* — of
+each district. Shape ``(42, 18)``.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 16 10 46 28
+
+   * - Column
+     - dtype
+     - Meaning
+     - Range as shipped
+   * - ``idkab``
+     - int64
+     - BPS district code
+     - [9101, 9471]
+   * - ``nama_kab``
+     - str
+     - District or city name
+     -
+   * - ``kode_prov_2021``, ``nama_prov_2021``
+     - int64, str
+     - Province before the 2022 split
+     - 91 Papua Barat, 94 Papua
+   * - ``kode_prov_2022``, ``nama_prov_2022``
+     - int64, str
+     - Province after the 2022 split
+     - six provinces, codes [91, 97]
+   * - ``n_kec``
+     - int64
+     - Number of subdistricts (*kecamatan*)
+     - [5, 51]
+   * - ``n_desa``
+     - int64
+     - Number of villages, *desa* and *kelurahan* together
+     - [38, 545]
+   * - ``X1`` … ``X10``
+     - float64
+     - Auxiliary variables, defined below
+     - see below
+
+Each auxiliary variable is computed from Podes 2021 village items over **all**
+villages of the district, *desa* and *kelurahan* alike. The item codes are those
+of the Podes 2021 village questionnaire. Every value in the file was recomputed
+from the village records with the definitions below and matches to rounding.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 8 44 30 18
+
+   * - Name
+     - Meaning
+     - Computed from
+     - Range as shipped
+   * - ``X1``
+     - Percentage of villages where most families defecate in latrines
+     - share with ``r505a`` in {1, 2, 3}
+     - [0, 100]
+   * - ``X2``
+     - Percentage of villages where most families drink from a decent water
+       source
+     - share with ``r507a`` in {1, 2, 3, 4, 5, 6, 7, 9}
+     - [14.56, 100]
+   * - ``X3``
+     - Percentage of villages where most families bathe and wash with water
+       from a decent source
+     - share with ``r507b`` in {1, 2, 3, 4, 5, 6, 7}
+     - [98.42, 100]
+   * - ``X4``
+     - Public elementary or equivalent schools per village
+     - mean of ``r701dk2 + r701ek2``
+     - [0.0769, 1.44]
+   * - ``X5``
+     - Public junior high or equivalent schools per village
+     - mean of ``r701fk2 + r701gk2``
+     - [0.0232, 0.436]
+   * - ``X6``
+     - Public senior high or equivalent schools per village
+     - mean of ``r701hk2 + r701ik2 + r701jk2``
+     - [0.00917, 0.539]
+   * - ``X7``
+     - Hospitals (general and maternity) and community health centres
+       (*puskesmas*) per village
+     - mean of ``r704ak2 + r704bk2 + r704ck2 + r704dk2``
+     - [0.0232, 0.590]
+   * - ``X8``
+     - Integrated health posts (*posyandu*) with service activities once a
+       month or more, per village
+     - mean of ``r705b``
+     - [0, 5.49]
+   * - ``X9``
+     - Doctors and midwives per village
+     - mean of ``r706a1 + r706a2 + r706c``
+     - [0.0431, 5.49]
+   * - ``X10``
+     - Other health workers per village
+     - mean of ``r706d``
+     - [0.0388, 5.92]
+
+.. note::
+
+   Four village records hold the value 99 in a health-worker item: ``r706a2``
+   in Bawei (Biak Numfor), and ``r706d`` in Wouyebutu (Paniai), Bis Agats
+   (Asmat) and Kasonaweja (Mamberamo Raya). Whether 99 is a count or a special
+   code has not been verified. The records are aggregated as recorded, so they
+   feed ``X9`` for Biak Numfor and ``X10`` for Paniai, Asmat and Mamberamo Raya.

@@ -1,3 +1,10 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+---
+
 # 5 · Estimate the areas
 
 Turn a fitted model into a table of per-area estimates with their uncertainty.
@@ -8,13 +15,13 @@ You need a fitted model that has passed {doc}`03-check-convergence`. This is the
 whose output you will actually publish, so everything upstream has to be trustworthy
 before you read it.
 
-```{testcode}
-from hbsaemp import (create_model, load_dataset, estimate_areas,
+```{code-cell} ipython3
+from hbsaemp import (create_model, load_dataset, estimate_areas, ModelConfig,
                      ModelNotFittedError)
 
 df = load_dataset("data_fhnorm")
-model = create_model("y ~ x1 + x2", family="gaussian", data=df,
-                     group="group", sampling_var="D")
+model = create_model("y ~ x1 + x2", family="gaussian", data=df, group="group",
+                     sampling_var="D", config=ModelConfig(progressbar=False))
 
 try:
     estimate_areas(model)
@@ -22,38 +29,20 @@ except ModelNotFittedError as err:
     print(err.message)
 ```
 
-```{testoutput}
-Call GaussianModel.fit() before accessing .result.
+So fit it, and check convergence as in {doc}`03-check-convergence`, before estimating:
+
+```{code-cell} ipython3
+model.fit()
 ```
 
 ## Do it
 
-```{testsetup} fitted
-from hbsaemp import create_model, load_dataset
-
-df = load_dataset("data_fhnorm")
-model = create_model("y ~ x1 + x2", family="gaussian", data=df,
-                     group="group", sampling_var="D")
-model.fit()
-```
-
-```{testcode} fitted
+```{code-cell} ipython3
 from hbsaemp import estimate_areas
 
 est = estimate_areas(model)
 print(est.summary())
-print(est.result_table.head())
-```
-
-```{testoutput} fitted
-:hide:
-:options: +ELLIPSIS
-
-AreaEstimatesResult
-  Areas     : 30
-...
-  Columns   : ['group', 'mean', 'sd', 'ci_lower', 'ci_upper', 'rse_pct', 'mse', 'rmse']
-...
+est.result_table.head()
 ```
 
 The per-area table is `result_table`; `mean_rse` and `mean_mse` on the same object give
@@ -71,7 +60,7 @@ it should be: no survey data speaks for it. Those draws are seeded by the model'
 
 Change the interval width with `ci_prob`, which defaults to 0.95:
 
-```{testcode} fitted
+```{code-cell} ipython3
 est = estimate_areas(model, ci_prob=0.90)
 ```
 

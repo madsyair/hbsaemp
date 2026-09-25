@@ -1,3 +1,10 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+---
+
 # 4 · Compare models
 
 Rank competing specifications, and read the comparison table without over-reading it.
@@ -15,19 +22,15 @@ untrustworthy draws produces a trustworthy-looking ranking of nothing.
 
 ## Do it
 
-```{testsetup}
-from hbsaemp import create_model, load_dataset
+```{code-cell} ipython3
+from hbsaemp import create_model, load_dataset, compare_models, ModelConfig
 
 df = load_dataset("data_fhnorm")
-```
-
-```{testcode}
-from hbsaemp import compare_models
-
+config = ModelConfig(progressbar=False)  # one config, shared by both models
 m1 = create_model("y ~ x1", family="gaussian", data=df,
-                  group="group", sampling_var="D")
+                  group="group", sampling_var="D", config=config)
 m2 = create_model("y ~ x1 + x2", family="gaussian", data=df,
-                  group="group", sampling_var="D")
+                  group="group", sampling_var="D", config=config)
 m1.fit()
 m2.fit()
 
@@ -35,20 +38,11 @@ cmp = compare_models([m1, m2])
 print(cmp.summary())
 ```
 
-```{testoutput}
-:hide:
-:options: +ELLIPSIS
-
-ComparisonResult
-  LOO  : {model_0: ..., model_1: ...}
-...
-```
-
 The R-style alias `hbmc` is the same function.
 
 Two optional analyses run per model on request:
 
-```{testcode}
+```{code-cell} ipython3
 cmp = compare_models([m1, m2], metrics=["loo", "bf"], run_prior_sensitivity=True)
 cmp.bayes_factor["model_1"]        # BF10 / BF01 per coefficient
 cmp.prior_sensitivity["model_1"]   # prior / likelihood sensitivity per parameter
@@ -96,10 +90,7 @@ likelihood* (only the prior). Restrict the parameters with `sensitivity_vars=[..
 WAIC is not available. It was dropped upstream in favour of PSIS-LOO-CV, and asking for
 it is refused rather than silently substituted:
 
-```{testcode}
-from hbsaemp import create_model, load_dataset, compare_models
-
-df = load_dataset("data_fhnorm")
+```{code-cell} ipython3
 model = create_model("y ~ x1", family="gaussian", data=df,
                      group="group", sampling_var="D")
 
@@ -109,17 +100,13 @@ except NotImplementedError as err:
     print(type(err).__name__)
 ```
 
-```{testoutput}
-NotImplementedError
-```
-
 ## If it fails
 
 **An argument is rejected before anything is computed.** Arguments that cannot be
 honoured raise rather than being quietly ignored, so you never receive a result that
 silently disregarded what you asked for:
 
-```{testcode}
+```{code-cell} ipython3
 try:
     compare_models([])
 except ValueError as err:
@@ -131,24 +118,15 @@ except ValueError as err:
     print(type(err).__name__)
 ```
 
-```{testoutput}
-compare_models() requires at least one fitted model
-ValueError
-```
-
 **A model has not been fitted.** Same guard as everywhere else:
 
-```{testcode}
+```{code-cell} ipython3
 from hbsaemp import ModelNotFittedError
 
 try:
     compare_models(model)
 except ModelNotFittedError as err:
     print(err.message)
-```
-
-```{testoutput}
-Call GaussianModel.fit() before accessing .result.
 ```
 
 **The log-likelihood group is missing.** LOO needs per-observation log-likelihood, which

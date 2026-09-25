@@ -1,0 +1,8 @@
+{# Two-state colour-mode button, light <-> dark, driven by _static/theme-toggle.js.
+   It replaces the theme's own switcher, a menu that adds a third "system" mode.
+   Only the icon of the current mode is shown (see custom.css). #}
+<button class="btn btn-sm nav-link pst-navbar-icon theme-toggle-button pst-js-only"
+        title="{{ _('Toggle light/dark mode') }}" aria-label="{{ _('Toggle light/dark mode') }}">
+  <i class="fa-solid fa-sun fa-lg fa-fw theme-toggle-icon" data-mode="light"></i>
+  <i class="fa-solid fa-moon fa-lg fa-fw theme-toggle-icon" data-mode="dark"></i>
+</button>

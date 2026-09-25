@@ -1,3 +1,10 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+---
+
 # 2 · Fit the model
 
 Run the sampler, and choose how many draws, chains and warm-up steps to spend.
@@ -11,28 +18,20 @@ things are worth doing first, because both are free.
 Print the model. Before fitting, `summary()` describes what will be sampled rather than
 raising, so it is always safe to look:
 
-```{testcode}
+```{code-cell} ipython3
 from hbsaemp import create_model, load_dataset
 
 df = load_dataset("data_fhnorm")
 model = create_model("y ~ x1 + x2", family="gaussian", data=df,
                      group="group", sampling_var="D")
-print(model.summary().splitlines()[0])
-```
-
-```{testoutput}
-GaussianModel [not fitted]
+print(model.summary())
 ```
 
 Then run the data pipeline on its own, so a bad column costs you a millisecond instead
 of a failed sampling run:
 
-```{testcode}
+```{code-cell} ipython3
 print(model.check_data().shape)
-```
-
-```{testoutput}
-(30, 10)
 ```
 
 ## Do it
@@ -40,24 +39,23 @@ print(model.check_data().shape)
 Sampler settings are bundled into a `ModelConfig` rather than passed as loose keyword
 arguments, so the same settings can be reused across models in a comparison study:
 
-```{testcode}
+```{code-cell} ipython3
 from hbsaemp import ModelConfig, DEFAULT_CONFIG
 
 print(DEFAULT_CONFIG.draws, DEFAULT_CONFIG.tune,
       DEFAULT_CONFIG.chains, DEFAULT_CONFIG.target_accept)
 
-config = ModelConfig(draws=2000, tune=1000, chains=4, target_accept=0.95)
+config = ModelConfig(draws=2000, tune=1000, chains=4, target_accept=0.95,
+                     progressbar=False)
 print(config.draws, config.target_accept)
 ```
 
-```{testoutput}
-1000 1000 4 0.8
-2000 0.95
-```
+`progressbar=False` only keeps the output on these pages short; leave it out to watch the
+sampler's progress.
 
 Pass it when you build the model, then sample:
 
-```{testcode}
+```{code-cell} ipython3
 model = create_model("y ~ x1 + x2", family="gaussian", data=df,
                      group="group", sampling_var="D", config=config)
 result = model.fit()
@@ -85,20 +83,9 @@ a single chain makes the most useful convergence diagnostic impossible to comput
 
 ## Check it worked
 
-```{testcode}
+```{code-cell} ipython3
 print(model.is_fitted)        # True
 print(model.result.summary())
-```
-
-```{testoutput}
-:hide:
-:options: +ELLIPSIS
-
-True
-ModelResult [gaussian]
-  Formula : y ~ x1 + x2 + (1|group)
-  n       : 30
-...
 ```
 
 Sampling finishing is not the same as sampling succeeding. The real check is
@@ -109,18 +96,12 @@ Sampling finishing is not the same as sampling succeeding. The real check is
 **A setting is out of range.** `ModelConfig` validates at construction, so the mistake
 surfaces before any sampling time is spent:
 
-```{testcode}
+```{code-cell} ipython3
 for bad in [{"draws": -1}, {"chains": 0}, {"target_accept": 1.5}]:
     try:
         ModelConfig(**bad)
     except ValueError as err:
         print(type(err).__name__)
-```
-
-```{testoutput}
-ValueError
-ValueError
-ValueError
 ```
 
 **The data is rejected.** Every message names the offending column; see the failure

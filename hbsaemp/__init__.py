@@ -41,6 +41,7 @@ from hbsaemp.data._preprocessor import DataPreprocessor as DataPreprocessor
 from hbsaemp.data._validator import DataValidator as DataValidator
 from hbsaemp.data.datasets import (
     AVAILABLE_DATASETS as AVAILABLE_DATASETS,
+    REAL_DATASETS as REAL_DATASETS,
     load_dataset as load_dataset,
 )
 from hbsaemp.diagnostics.comparison import (
@@ -148,7 +149,7 @@ __all__: list[str] = [
     "FamilySpec",            # frozen family-metadata type
     "list_families", "get_family_spec",  # read-only family registry accessors
     # Data layer
-    "DataValidator", "DataPreprocessor", "load_dataset", "AVAILABLE_DATASETS",
+    "DataValidator", "DataPreprocessor", "load_dataset", "AVAILABLE_DATASETS", "REAL_DATASETS",
     # Diagnostics (Python names + R aliases)
     "ConvergenceResult", "check_convergence", "hbcc",
     "PriorCheckResult", "check_prior", "hbpc",
