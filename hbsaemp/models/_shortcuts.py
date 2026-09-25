@@ -1,4 +1,4 @@
-"""Tier 3 — family-specific shortcuts (`hbm_beta`, `hbm_gaussian`, ...).
+"""Tier 1 (beginner interface) — family-specific shortcuts (`hbm_beta`, ...).
 
 Each function hardcodes `family=` and exposes only kwargs relevant to that
 family, so a typo like ``hbm_gaussian(..., trials="n")`` is a Python

@@ -28,12 +28,32 @@ Call GaussianModel.fit() before accessing .result.
 
 ## Do it
 
-```python
+```{testsetup} fitted
+from hbsaemp import create_model, load_dataset
+
+df = load_dataset("data_fhnorm")
+model = create_model("y ~ x1 + x2", family="gaussian", data=df,
+                     group="group", sampling_var="D")
+model.fit()
+```
+
+```{testcode} fitted
 from hbsaemp import estimate_areas
 
 est = estimate_areas(model)
 print(est.summary())
 print(est.result_table.head())
+```
+
+```{testoutput} fitted
+:hide:
+:options: +ELLIPSIS
+
+AreaEstimatesResult
+  Areas     : 30
+...
+  Columns   : ['group', 'mean', 'sd', 'ci_lower', 'ci_upper', 'rse_pct', 'mse', 'rmse']
+...
 ```
 
 The per-area table is `result_table`; `mean_rse` and `mean_mse` on the same object give
@@ -51,7 +71,7 @@ it should be: no survey data speaks for it. Those draws are seeded by the model'
 
 Change the interval width with `ci_prob`, which defaults to 0.95:
 
-```python
+```{testcode} fitted
 est = estimate_areas(model, ci_prob=0.90)
 ```
 

@@ -57,7 +57,7 @@ print(config.draws, config.target_accept)
 
 Pass it when you build the model, then sample:
 
-```python
+```{testcode}
 model = create_model("y ~ x1 + x2", family="gaussian", data=df,
                      group="group", sampling_var="D", config=config)
 result = model.fit()
@@ -85,9 +85,20 @@ a single chain makes the most useful convergence diagnostic impossible to comput
 
 ## Check it worked
 
-```python
+```{testcode}
 print(model.is_fitted)        # True
 print(model.result.summary())
+```
+
+```{testoutput}
+:hide:
+:options: +ELLIPSIS
+
+True
+ModelResult [gaussian]
+  Formula : y ~ x1 + x2 + (1|group)
+  n       : 30
+...
 ```
 
 Sampling finishing is not the same as sampling succeeding. The real check is

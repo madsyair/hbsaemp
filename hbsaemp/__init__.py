@@ -139,10 +139,10 @@ __all__: list[str] = [
     "EstimationError", "PriorSpecError", "ConvergenceWarning",
     # Model layer
     "ModelConfig", "DEFAULT_CONFIG", "BaseModel", "ModelResult",
-    "create_model",          # primary Python name
+    "create_model",          # primary Python name; tier 3 (advanced): full formula
     "hbm",                   # R-style alias for create_model
-    "hbm_flex",              # tier 2: response + auxiliary list
-    "hbm_beta", "hbm_gaussian", "hbm_binomial",  # tier 3
+    "hbm_flex",              # tier 2 (intermediate): response + auxiliary list
+    "hbm_beta", "hbm_gaussian", "hbm_binomial",  # tier 1 (beginner)
     "MODEL_REGISTRY",
     "Prior",                 # validated prior value object
     "FamilySpec",            # frozen family-metadata type

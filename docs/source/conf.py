@@ -84,6 +84,32 @@ napoleon_numpy_docstring = False
 # to the documentation, and is tracked separately.
 doctest_test_doctest_blocks = ""
 
+# Blocks that sample are tested as well, on a light budget: under `-b doctest`
+# every fit runs 100 draws after 300 tuning steps on 2 chains, with no progress
+# bar (it writes to stdout, which doctest compares) and seed 0 when none is set.
+# The patch sits on `ModelConfig.to_sampler_kwargs`, the one place every fit
+# passes through, so the code on the page runs exactly as written and only the
+# sampler budget shrinks. That proves each call works, not that it converges.
+#
+# Tuning stays at 300 rather than 100 on purpose: with 100 the sampler never
+# adapts, every transition hits the maximum tree depth, and the job takes three
+# times as long. Sphinx runs this before every test group, hence the guard.
+doctest_global_setup = """
+from hbsaemp import ModelConfig as _ModelConfig
+
+if not hasattr(_ModelConfig, "_full_sampler_kwargs"):
+    _ModelConfig._full_sampler_kwargs = _ModelConfig.to_sampler_kwargs
+
+    def _light_sampler_kwargs(self):
+        kwargs = self._full_sampler_kwargs()
+        seed = kwargs["random_seed"]
+        kwargs.update(draws=100, tune=300, chains=2, progressbar=False,
+                      random_seed=0 if seed is None else seed)
+        return kwargs
+
+    _ModelConfig.to_sampler_kwargs = _light_sampler_kwargs
+"""
+
 # Every source module is underscore-private (_base.py, _factory.py, ...).
 # Without this, signatures render as `hbsaemp.models._base.BaseModel` instead
 # of the path users actually import from.

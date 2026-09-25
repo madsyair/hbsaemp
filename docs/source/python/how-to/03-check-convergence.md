@@ -30,11 +30,30 @@ cannot defend.
 
 ## Do it
 
-```python
+```{testsetup} fitted
+from hbsaemp import create_model, load_dataset
+
+df = load_dataset("data_fhnorm")
+model = create_model("y ~ x1 + x2", family="gaussian", data=df,
+                     group="group", sampling_var="D")
+model.fit()
+```
+
+```{testcode} fitted
 from hbsaemp import check_convergence
 
 diag = check_convergence(model)
 print(diag.summary())
+```
+
+```{testoutput} fitted
+:hide:
+:options: +ELLIPSIS
+
+ConvergenceResult
+  Parameters   : 35
+...
+  Status       : ...
 ```
 
 The R-style alias `hbcc` is the same function.
@@ -44,7 +63,7 @@ R-hat, ESS and energy plots. The R-hat plot shows the distribution of R-hat valu
 all parameters, group effects included, against the 1.01 reference line. The pair plot, which
 highlights divergent transitions, is opt-in because it is slow:
 
-```python
+```{testcode} fitted
 diag = check_convergence(model, plot_types=["dens", "rhat", "energy", "pair"])
 ```
 

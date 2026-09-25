@@ -1,7 +1,7 @@
-"""Wiring & delegation tests for tier 2/3 API — no Bambi, no MCMC.
+"""Wiring & delegation tests for tier 1/2 API — no Bambi, no MCMC.
 
-Covers `hbm_flex()` (tier 2) and `hbm_{beta,gaussian,binomial}()`
-(tier 3). MCMC behaviour is already exercised by `tests/test_v1_*.py` —
+Covers `hbm_{beta,gaussian,binomial}()` (tier 1) and `hbm_flex()`
+(tier 2). MCMC behaviour is already exercised by `tests/test_v1_*.py` —
 this file only verifies formula construction, validation, and delegation
 to `create_model()`.
 """
@@ -28,7 +28,7 @@ def test_lognormal_shortcut_not_exported_in_v1():
 
 
 def test_tiers_not_aliased_to_create_model():
-    """Tier 2/3 are wrappers, not the same callable as hbm()/create_model()."""
+    """Tier 1/2 are wrappers, not the same callable as hbm()/create_model()."""
     assert hb.hbm_flex is not hb.create_model
     assert hb.hbm_beta is not hb.create_model
 
@@ -115,7 +115,7 @@ class TestHbmFlexDelegation:
         """Tier 2 knows no family vocabulary — that is the point of it.
 
         Adding a family must not touch this signature, so the per-family
-        names live one tier up (`_shortcuts.py`) and reach tier 2 only
+        names live one tier down (`_shortcuts.py`, tier 1) and reach tier 2 only
         through `aux_args` / `addition_var`.
         """
         import inspect
@@ -201,7 +201,7 @@ class TestShortcutSignatures:
 
     @pytest.mark.parametrize("family", sorted(FAMILY_SPECS))
     def test_fixed_params_exposed_iff_family_pins_something(self, family):
-        """Tier 3 takes `fixed_params=` exactly when the family can pin.
+        """Tier 1 takes `fixed_params=` exactly when the family can pin.
 
         Binomial's only parameter is the estimand, so the argument could only
         ever raise `ValueError` downstream — a `TypeError` at the call is the
@@ -245,7 +245,7 @@ class TestShortcutAreaVar:
 
 def test_delegation_chain_consistency(data_beta, default_config):
     """hbm_beta(...) must yield the same model spec as the equivalent
-    hbm_flex(...) call — confirms tier 3 routes through tier 2."""
+    hbm_flex(...) call — confirms tier 1 routes through tier 2."""
     m_specific = hb.hbm_beta("y", ["x1", "x2"], data_beta,
                               n="n", deff="deff", area_var="group",
                               config=default_config)
@@ -266,7 +266,7 @@ def test_bambi_handoff_only_in_base():
     """Lock the handoff contract: only `_base.py` may import `bambi`.
 
     Family subclasses receive the `bmb` module as a hook argument from
-    `BaseModel.fit()`; tier 2/3 and the factory stay Bambi-free. Any other
+    `BaseModel.fit()`; tier 1/2 and the factory stay Bambi-free. Any other
     `import bambi` under `models/` bypasses the single handoff point.
     """
     models_dir = Path(hb.models.__file__).parent
