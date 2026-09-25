@@ -111,9 +111,9 @@ version = { attr = "hbsaemp.__version__" }
 include = ["hbsaemp*"]
 
 [tool.setuptools.package-data]
-# PEP 561 marker only. Datasets are generated in data/datasets.py, never read
-# from disk, so there is no data file to ship.
-hbsaemp = ["py.typed"]
+# PEP 561 marker, plus the real datasets (REAL_DATASETS) that load_dataset()
+# reads from disk. The synthetic ones are generated in code and need no file.
+hbsaemp = ["py.typed", "data/*.csv"]
 
 # ===========================================================================
 # Tool configuration

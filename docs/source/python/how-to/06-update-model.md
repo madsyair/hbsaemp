@@ -1,3 +1,10 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+---
+
 # 6 · Update a model
 
 Refit an existing specification against new data, a changed formula, changed priors or a
@@ -10,13 +17,13 @@ builds and samples again from scratch, keeping the parts of the specification yo
 override. The R package behaves the same way — its `update_hbm()` reruns `brms::brm()`
 with fresh chains.
 
-```{testcode}
-from hbsaemp import (create_model, load_dataset, update_model,
+```{code-cell} ipython3
+from hbsaemp import (create_model, load_dataset, update_model, ModelConfig,
                      ModelNotFittedError)
 
 df = load_dataset("data_fhnorm")
-model = create_model("y ~ x1 + x2", family="gaussian", data=df,
-                     group="group", sampling_var="D")
+model = create_model("y ~ x1 + x2", family="gaussian", data=df, group="group",
+                     sampling_var="D", config=ModelConfig(progressbar=False))
 
 try:
     update_model(model)
@@ -24,8 +31,10 @@ except ModelNotFittedError as err:
     print(err.message)
 ```
 
-```{testoutput}
-Call GaussianModel.fit() before accessing .result.
+So fit it first:
+
+```{code-cell} ipython3
+model.fit()
 ```
 
 ## Do it
@@ -33,21 +42,9 @@ Call GaussianModel.fit() before accessing .result.
 Refit with different sampler settings — the usual reason, after
 {doc}`03-check-convergence` says the chains need more:
 
-```{testsetup} fitted
-from hbsaemp import create_model, load_dataset
-
-df = load_dataset("data_fhnorm")
-df_2025 = df.copy()
-model = create_model("y ~ x1 + x2", family="gaussian", data=df,
-                     group="group", sampling_var="D")
-model.fit()
-```
-
-```{testcode} fitted
-from hbsaemp import update_model, ModelConfig
-
-updated = update_model(model, config=ModelConfig(draws=4000, tune=2000,
-                                                 chains=4, target_accept=0.95))
+```{code-cell} ipython3
+updated = update_model(model, config=ModelConfig(draws=2000, tune=2000, chains=4,
+                                                 target_accept=0.95, progressbar=False))
 ```
 
 Sampler settings can also be overridden one at a time — `draws`, `tune`, `chains`,
@@ -55,13 +52,14 @@ Sampler settings can also be overridden one at a time — `draws`, `tune`, `chai
 `sampler_kwargs` — on top of the current configuration. Passing both a `config` and an
 individual override is refused, because one of them would have to be ignored:
 
-```{testcode} fitted
+```{code-cell} ipython3
 updated = update_model(model, target_accept=0.99, max_treedepth=12)
 ```
 
 Refit against newer data, keeping the same formula, family and priors:
 
-```{testcode} fitted
+```{code-cell} ipython3
+df_2025 = load_dataset("data_fhnorm")  # stands in for a newer survey round
 updated = update_model(model, new_data=df_2025)
 ```
 
@@ -75,7 +73,7 @@ Change the formula with an R-style update template. `.` stands for the current s
 the formula, `+ term` adds a term and `- term` removes one. Without `new_data`, an added
 term is read from the current data:
 
-```{testcode} fitted
+```{code-cell} ipython3
 updated = update_model(model, formula=". ~ . + x3 - x1")
 ```
 
@@ -83,7 +81,7 @@ Change priors by passing only the ones that change. They are merged into the cur
 priors — new entries win and the rest are kept, as `brms::update()` does — and a prior on
 a term the formula update removes is dropped:
 
-```{testcode} fitted
+```{code-cell} ipython3
 from hbsaemp import Prior
 
 updated = update_model(model, priors={"x3": Prior("Normal", mu=0, sigma=1)})
@@ -100,21 +98,11 @@ specification invites a silent difference between the two runs.
 `update_model()` writes the new result, data, config, formula and priors back onto the
 model **in place**, so the model always reflects its most recent fit:
 
-```{testcode} fitted
+```{code-cell} ipython3
 print(model.is_fitted)
 print(model.result.fitted_at)     # timestamp of the newest run
 print(model.config.draws)         # the config actually used
 print(model.formula)              # the formula actually fitted
-```
-
-```{testoutput} fitted
-:hide:
-:options: +ELLIPSIS
-
-True
-...
-4000
-y ~ x2 + (1|group) + x3
 ```
 
 This matters when you chain calls. A second `update_model(model, ...)` starts from the

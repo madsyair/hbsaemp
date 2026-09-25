@@ -1,3 +1,10 @@
+---
+file_format: mystnb
+kernelspec:
+  name: python3
+  display_name: Python 3
+---
+
 # 3 · Check convergence
 
 Decide whether the chains have converged, and what to change when they have not.
@@ -7,12 +14,13 @@ Decide whether the chains have converged, and what to change when they have not.
 You need a fitted model from {doc}`02-fit-model`. Calling this on an unfitted model
 raises rather than guessing:
 
-```{testcode}
-from hbsaemp import create_model, load_dataset, check_convergence, ModelNotFittedError
+```{code-cell} ipython3
+from hbsaemp import (create_model, load_dataset, check_convergence, ModelConfig,
+                     ModelNotFittedError)
 
 df = load_dataset("data_fhnorm")
-model = create_model("y ~ x1 + x2", family="gaussian", data=df,
-                     group="group", sampling_var="D")
+model = create_model("y ~ x1 + x2", family="gaussian", data=df, group="group",
+                     sampling_var="D", config=ModelConfig(progressbar=False))
 
 try:
     check_convergence(model)
@@ -20,8 +28,10 @@ except ModelNotFittedError as err:
     print(err.message)
 ```
 
-```{testoutput}
-Call GaussianModel.fit() before accessing .result.
+So fit it first; {doc}`02-fit-model` covers the settings:
+
+```{code-cell} ipython3
+model.fit()
 ```
 
 MCMC does not converge or fail; it produces draws whose trustworthiness you have to
@@ -30,30 +40,11 @@ cannot defend.
 
 ## Do it
 
-```{testsetup} fitted
-from hbsaemp import create_model, load_dataset
-
-df = load_dataset("data_fhnorm")
-model = create_model("y ~ x1 + x2", family="gaussian", data=df,
-                     group="group", sampling_var="D")
-model.fit()
-```
-
-```{testcode} fitted
+```{code-cell} ipython3
 from hbsaemp import check_convergence
 
 diag = check_convergence(model)
 print(diag.summary())
-```
-
-```{testoutput} fitted
-:hide:
-:options: +ELLIPSIS
-
-ConvergenceResult
-  Parameters   : 35
-...
-  Status       : ...
 ```
 
 The R-style alias `hbcc` is the same function.
@@ -63,7 +54,7 @@ R-hat, ESS and energy plots. The R-hat plot shows the distribution of R-hat valu
 all parameters, group effects included, against the 1.01 reference line. The pair plot, which
 highlights divergent transitions, is opt-in because it is slow:
 
-```{testcode} fitted
+```{code-cell} ipython3
 diag = check_convergence(model, plot_types=["dens", "rhat", "energy", "pair"])
 ```
 
@@ -90,16 +81,11 @@ applied in `diag.ess_threshold`.
 
 `ConvergenceWarning` is a warning, not an error, which has a practical consequence:
 
-```{testcode}
+```{code-cell} ipython3
 from hbsaemp import ConvergenceWarning, HBSAEError
 
 print(issubclass(ConvergenceWarning, HBSAEError))
 print(issubclass(ConvergenceWarning, UserWarning))
-```
-
-```{testoutput}
-False
-True
 ```
 
 `except HBSAEError` will not catch it. Sampling completed; the result is merely

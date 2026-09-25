@@ -43,6 +43,40 @@ Every track holds the same four kinds of page.
 - **Reference** states technical facts. Read it when you need a fact.
 - **Explanation** gives the reasoning. Read it when you want to understand.
 
+## About the project
+
+::::{grid} 2 2 4 4
+:gutter: 2
+
+:::{grid-item-card} Authors
+:link: about/authors
+:link-type: doc
+Who develops hbsaemp.
+:::
+
+:::{grid-item-card} Citation
+:link: about/citation
+:link-type: doc
+How to cite it.
+:::
+
+:::{grid-item-card} License
+:link: about/license
+:link-type: doc
+GPL-3.0-or-later.
+:::
+
+:::{grid-item-card} References
+:link: about/references
+:link-type: doc
+Works cited in these pages.
+:::
+::::
+
+The documentation is organised following Diátaxis: Procida, D. (2022, 9 May).
+*Diátaxis: A systematic approach to technical documentation authoring*.
+<https://diataxis.fr/>
+
 ```{toctree}
 :maxdepth: 2
 :hidden:

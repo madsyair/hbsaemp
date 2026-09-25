@@ -1,25 +1,32 @@
-"""Built-in datasets mirroring R hbsaems (30 areas, seed=42, area-level).
+"""Built-in datasets: synthetic ones mirroring R hbsaems, and real Papua data.
 
-Available datasets (names match R hbsaems):
+Synthetic datasets (names match R hbsaems; 30 areas, generated from seed 42):
     data_fhnorm         — Gaussian / Fay-Herriot normal
     data_betalogitnorm  — Beta logit-normal
     data_binlogitnorm   — Binomial logit-normal
     data_lnln           — Lognormal-lognormal (reserved for V2)
+
+Real datasets (42 districts/cities of Papua Island, shipped as CSV files):
+    susenas2023_papua   — Susenas 2023 direct estimates of the morbidity rate
+    podes2021_papua     — Podes 2021 auxiliary variables aggregated per district
 """
 from __future__ import annotations
 
+from importlib.resources import files
 from typing import Literal
 
 import numpy as np
 import pandas as pd
 
-__all__: list[str] = ["load_dataset", "AVAILABLE_DATASETS"]
+__all__: list[str] = ["load_dataset", "AVAILABLE_DATASETS", "REAL_DATASETS"]
 
 DatasetName = Literal[
     "data_fhnorm",
     "data_betalogitnorm",
     "data_binlogitnorm",
     "data_lnln",
+    "susenas2023_papua",
+    "podes2021_papua",
 ]
 
 AVAILABLE_DATASETS: list[str] = [
@@ -29,6 +36,15 @@ AVAILABLE_DATASETS: list[str] = [
     "data_lnln",
 ]
 
+# Kept out of AVAILABLE_DATASETS on purpose: these frames ship as published,
+# defects included, and need preparing before a model can use them, whereas
+# every name in AVAILABLE_DATASETS loads model-ready (the GUI's dataset
+# selector relies on that).
+REAL_DATASETS: list[str] = [
+    "susenas2023_papua",
+    "podes2021_papua",
+]
+
 _SEED: int = 42
 _N_AREAS: int = 30
 
@@ -36,18 +52,22 @@ _N_AREAS: int = 30
 def load_dataset(name: DatasetName) -> pd.DataFrame:
     """Load a built-in hbsaemp dataset.
 
-    Returns a :class:`pandas.DataFrame` with one row per small area, column
-    names matching the R ``hbsaems`` package.  All datasets are generated
-    from a fixed seed (42) and are reproducible across runs.
+    Returns a :class:`pandas.DataFrame` with one row per small area. The
+    synthetic datasets in :data:`AVAILABLE_DATASETS` have 30 areas and column
+    names matching the R ``hbsaems`` package, and are generated from a fixed
+    seed (42), so they are reproducible across runs. The real datasets in
+    :data:`REAL_DATASETS` have one row per district/city of Papua Island and
+    are read, exactly as published, from CSV files shipped with the package.
 
     Args:
-        name: Dataset identifier. One of :data:`AVAILABLE_DATASETS`.
+        name: Dataset identifier from :data:`AVAILABLE_DATASETS` or
+            :data:`REAL_DATASETS`.
 
     Returns:
-        A :class:`pandas.DataFrame` with :data:`_N_AREAS` rows.
+        A new :class:`pandas.DataFrame` on every call.
 
     Raises:
-        ValueError: If *name* is not in :data:`AVAILABLE_DATASETS`.
+        ValueError: If *name* is in neither list.
 
     Examples:
         >>> df = load_dataset("data_fhnorm")
@@ -56,10 +76,13 @@ def load_dataset(name: DatasetName) -> pd.DataFrame:
         >>> list(df.columns)
         ['y', 'D', 'x1', 'x2', 'x3', 'theta_true', 'u', 'group', 'sre']
     """
+    if name in REAL_DATASETS:
+        with files("hbsaemp.data").joinpath(f"{name}.csv").open("rb") as fh:
+            return pd.read_csv(fh)
     if name not in AVAILABLE_DATASETS:
         raise ValueError(
             f"Unknown dataset {name!r}. "
-            f"Available: {AVAILABLE_DATASETS}"
+            f"Available: {[*AVAILABLE_DATASETS, *REAL_DATASETS]}"
         )
     _generators: dict[str, object] = {
         "data_fhnorm":        _make_fhnorm,

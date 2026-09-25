@@ -54,3 +54,12 @@
   color: var(--pst-color-text-muted, #6c6c6c);
   pointer-events: none;
 }
+
+/* Theme toggle (_templates/theme-toggle.html): show only the icon of the
+ * current mode. The theme sets `data-theme` on <html> before the page renders,
+ * so the right icon is there from the first paint.
+ */
+html[data-theme="light"] .theme-toggle-icon[data-mode="dark"],
+html[data-theme="dark"] .theme-toggle-icon[data-mode="light"] {
+  display: none;
+}
