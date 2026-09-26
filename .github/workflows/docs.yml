@@ -51,9 +51,9 @@ jobs:
 
       # The [bambi] extra is required from v0.2 on: the notebooks are executed
       # on every build, so the tutorials genuinely sample rather than being
-      # rendered as dead text.
+      # rendered as dead text. pytest runs tests/docs after the build.
       - name: Install package and documentation toolchain
-        run: uv pip install --system -e ".[bambi]" -r docs/requirements-docs.txt
+        run: uv pip install --system -e ".[bambi]" -r docs/requirements-docs.txt pytest
 
       # Executed notebooks are kept between runs. jupyter-cache re-runs a
       # notebook whose code changed, but it cannot see what the code calls, so
@@ -81,6 +81,19 @@ jobs:
       # results.
       - name: Build documentation
         run: python docs/i18n.py build
+
+      # tests/docs checks the sources, the translation catalogues and the site
+      # just built. Every page, notebook and catalogue is its own test case,
+      # and the JUnit report is kept with the run.
+      - name: Test documentation
+        run: python -m pytest tests/docs -m "docs or docs_site" -q -p no:cacheprovider --junitxml=docs/_build/docs-tests.xml
+
+      - name: Upload documentation test report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: docs-tests
+          path: docs/_build/docs-tests.xml
 
       # `actions/configure-pages` is deliberately not used. It only supplies a
       # base path for generators that need one, which Sphinx does not, and it
