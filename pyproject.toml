@@ -127,6 +127,8 @@ markers = [
     "slow:    requires Bambi MCMC (v1). Skip with: pytest -m 'not slow'",
     "spatial: requires PyMC spatial (v2+). Skip with: pytest -m 'not spatial'",
     "gui:     requires Panel (v1). Skip with: pytest -m 'not gui'",
+    "docs:    documentation sources and translations (tests/docs). Skip with: pytest -m 'not docs'",
+    "docs_site: the built site in docs/_build/html; skipped until `python docs/i18n.py build` has run",
 ]
 
 [tool.ruff]

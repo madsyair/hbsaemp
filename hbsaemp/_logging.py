@@ -44,9 +44,10 @@ def configure_logging(
     propagate: bool = False,
     force: bool = False,
 ) -> logging.Logger:
-    """Attach a StreamHandler to the root logger (opt-in for interactive use).
+    """Attach a console handler to the ``hbsaemp`` package logger.
 
-    Idempotent when ``force=False``.
+    The package is silent until this is called. Calling it again with
+    ``force=False`` adds no second handler.
 
     Args:
         level: ``"DEBUG"``, ``"INFO"``, ``"WARNING"``, ``"ERROR"`` or int.
