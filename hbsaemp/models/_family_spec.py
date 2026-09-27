@@ -435,6 +435,9 @@ def list_families() -> list[str]:
 def get_family_spec(name: str) -> FamilySpec:
     """Return the `FamilySpec` for family *name* (mirrors R `get_hbsae_model()`).
 
+    Args:
+        name: Family name, one of `list_families()`.
+
     Raises:
         ModelRegistryError: When *name* is not a registered family.
     """

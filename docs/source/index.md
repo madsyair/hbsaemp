@@ -7,7 +7,7 @@ Pick one; each track is complete on its own.
 
 ## Install
 
-hbsaemp is not on PyPI; install it straight from the GitHub repository.
+Install hbsaemp straight from the GitHub repository.
 
 ```bash
 pip install "hbsaemp[bambi] @ git+https://github.com/madsyair/hbsaemp"   # Python API
@@ -74,7 +74,7 @@ Works cited in these pages.
 ::::
 
 The documentation is organised following Diátaxis: Procida, D. (2022, 9 May).
-*Diátaxis: A systematic approach to technical documentation authoring*.
+_Diátaxis: A systematic approach to technical documentation authoring_.
 <https://diataxis.fr/>
 
 ```{toctree}
