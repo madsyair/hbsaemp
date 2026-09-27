@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hbsaemp 1.0.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"POT-Creation-Date: 2026-09-28 02:47+0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: id\n"
@@ -35,8 +35,8 @@ msgid "Install"
 msgstr "Instalasi"
 
 #: ../../source/index.md:10
-msgid "hbsaemp is not on PyPI; install it straight from the GitHub repository."
-msgstr "hbsaemp tidak tersedia di PyPI; pasang langsung dari repositori GitHub."
+msgid "Install hbsaemp straight from the GitHub repository."
+msgstr "Pasang hbsaemp langsung dari repositori GitHub."
 
 #: ../../source/index.md:17
 msgid "Choose a track"
@@ -119,6 +119,6 @@ msgid "Works cited in these pages."
 msgstr "Karya yang dikutip di halaman-halaman ini."
 
 #: ../../source/index.md:76
-msgid "The documentation is organised following Diátaxis: Procida, D. (2022, 9 May). *Diátaxis: A systematic approach to technical documentation authoring*. <https://diataxis.fr/>"
-msgstr "Dokumentasi ini disusun mengikuti Diátaxis: Procida, D. (2022, 9 Mei). *Diátaxis: A systematic approach to technical documentation authoring*. <https://diataxis.fr/>"
+msgid "The documentation is organised following Diátaxis: Procida, D. (2022, 9 May). _Diátaxis: A systematic approach to technical documentation authoring_. <https://diataxis.fr/>"
+msgstr "Dokumentasi ini disusun mengikuti Diátaxis: Procida, D. (2022, 9 Mei). _Diátaxis: A systematic approach to technical documentation authoring_. <https://diataxis.fr/>"
 

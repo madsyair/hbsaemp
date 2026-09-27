@@ -52,8 +52,26 @@ def hbm_gaussian(
 ) -> BaseModel:
     """Gaussian-family shortcut. Pass `sampling_var=` to enable the FH offset.
 
-    `fixed_params={"sigma": <column or number>}` pins the scale directly;
-    it and `sampling_var=` pin the same parameter, so pass one or the other.
+    Args:
+        response: Response column name: the direct estimate of each area.
+        auxiliary: Non-empty sequence of auxiliary (predictor) column names.
+        data: Input `pandas.DataFrame`, one row per area.
+        sampling_var: Column of known sampling variances D_i; enables the
+            Fay-Herriot offset. The same as `sampling_variance` in hbsaems.
+        area_var: Area identifier column; adds the random intercept
+            ``(1|area_var)``.
+        intercept: `False` drops the fixed intercept.
+        link: Override the default link.
+        priors: Optional prior dict or `Prior` instances, keyed by term.
+        handle_missing: Missing-data strategy; only `"deleted"`.
+        config: `ModelConfig` (sampler settings); `None` uses
+            `DEFAULT_CONFIG`.
+        fixed_params: `{"sigma": <column or number>}` pins the scale
+            directly. It pins the same parameter as `sampling_var`, so pass
+            one or the other.
+
+    Returns:
+        An unfitted model; call `fit()` to sample.
     """
     return hbm_flex(
         response, auxiliary, data, family="gaussian",
@@ -82,11 +100,31 @@ def hbm_beta(
 ) -> BaseModel:
     """Beta-family shortcut. Pass `n=`/`deff=` together to use the FH offset.
 
-    Set `squeeze=True` for the Smithson-Verkuilen transform when the data
-    contains boundary values y=0 or y=1.
+    Args:
+        response: Response column name: the direct proportion of each area,
+            strictly between 0 and 1 unless `squeeze=True`.
+        auxiliary: Non-empty sequence of auxiliary (predictor) column names.
+        data: Input `pandas.DataFrame`, one row per area.
+        n: Survey sample-size column. Used with `deff` to fix the precision
+            at phi = n/deff - 1.
+        deff: Design-effect column. Used with `n`.
+        squeeze: Apply the Smithson-Verkuilen transform `(y*(n-1)+0.5)/n`
+            when the data contains boundary values y=0 or y=1. Requires `n`
+            and `deff`.
+        area_var: Area identifier column; adds the random intercept
+            ``(1|area_var)``.
+        intercept: `False` drops the fixed intercept.
+        link: Override the default link.
+        priors: Optional prior dict or `Prior` instances, keyed by term.
+        handle_missing: Missing-data strategy; only `"deleted"`.
+        config: `ModelConfig` (sampler settings); `None` uses
+            `DEFAULT_CONFIG`.
+        fixed_params: `{"kappa": <column or number>}` pins the precision
+            directly. It pins the same parameter as `n`/`deff`, so pass one
+            or the other.
 
-    `fixed_params={"kappa": <column or number>}` pins the precision directly;
-    it and `n=`/`deff=` pin the same parameter, so pass one or the other.
+    Returns:
+        An unfitted model; call `fit()` to sample.
     """
     return hbm_flex(
         response, auxiliary, data, family="beta",
@@ -111,7 +149,26 @@ def hbm_binomial(
     handle_missing: MissingStrategyLiteral = "deleted",
     config: ModelConfig | None = None,
 ) -> BaseModel:
-    """Binomial-family shortcut. `trials=` (column of trial counts) is required."""
+    """Binomial-family shortcut. `trials=` (column of trial counts) is required.
+
+    Args:
+        response: Response column name: the count of successes in each area,
+            a non-negative integer not above `trials`.
+        auxiliary: Non-empty sequence of auxiliary (predictor) column names.
+        data: Input `pandas.DataFrame`, one row per area.
+        trials: Column of trial counts, positive integers (required).
+        area_var: Area identifier column; adds the random intercept
+            ``(1|area_var)``.
+        intercept: `False` drops the fixed intercept.
+        link: Override the default link.
+        priors: Optional prior dict or `Prior` instances, keyed by term.
+        handle_missing: Missing-data strategy; only `"deleted"`.
+        config: `ModelConfig` (sampler settings); `None` uses
+            `DEFAULT_CONFIG`.
+
+    Returns:
+        An unfitted model; call `fit()` to sample.
+    """
     return hbm_flex(
         response, auxiliary, data, family="binomial",
         area_var=area_var, intercept=intercept,
