@@ -25,7 +25,11 @@ concurrency:
 jobs:
   build:
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    # Pinned rather than ubuntu-latest, which moves to a new release on
+    # GitHub's schedule: a new compiler or system library could change the
+    # built site without any change in this repository. Every job uses the
+    # same image; move them together, on purpose.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -37,7 +41,9 @@ jobs:
           python-version: "3.12"
 
       # uv installs the same packages as pip, several times faster, and caches
-      # the downloaded wheels between runs.
+      # the downloaded wheels between runs. Only this job saves that cache;
+      # the others run alongside it with the same key and only restore it,
+      # so they do not race to save it.
       - uses: astral-sh/setup-uv@v10.2.0
 
       # PyTensor compiles C extensions on first use and caches them here.
@@ -110,7 +116,7 @@ jobs:
   # 2 chains: this proves the call works, not that the draws converge.
   doctest:
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Plots drawn outside Jupyter need a backend that works without a display.
     env:
       MPLBACKEND: Agg
@@ -119,7 +125,10 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      # Restores the uv cache that `build` saves (see there).
       - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          save-cache: false
       # The sampling blocks compile models too; same cache as `build`.
       - name: Cache PyTensor compiledir
         uses: actions/cache@v5
@@ -136,13 +145,16 @@ jobs:
   # a reason to block a merge. Weekly, plus on demand.
   linkcheck:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
+      # Restores the uv cache that `build` saves (see there).
       - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          save-cache: false
       - name: Install package and documentation toolchain
         run: uv pip install --system -e ".[bambi]" -r docs/requirements-docs.txt
       - name: Check external links
@@ -151,7 +163,7 @@ jobs:
   deploy:
     needs: build
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # Never let two Pages deployments run at once, and never cancel one midway.
     concurrency:
       group: pages
