@@ -102,7 +102,7 @@ def test_results_tab_uses_estimate_areas():
     assert "az.plot_trace" not in src
 
 
-def test_model_tab_uses_tier3_dispatch():
+def test_model_tab_uses_tier1_dispatch():
     src = (APP_DIR / "tabs" / "model_tab.py").read_text(encoding="utf-8")
     assert "hbm_gaussian" in src and "hbm_beta" in src and "hbm_binomial" in src
     assert "def _build_bambi_model" not in src

@@ -1,16 +1,16 @@
 # 2 · Explore data
 
-Look at your variables before you commit to a model — their distributions, and how
+Look at your variables before you commit to a model: their distributions, and how
 strongly pairs of them relate to each other.
 
 ## Before you start
 
-You need data already loaded — see {doc}`01-load-data`. This tab only ever shows
+You need data already loaded. See {doc}`01-load-data`. This tab only ever shows
 **numeric** columns: any text or category column you loaded (an area-name identifier,
 for example) will not appear in any dropdown here, since none of the summaries or
 plots on this tab apply to it.
 
-If you skip this tab, nothing is lost — the Model tab works whether or not you've
+If you skip this tab, nothing is lost: the Model tab works whether or not you've
 visited Data Exploration. Use it when you want a look at the data before deciding
 which auxiliary variables and transformations make sense.
 
@@ -22,7 +22,7 @@ The tab has three sub-tabs.
 
 :::{tab-item} Summary Statistics
 Open on landing. One row per numeric variable: Min, 1st Qu., Median, Mean, 3rd Qu.,
-Max. No configuration needed — it covers every numeric column at once.
+Max. No configuration needed. It covers every numeric column at once.
 
 ```{figure} images/02-summary-statistics.png
 :alt: Summary Statistics table
@@ -35,7 +35,7 @@ The **Summary Statistics** table.
 :::{tab-item} Visualize Distribution
 Two independent cards, side by side:
 
-1. **Histogram** — pick a **Variable**, then adjust **Number of bins** (1–100) with
+1. **Histogram**: pick a **Variable**, then adjust **Number of bins** (1–100) with
    the slider. A kernel density curve is overlaid automatically.
 
    ```{figure} images/02-histogram-controls.png
@@ -52,7 +52,7 @@ Two independent cards, side by side:
    The resulting histogram, with a kernel density curve overlaid.
    ```
 
-2. **Boxplot** — pick a **Variable**. Independent from the histogram's variable
+2. **Boxplot**: pick a **Variable**. Independent from the histogram's variable
    choice, so you can compare two different columns at a glance.
 
    ```{figure} images/02-boxplot-controls.png
@@ -89,7 +89,7 @@ Two independent cards, side by side:
    :alt: Correlation table with Pearson, Spearman, Chatterjee's Xi, and Distance Correlation
    :width: 600px
 
-   The correlation table — Pearson's r, Spearman's rho, Chatterjee's Xi, and
+   The correlation table: Pearson's r, Spearman's rho, Chatterjee's Xi, and
    Distance Correlation side by side.
    ```
 
@@ -103,7 +103,7 @@ Two independent cards, side by side:
 
 ::::
 
-Every plot and table on this tab reacts live to your selections — there's no
+Every plot and table on this tab reacts live to your selections. There's no
 "apply" button to click.
 
 ## Check it worked
@@ -115,7 +115,7 @@ Every plot and table on this tab reacts live to your selections — there's no
 - **Histogram/Boxplot**: look for skew or outliers now, since some families
   (Beta, Binomial) assume a bounded response and will reject values outside their
   valid range at model-fitting time.
-- **Scatter & Correlation**: the table reports four measures side by side —
+- **Scatter & Correlation**: the table reports four measures side by side:
   Pearson's r and Spearman's rho for the usual linear/monotonic relationships,
   plus Chatterjee's Xi and Distance Correlation, which can catch a dependency
   between two variables even when it isn't linear or monotonic. A trendline is
@@ -124,8 +124,8 @@ Every plot and table on this tab reacts live to your selections — there's no
 ## If it fails
 
 **A variable I expect to see isn't in any dropdown.**
-Only numeric columns are shown. If a column you need was loaded as text — a
-numeric-looking ID column with leading zeros, for instance — it won't appear here,
+Only numeric columns are shown. If a column you need was loaded as text (a
+numeric-looking ID column with leading zeros, for instance), it won't appear here,
 though it can still be used as a `group` (area identifier) in the Model tab.
 
 **The tab is empty, or dropdowns have no options.**
@@ -133,7 +133,7 @@ No data is loaded yet. Go back to {doc}`01-load-data`.
 
 **The correlation table or scatter plot doesn't update after picking a variable.**
 This usually means the chosen column has too few non-missing values to compute a
-correlation. Check its missing-value count first — the Summary Statistics table
+correlation. Check its missing-value count first: the Summary Statistics table
 counts only present values, so a variable that's mostly `NaN` will still show
 there, just with a smaller effective sample.
 

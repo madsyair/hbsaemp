@@ -1,7 +1,7 @@
 # 5 · Evaluation
 
 Model 1 fit without errors and passed its posterior predictive check in
-{doc}`04-modeling` — but neither of those confirms the *sampler* actually
+{doc}`04-modeling`, but neither of those confirms the *sampler* actually
 explored the posterior properly. That's what this stage checks first,
 before trusting anything downstream.
 
@@ -25,7 +25,7 @@ before trusting anything downstream.
    :alt: R-hat and ESS table for Model 1, showing two predictors exceeding the R-hat threshold
    :width: 700px
 
-   **R-hat and ESS** for Model 1 — page 1 of 5 (~518 parameters: 5
+   **R-hat and ESS** for Model 1, page 1 of 5 (~518 parameters: 5
    population-level terms plus one random intercept per district).
    ```
 
@@ -34,20 +34,20 @@ before trusting anything downstream.
 | Parameter | r_hat | ess_bulk | Within threshold? |
 |---|---|---|---|
 | `Intercept` | 1.009 | 615 | Yes |
-| `proporsi_R704IK2` (X1) | **1.019** | **323** | **No** — both r_hat and ESS fail |
-| `proporsi_R704JK2` (X2) | **1.017** | **352** | **No** — both r_hat and ESS fail |
+| `proporsi_R704IK2` (X1) | **1.019** | **323** | **No**: both r_hat and ESS fail |
+| `proporsi_R704JK2` (X2) | **1.017** | **352** | **No**: both r_hat and ESS fail |
 | `proporsi_R805I` (X3) | 1.009 | 457 | Yes, at the edge |
 | `1|IDKABKOT_sigma` | 1.005 | 753 | Yes |
 
 The per-district random intercepts shown on this first page
 (`1|IDKABKOT[1101]` through `[1110]`) all sit at r_hat 1.000–1.009 with
-ESS in the thousands — the group-level structure itself is sampling
+ESS in the thousands: the group-level structure itself is sampling
 fine. The problem is narrow and specific: **X1 and X2's population-level
 slopes** are the only two parameters (out of roughly 518) failing on
 *both* metrics at once, not just sitting near the threshold on one.
 
 **Can this move on as-is, or does it need a refit?** A refit is the right
-call here — not because the app requires it (see
+call here, not because the app requires it (see
 {doc}`../../explanation/convergence` for why the app never blocks you
 either way), but because two coefficients failing r_hat *and* ESS
 together is a genuine mixing problem for exactly the two predictors this
@@ -60,14 +60,14 @@ variables were chosen in the first place.
 
 Move to **Results → Update Model** to refit with adjusted sampler
 settings, without going back to {doc}`03-data-preparation` to rebuild the
-model from scratch — same formula, same family, just a harder-working
+model from scratch: same formula, same family, just a harder-working
 sampler.
 
 4. Check **Override draws** and set it to **4000** (double the original
-   2000) — more post-warmup samples directly raises ESS for the two
+   2000): more post-warmup samples directly raises ESS for the two
    parameters that fell short.
-5. Check **Override target_accept** and set it to **0.95** (up from 0.9)
-   — a still-smaller step size, one more push against the same
+5. Check **Override target_accept** and set it to **0.95** (up from 0.9),
+   a still-smaller step size, one more push against the same
    funnel-shaped geometry {doc}`03-data-preparation` already flagged as
    the likely cause. Leave every other override unchecked: `tune`,
    `chains`, `cores`, and `random_seed` stay exactly as they were.
@@ -76,7 +76,7 @@ sampler.
    :alt: Sampler Overrides with draws set to 4000 and target_accept set to 0.95
    :width: 700px
 
-   **Override draws**: 4000, **Override target_accept**: 0.95 — everything
+   **Override draws**: 4000, **Override target_accept**: 0.95. Everything
    else unchecked.
    ```
 
@@ -91,7 +91,7 @@ sampler.
 
 7. Confirm the new configuration in the generated summary: `draws: 4000`,
    `tune: 2000`, `chains: 4`, `target_accept: 0.95`, same formula, same
-   514 rows — only the two overridden settings changed.
+   514 rows: only the two overridden settings changed.
 
    ```{figure} images/05-update-formula-config.png
    :alt: Updated model configuration summary showing draws 4000 and target_accept 0.95
@@ -102,21 +102,21 @@ sampler.
 
 8. Worth a quick re-check before trusting the new fit: re-run **Posterior
    Predictive Check** back on the Modeling tab. Both plots still look the
-   same as {doc}`04-modeling`'s originals — the model's fit to the data
+   same as {doc}`04-modeling`'s originals: the model's fit to the data
    hasn't changed, only how thoroughly the sampler explored it has.
 
    ```{figure} images/05-update-posterior-plot.png
    :alt: Posterior Predictive Plot after the refit, matching the original
    :width: 600px
 
-   Posterior Predictive Plot after refitting — unchanged from before.
+   Posterior Predictive Plot after refitting: unchanged from before.
    ```
 
    ```{figure} images/05-update-posterior-rootgram.png
    :alt: Rootgram after the refit, matching the original
    :width: 600px
 
-   Rootgram after refitting — unchanged from before.
+   Rootgram after refitting: unchanged from before.
    ```
 
 9. Back on **Results → MCMC Convergence Evaluation**, click **Load
@@ -129,7 +129,7 @@ sampler.
    **R-hat and ESS** after the refit.
    ```
 
-**Is it converged now?** Yes — every population-level parameter clears
+**Is it converged now?** Yes. Every population-level parameter clears
 both thresholds, most by a wide margin:
 
 | Parameter | r_hat before → after | ess_bulk before → after |
@@ -140,7 +140,7 @@ both thresholds, most by a wide margin:
 | `proporsi_R805I` (X3) | 1.009 → 1.003 | 457 → 812 |
 | `1|IDKABKOT_sigma` | 1.005 → 1.010 | 753 → 906 |
 
-The two parameters that failed before — X1 and X2 — are now comfortably
+The two parameters that failed before, X1 and X2, are now comfortably
 under 1.01, with ESS more than double the 400 threshold. `1|IDKABKOT_sigma`
 sits exactly at 1.01, the edge of the threshold rather than clearly inside
 it; combined with its ESS also having improved (753 to 906), that's a
@@ -149,14 +149,14 @@ pass, not a lingering concern.
 ```{note}
 Doubling `draws` and raising `target_accept` both worked in the same
 direction here, so this case study can't tell you which one mattered
-more — only that the combination was enough. If a future model needs
+more: only that the combination was enough. If a future model needs
 this same fix and either change alone is expensive (more draws costs
 runtime, higher target_accept costs it too), it's worth trying them one
 at a time to see which is doing the real work.
 ```
 
 This refit is worth keeping. Go back to the **Modeling** tab and **Save
-Model** again — name it **Model 2** rather than reusing "Model 1", so
+Model** again: name it **Model 2** rather than reusing "Model 1", so
 both the original and the refit are available side by side on
 **Model Comparison** next, instead of the refit silently replacing the
 evidence that the fix was needed at all.
@@ -171,13 +171,13 @@ evidence that the fix was needed at all.
    :width: 700px
 
    "Saved as **Model 2**." (The field itself has already reset to suggest
-   `Model 3` as the next default name — that's just a suggestion for a
+   `Model 3` as the next default name: that's just a suggestion for a
    future save, not a sign anything went wrong.)
    ```
 
 ## Confirm convergence beyond the summary table
 
-The R-hat/ESS table already showed every parameter clearing threshold —
+The R-hat/ESS table already showed every parameter clearing threshold:
 worth also glancing at the plots below that table, which show *how* the
 sampler behaved, not just the two summary numbers.
 
@@ -190,7 +190,7 @@ sampler behaved, not just the two summary numbers.
 
 The **Trace Plot** shows all four chains (four colors) for each
 parameter overlapping into one dense, uniform band with no chain
-drifting off on its own — the "fuzzy caterpillar" look that indicates
+drifting off on its own: the "fuzzy caterpillar" look that indicates
 good mixing. The **Density Plot** underneath shows a single smooth,
 unimodal peak per parameter, consistent with the means already reported
 in the table (X1 ≈ 1.7, X2 ≈ 0.51, X3 ≈ 1.7, Intercept ≈ −5.2).
@@ -203,12 +203,12 @@ in the table (X1 ≈ 1.7, X2 ≈ 0.51, X3 ≈ 1.7, Intercept ≈ −5.2).
 ```
 
 The **Autocorrelation Plot** drops toward zero within about 20–40 lags
-for every parameter and stays inside the shaded band afterward — draws
+for every parameter and stays inside the shaded band afterward: draws
 decorrelate quickly, which is exactly what high ESS numbers require. The
 **R-hat Distribution Plot** is the most reassuring of the six: it's a
 cumulative view across *every* parameter in the model, not just the five
-shown in the earlier table — including all 514 district random
-intercepts — and the curve reaches 1.0 well before the dashed line at
+shown in the earlier table (including all 514 district random
+intercepts) and the curve reaches 1.0 well before the dashed line at
 1.01. Every parameter in the model clears the threshold, not only the
 handful visible on the table's first page.
 
@@ -221,11 +221,11 @@ handful visible on the table's first page.
 
 The **Effective Sample Size Plot** shows local ESS across quantiles
 (not just the bulk/tail summary numbers) staying between roughly 5,000
-and 15,000 for every parameter — far above the 400 threshold at every
+and 15,000 for every parameter, far above the 400 threshold at every
 point in the distribution, not only on average. The **NUTS Energy/BFMI
 Plot** shows all four chains' BFMI values (left) comfortably above the
 0.3 reference line, and the marginal and transition energy distributions
-(right) overlapping closely in shape — no sign of the sampler getting
+(right) overlapping closely in shape, no sign of the sampler getting
 stuck in high-energy regions. Combined with the R-hat/ESS table from
 before, **Model 2 has converged** on every diagnostic this page checks,
 not just the two summary numbers.
@@ -233,15 +233,15 @@ not just the two summary numbers.
 ## Model Comparison
 
 With both a non-converged and a converged fit saved, this is a natural
-point to compare them — not just on fit quality, but on whether the
+point to compare them: not just on fit quality, but on whether the
 convergence problem in Model 1 changed any substantive conclusion.
 
 11. Open **Results → Model Comparison**.
 12. Check both **Model 1** and **Model 2**.
-13. Check **Include Bayes Factor (Savage-Dickey, per coefficient)** — to
+13. Check **Include Bayes Factor (Savage-Dickey, per coefficient)** to
    see whether each predictor's evidence for being non-zero holds up the
    same way regardless of which fit is used.
-14. Check **Include Prior Sensitivity (power-scaling, per parameter)** —
+14. Check **Include Prior Sensitivity (power-scaling, per parameter)**
    to finally settle the question {doc}`04-modeling`'s Prior Predictive
    Check left open: does the wide, weakly informative prior end up
    quietly dominating any parameter's posterior, now that there's an
@@ -265,7 +265,7 @@ convergence problem in Model 1 changed any substantive conclusion.
 ```
 
 Model 1 ranks first (`elpd_diff` 0.0, the reference), with Model 2
-scoring 26.0 lower — about 6.5 times its own standard error (`dse` 4.0),
+scoring 26.0 lower, about 6.5 times its own standard error (`dse` 4.0),
 and `p_worse` 1.0 suggesting that difference is close to certain under
 this metric. Taken at face value, that says Model 1 predicts held-out
 data better than Model 2.
@@ -273,11 +273,11 @@ data better than Model 2.
 ```{important}
 Taken at face value is doing a lot of work in that sentence. The
 `diag_elpd` column reads **453 k̂ > 0.70** for Model 1 and **491 k̂ >
-0.70** for Model 2 — out of 514 districts, the overwhelming majority of
+0.70** for Model 2: out of 514 districts, the overwhelming majority of
 both models' per-district PSIS-LOO estimates are flagged unreliable.
 When almost every point estimate behind a ranking is untrustworthy, the
 ranking built from them is untrustworthy too. This isn't a reason to
-prefer Model 1 over Model 2 on ELPD grounds — it's a reason not to trust
+prefer Model 1 over Model 2 on ELPD grounds. It's a reason not to trust
 ELPD much for either model here, likely a consequence of how variable
 `n` is across districts (957 to 4,529) interacting with PSIS-LOO's
 importance-sampling assumptions. Read the Bayes Factor and Prior
@@ -312,17 +312,17 @@ sampler had fully converged.
 :alt: Prior Sensitivity power-scaling table for the Intercept, Model 1 and Model 2
 :width: 700px
 
-**Prior Sensitivity** — Intercept shown; page 1 of 5.
+**Prior Sensitivity**: Intercept shown; page 1 of 5.
 ```
 
 For the Intercept, **likelihood sensitivity clearly exceeds prior
 sensitivity** in both models (Model 1: 0.249 vs. 0.027; Model 2: 0.363
-vs. 0.025) — roughly nine to fifteen times larger. By the metric
+vs. 0.025), roughly nine to fifteen times larger. By the metric
 explained above the table, that means scaling the *data's* influence
 moves this parameter's posterior far more than scaling the *prior's*
 influence does: the Intercept is data-driven, not prior-driven, in both
 fits. That's the direct answer to the concern {doc}`04-modeling` raised
-about the prior's very wide 89% intervals — at least for the Intercept,
+about the prior's very wide 89% intervals: at least for the Intercept,
 the wide prior isn't quietly steering the result. Checking the same
 pattern holds for X1, X2, and X3 means paging through the remaining four
 pages of this table; the Intercept alone doesn't confirm all four

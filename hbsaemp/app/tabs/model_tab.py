@@ -43,7 +43,7 @@ logger = get_logger(__name__)
 
 __all__: list[str] = ["ModelTab"]
 
-# Tier-3 dispatch, built from the registry itself (never a hardcoded list) so
+# Tier-1 (beginner interface) dispatch, built from the registry itself (never a hardcoded list) so
 # a new family registered in FAMILY_SPECS is picked up with zero code changes
 # here — as long as a hbm_<family> shortcut exists for it too. If backend
 # adds a family without one, that family is hidden from the selector
@@ -505,10 +505,10 @@ class ModelTab(param.Parameterized):
     def _param_traits(self, family: str, user_kw: str) -> tuple[type, bool] | None:
         """`(annotation, required)` for `hbm_<family>`'s `user_kw` parameter.
 
-        Returns `None` if the registry names a kwarg the tier-3 shortcut
+        Returns `None` if the registry names a kwarg the tier-1 shortcut
         doesn't actually expose — a mismatch that's now possible to reach
         (see `_HBM_DISPATCH`'s note on `fixed_params`/family-specific
-        params being tier-3-only) rather than raising a bare `KeyError`
+        params being tier-1-only) rather than raising a bare `KeyError`
         from `ModelTab.__init__` and failing the whole tab's construction.
         """
         fn = _HBM_DISPATCH[family]

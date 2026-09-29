@@ -2,7 +2,7 @@ App internals
 =============
 
 Auto-generated from docstrings in ``hbsaemp.app``. This page is for
-contributors extending the dashboard — for how to *use* the app, see the
+contributors extending the dashboard. For how to *use* the app, see the
 :doc:`../how-to/index` guides instead.
 
 Launching

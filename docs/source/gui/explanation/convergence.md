@@ -7,14 +7,14 @@ The numbers are shown as-is. Deciding what they mean is left to you.
 Convergence diagnostics look like a pass/fail test: R-hat close to 1, effective
 sample size above some threshold, no divergences. It would be easy for the app to
 read those numbers itself and refuse to let you save, compare, or trust a model
-that didn't clear them — an earlier version of this app did exactly that. Why was
+that didn't clear them. An earlier version of this app did exactly that. Why was
 that removed?
 
 ## Background
 
 At one point, saving a model recorded whether `check_convergence()` had raised a
 `ConvergenceWarning`, and the Model Comparison table only let you *select* a model
-that had converged when saved — attempting to compare an unconverged one returned
+that had converged when saved. Attempting to compare an unconverged one returned
 an error telling you to refit first. The intent was protective: stop a bad fit from
 quietly feeding into a comparison or a final estimate.
 
@@ -25,14 +25,14 @@ Comparison will happily compare models regardless of their diagnostics.
 ## The reasoning
 
 **The threshold is a convention, not a law.** R-hat ≤ 1.01 and ESS ≥ 100 × the number
-of chains are commonly used defaults, not universal cutoffs — the same numbers that
+of chains are commonly used defaults, not universal cutoffs. The same numbers that
 are too strict for one study can be too lenient for another, depending on how the
 estimates will be used downstream. Hardcoding that threshold into a gate means the
 app is making a statistical judgment call on the analyst's behalf, using a rule of
 thumb it has no way to calibrate to the actual study.
 
 **A gate teaches the wrong lesson.** Once a check exists that blocks you when it
-fails, passing it starts to feel like a guarantee — "the app let me save it, so it
+fails, passing it starts to feel like a guarantee: "the app let me save it, so it
 must be fine." R-hat and ESS are properties of the *sampling*, not proof the model is
 correct or the estimates are usable; treating them as a checkpoint to clear rather
 than a diagnostic to read encourages exactly the shortcut the workflow is meant to
@@ -47,15 +47,15 @@ judgment call from the one person actually positioned to make it.
 ## Consequences
 
 **Nothing stops you from comparing or exporting a fit with real convergence
-problems.** The Convergence Evaluation tab is not a formality — it's the only place
+problems.** The Convergence Evaluation tab is not a formality. It's the only place
 the app tells you anything about diagnostics at all, and unlike before, it does so
 without also acting on your behalf.
 
 **Reading Convergence Evaluation is now something you have to remember to do**,
 rather than something the app enforces. There is no badge, checkmark, or blocked
 button reminding you. If you add a new feature that consumes a saved or fitted
-model, it should follow the same pattern — show what's known, don't decide for the
-user — rather than reintroducing a gate.
+model, it should follow the same pattern (show what's known, don't decide for the
+user) rather than reintroducing a gate.
 
 ## Related
 

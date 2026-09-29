@@ -1,12 +1,12 @@
-# 8 · Update a model
+# 7 · Update a model
 
 Refit the model currently in use with different sampler settings, a modified
-formula, or replacement data — without rebuilding it from scratch on the
+formula, or replacement data, without rebuilding it from scratch on the
 Modeling tab.
 
 ## Before you start
 
-You need a fitted model — see {doc}`04-fit-model`. This page covers the
+You need a fitted model. See {doc}`05-fit-model`. This page covers the
 **Results** tab's **Update Model** sub-tab. `update_model()` is a **full
 refit**, not a resumption: whatever you don't override stays the same as the
 current model.
@@ -23,10 +23,10 @@ current model.
    The **Update Model** sub-tab, with the **Current Fitted Model** card.
    ```
 
-2. **Optional — override sampler settings.** Check **Override draws**,
+2. **Optional: override sampler settings.** Check **Override draws**,
    **Override tune**, **Override chains**, **Override cores**, **Override
    target_accept**, **Override max_treedepth**, or **Override random_seed**
-   individually — each checkbox enables its own input field. Anything left
+   individually. Each checkbox enables its own input field. Anything left
    unchecked keeps the current model's value.
 
    ```{figure} images/08-step2-sampler-override-checkboxes.png
@@ -36,7 +36,7 @@ current model.
    The sampler override checkboxes and their input fields.
    ```
 
-3. **Optional — update the formula.** In **Formula Update**, type a template
+3. **Optional: update the formula.** In **Formula Update**, type a template
    like `. ~ . + x3 - x1` to add `x3` and remove `x1` while keeping everything
    else the same. A live preview shows the resulting formula string; whether
    the new column actually exists in the data is only checked when you click
@@ -49,7 +49,7 @@ current model.
    The **Formula Update** field, with its live preview.
    ```
 
-4. **Optional — refit on different data.** Check "Refit on different data"
+4. **Optional: refit on different data.** Check "Refit on different data"
    and either upload a replacement CSV or pick a built-in dataset. Formula,
    family, link, and group stay the same unless you also changed the formula
    above.
@@ -87,18 +87,18 @@ current model.
   the other Results sub-tabs to see updated diagnostics and estimates.
 - If the backend had to quietly fix something in your replacement data (for
   example, copying over a missing design column when the row count matches),
-  that's reported as a note appended to the success message — not hidden.
+  that's reported as a note appended to the success message, not hidden.
 - Every other Results sub-tab (Convergence Evaluation, SAE Estimation) resets
-  to "Model changed — run again to refresh the results" the moment the
+  to a "Model changed" message asking you to run again the moment the
   update completes, since their old numbers described the previous fit.
 
 ## If it fails
 
 **"Model has not been fitted."**
-There's no active model to update — fit one first on the Modeling tab.
+There's no active model to update. Fit one first on the Modeling tab.
 
 **"Invalid formula" (from the Formula Update field).**
-The template couldn't be applied to the current formula — check the syntax
+The template couldn't be applied to the current formula. Check the syntax
 (`. ~ . + newcol - oldcol`).
 
 **"Replacement data does not meet the family's requirements."**
@@ -112,3 +112,7 @@ An overridden sampler value is out of range.
 
 For why Update Model lives here inside Results instead of as its own
 top-level tab, see {doc}`../explanation/results`.
+
+## Next
+
+Go back to {doc}`06-check-convergence` and check the refitted model.
