@@ -1,9 +1,33 @@
+"""Unit tests for the GUI: one tab or one behaviour at a time.
+
+Contents:
+
+* configuration, ``App`` construction and structure checks;
+* Data Upload, Data Exploration, Modeling and Results tabs on their own;
+* the guards that need no fitted model;
+* tests that use one real (small) MCMC fit, shared per module (``slow``).
+
+Multi-tab behaviour lives in ``test_v1_app_integration.py``; the browser
+tests live in ``test_v1_app_e2e.py``.
+
+    pytest tests/test_v1_app_unit.py -m "not slow"    # fast, no MCMC
+    pytest tests/test_v1_app_unit.py                  # tests with one MCMC fit
+"""
 from __future__ import annotations
 
+import matplotlib
+
+# The GUI draws its figures from worker threads, and the macOS backend forbids
+# that. launch_app() selects Agg for real sessions; tests bypass launch_app().
+matplotlib.use("Agg")
+
+import asyncio
 import re
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -16,13 +40,13 @@ from hbsaemp.app._app import App, AppState  # noqa: E402
 from hbsaemp.app.tabs import DataTab, ExploreTab, ModelTab, ResultsTab, UpdateModelTab  # noqa: E402
 from hbsaemp.app.tabs.model_tab import _HBM_DISPATCH  # noqa: E402
 
+
 APP_DIR = Path(__file__).resolve().parent.parent / "hbsaemp" / "app"
 
 
 # ---------------------------------------------------------------------------
 # AppConfig 
 # ---------------------------------------------------------------------------
-
 def test_app_config_defaults():
     cfg = hb.DEFAULT_APP_CONFIG
     assert cfg.port == 8080
@@ -46,7 +70,6 @@ def test_app_config_validation(bad):
 # ---------------------------------------------------------------------------
 # App / AppState 
 # ---------------------------------------------------------------------------
-
 def test_app_state_is_not_a_dict():
     """AppState is a param.Parameterized with `data`/`model` attributes."""
     state = AppState()
@@ -63,18 +86,6 @@ def test_app_no_panel_needed_to_construct():
     assert app.state.model is None
 
 
-def test_app_view_returns_template():
-    app = App(app_config=hb.AppConfig(port=9998, open_browser=False))
-    template = app.view()
-    assert isinstance(template, pn.template.FastListTemplate)
-
-
-def test_app_view_respects_show_sidebar():
-    app = App(app_config=hb.AppConfig(port=9997, open_browser=False, show_sidebar=False))
-    template = app.view()
-    assert len(template.sidebar) == 0
-
-
 def test_launch_app_is_callable():
     """v1 no longer raises NotImplementedError — it's a thin App(...).serve() wrapper."""
     assert callable(hb.launch_app)
@@ -84,7 +95,6 @@ def test_launch_app_is_callable():
 # ---------------------------------------------------------------------------
 # Architectural contract
 # ---------------------------------------------------------------------------
-
 def test_no_bambi_in_app():
     for path in APP_DIR.rglob("*.py"):
         src = path.read_text(encoding="utf-8")
@@ -113,7 +123,6 @@ def test_model_tab_uses_tier1_dispatch():
 # ---------------------------------------------------------------------------
 # Family/link/extra-param registry consistency (guards against drift)
 # ---------------------------------------------------------------------------
-
 def test_dispatch_covers_every_family():
     """`<=`, not `==` — a future family without a hbm_<family> shortcut
     should degrade gracefully (hidden from the selector, S1) rather than
@@ -143,7 +152,6 @@ def test_extra_params_match_spec(family):
 # ---------------------------------------------------------------------------
 # ModelTab build contract
 # ---------------------------------------------------------------------------
-
 def test_build_model_returns_unfitted_basemodel(data_gaussian: pd.DataFrame):
     state = AppState()
     state.data = data_gaussian
@@ -186,20 +194,8 @@ def test_binomial_requires_trials_widget(data_binomial: pd.DataFrame):
 
 
 # ---------------------------------------------------------------------------
-# Tab construction smoke tests 
-# ---------------------------------------------------------------------------
-
-def test_all_tabs_construct_and_render():
-    state = AppState()
-    for cls in (DataTab, ExploreTab, ModelTab, ResultsTab, UpdateModelTab):
-        tab = cls(state=state)
-        assert tab.panel() is not None
-
-
-# ---------------------------------------------------------------------------
 # UpdateModelTab 
 # ---------------------------------------------------------------------------
-
 def test_update_tab_requires_fitted_model():
     """No fitted model yet -> clicking Update Model must not call update_model()."""
     import asyncio
@@ -210,103 +206,9 @@ def test_update_tab_requires_fitted_model():
     assert "No fitted model" in tab._update_status.object
 
 
-@pytest.mark.slow
-def test_update_tab_reacts_to_first_fit(data_gaussian: pd.DataFrame):
-    """Fitting in ModelTab (not this tab) must refresh the summary via the
-    state.model watcher — no manual tab switch/refresh should be required."""
-    state = AppState()
-    state.data = data_gaussian
-    tab = UpdateModelTab(state=state)
-    assert "No fitted model" in tab._current_info.object
-
-    mt = ModelTab(state=state)
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1", "x2"]
-    mt._draws_in.value = 20
-    mt._tune_in.value = 20
-    mt._chains_in.value = 1
-    mt._cores_in.value = 1
-    model = mt._build_model()
-    model.fit()
-    state.model = model
-
-    assert "No fitted model" not in tab._current_info.object
-    assert model.formula in tab._current_info.object
-
-
-@pytest.mark.slow
-def test_update_tab_refits_in_place(data_gaussian: pd.DataFrame):
-    import asyncio
-
-    state = AppState()
-    state.data = data_gaussian
-
-    mt = ModelTab(state=state)
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1", "x2"]
-    mt._group_sel.value = "group"
-    mt._family_sel.value = "gaussian"
-    mt._draws_in.value = 50
-    mt._tune_in.value = 50
-    mt._chains_in.value = 1
-    mt._cores_in.value = 1
-    asyncio.run(mt._on_fit_model(None))
-    assert state.model is not None and state.model.is_fitted
-
-    model_before = state.model
-    original_target_accept = model_before.config.target_accept
-
-    ut = UpdateModelTab(state=state)
-    ut._target_accept_cb.value = True
-    ut._target_accept_in.value = 0.95
-    asyncio.run(ut._on_update(None))
-
-    assert "refit complete" in ut._update_status.object.lower()
-    assert state.model is model_before
-    assert state.model.config.target_accept == 0.95
-    assert state.model.config.target_accept != original_target_accept
-
-
-# ---------------------------------------------------------------------------
-# End-to-end: DataTab -> ModelTab -> ResultsTab, one real fit
-# ---------------------------------------------------------------------------
-
-@pytest.mark.slow
-def test_end_to_end_fit_and_sae(data_gaussian: pd.DataFrame):
-    state = AppState()
-    state.data = data_gaussian
-
-    mt = ModelTab(state=state)
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1", "x2"]
-    mt._group_sel.value = "group"
-    mt._family_sel.value = "gaussian"
-    mt._draws_in.value = 100
-    mt._tune_in.value = 100
-    mt._chains_in.value = 2
-    mt._cores_in.value = 1
-
-    model = mt._build_model()
-    assert model.is_fitted is False
-
-    fitted = mt._fit_blocking(model)
-    assert fitted.is_fitted is True
-    state.model = fitted
-
-    rt = ResultsTab(state=state)
-    sae = rt._sae_blocking(state.model, 0.95, None)
-    assert set(sae.result_table.columns) >= {
-        "mean", "sd", "ci_lower", "ci_upper", "rse_pct", "mse", "rmse",
-    }
-
-    conv = rt._convergence_blocking(state.model)
-    assert conv.rhat_ess is not None
-
-
 # ---------------------------------------------------------------------------
 # Code export (`ModelTab.to_code()`) — GUI to CLI code correctness
 # ---------------------------------------------------------------------------
-
 def test_to_code_disabled_without_valid_model_draft(data_binomial: pd.DataFrame):
     """No `_model_draft` (e.g. binomial missing its required `trials`
     widget) -> nothing safe to export yet."""
@@ -430,7 +332,6 @@ def test_to_code_uses_result_table_not_estimates(data_gaussian: pd.DataFrame):
 # ---------------------------------------------------------------------------
 # matplotlib.use("Agg")
 # ---------------------------------------------------------------------------
-
 def test_matplotlib_use_agg_not_at_tab_import_time():
     """Setting the matplotlib backend at tab-import time would silently
     hijack it for anything that imports these modules (e.g. a notebook).
@@ -446,7 +347,6 @@ def test_matplotlib_use_agg_not_at_tab_import_time():
 # ---------------------------------------------------------------------------
 # Save Model + Model Comparison 
 # ---------------------------------------------------------------------------
-
 def test_save_button_disabled_until_fit(data_gaussian: pd.DataFrame):
     state = AppState()
     state.data = data_gaussian
@@ -562,66 +462,9 @@ def test_compare_requires_at_least_one_model():
     assert "select a model" in rt._compare_status.object.lower()
 
 
-@pytest.mark.slow
-def test_compare_allows_single_model_for_its_own_diagnostics(data_gaussian: pd.DataFrame):
-    """A single saved model can be "compared" against nothing — this
-    just shows its own LOO/pp_check/params plots (and Bayes Factor, if
-    enabled), with no ranking table/plot (those need 2+, and stay None)."""
-    import asyncio
-
-    state = AppState()
-    state.data = data_gaussian
-    mt = ModelTab(state=state)
-    rt = ResultsTab(state=state)
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1"]
-    mt._draws_in.value = 200
-    mt._tune_in.value = 200
-    mt._chains_in.value = 2
-    mt._cores_in.value = 1
-    asyncio.run(mt._on_fit_model(None))
-    mt._save_name_in.value = "Solo"
-    asyncio.run(mt._on_save_model(None))
-
-    rt._compare_table.selection = [0]
-    rt._compare_bf_cb.value = True
-    asyncio.run(rt._on_compare_click(None))
-
-    titles = [o.title for o in rt._compare_result_pane.objects if isinstance(o, pn.Card)]
-    assert "Bayes Factor" in titles
-    assert "Ranking (LOO / ELPD)" not in titles  # needs 2+, correctly absent
-
-
-@pytest.mark.slow
-def test_use_model_button_sets_independent_copy(data_gaussian: pd.DataFrame):
-    import asyncio
-
-    from hbsaemp.app._app import SavedModel
-
-    state = AppState()
-    state.data = data_gaussian
-    mt = ModelTab(state=state)
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1", "x2"]
-    mt._draws_in.value = 200
-    mt._tune_in.value = 200
-    mt._chains_in.value = 2
-    mt._cores_in.value = 1
-    asyncio.run(mt._on_fit_model(None))
-
-    state.saved_models = {"A": SavedModel(model=mt.state.model)}
-    rt = ResultsTab(state=state)
-    rt._use_model_sel.value = "A"
-    rt._on_use_model_click(None)
-
-    assert state.model is not state.saved_models["A"].model  # fresh copy, not shared
-    assert state.model.formula == state.saved_models["A"].model.formula
-
-
 # ---------------------------------------------------------------------------
 # ResultsTab: stale-result clearing, ci_prob, error mapping 
 # ---------------------------------------------------------------------------
-
 def test_results_clear_on_model_change():
     from types import SimpleNamespace
 
@@ -681,52 +524,11 @@ def test_sae_blocking_passes_ci_prob_and_new_data(data_gaussian: pd.DataFrame, m
 # ---------------------------------------------------------------------------
 # Convergence plot titles 
 # ---------------------------------------------------------------------------
-
 def test_rhat_plot_title_is_distribution_not_forest():
     from hbsaemp.app.tabs.results_tab import _PLOT_TITLES
 
     assert _PLOT_TITLES["rhat"] == "R-hat Distribution Plot"
     assert "forest" not in _PLOT_TITLES["rhat"].lower()
-
-
-@pytest.mark.slow
-def test_comparison_table_uses_saved_names_not_generic_labels(data_gaussian: pd.DataFrame):
-    """Regression test: compare_models() always labels models "model_0",
-    "model_1", ... by list position (comparison.py has no way to accept
-    custom names) — the rendered table/badges must translate those back
-    to the names the user actually saved, not leak the generic labels."""
-    import asyncio
-
-    state = AppState()
-    state.data = data_gaussian
-    mt = ModelTab(state=state)
-    rt = ResultsTab(state=state)
-
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1", "x2"]
-    mt._draws_in.value = 800
-    mt._tune_in.value = 800
-    mt._chains_in.value = 4
-    mt._cores_in.value = 1
-    asyncio.run(mt._on_fit_model(None))
-    mt._save_name_in.value = "Model 2"
-    asyncio.run(mt._on_save_model(None))
-
-    mt._predictors_sel.value = ["x1"]
-    asyncio.run(mt._on_fit_model(None))
-    mt._save_name_in.value = "Model 3"
-    asyncio.run(mt._on_save_model(None))
-
-    rt._compare_table.selection = [0, 1]
-    asyncio.run(rt._on_compare_click(None))
-
-    ranking_table = next(
-        obj.objects[0] for obj in rt._compare_result_pane.objects
-        if isinstance(obj, pn.Card) and obj.title == "Ranking (LOO / ELPD)"
-    )
-    labels = ranking_table.value["Model"].astype(str).tolist()
-    assert set(labels) == {"Model 2", "Model 3"}
-    assert not any("model_" in label for label in labels)
 
 
 def test_bayes_factor_option_defaults_off():
@@ -739,62 +541,9 @@ def test_bayes_factor_option_defaults_off():
     assert rt._compare_bf_cb.value is False
 
 
-@pytest.mark.slow
-def test_bayes_factor_rendered_with_saved_names_when_enabled(data_gaussian: pd.DataFrame):
-    """`metrics=["loo", "bf"]` exercises the backend's `_bf_frame()`, which
-    reshapes `az.bayes_factor()`'s `xarray.Dataset` return (arviz-stats
-    >= 1.2.0, this project's pinned floor) into a BF10/BF01 table. This
-    test checks the GUI's rendering (saved names, not "model_0"/"model_1")
-    on top of that — it isn't a substitute for the backend's own tests of
-    `_bf_frame()` itself."""
-    import asyncio
-
-    state = AppState()
-    state.data = data_gaussian
-    mt = ModelTab(state=state)
-    rt = ResultsTab(state=state)
-
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1", "x2"]
-    mt._draws_in.value = 800
-    mt._tune_in.value = 800
-    mt._chains_in.value = 4
-    mt._cores_in.value = 1
-    asyncio.run(mt._on_fit_model(None))
-    mt._save_name_in.value = "Model 2"
-    asyncio.run(mt._on_save_model(None))
-
-    mt._predictors_sel.value = ["x1"]
-    asyncio.run(mt._on_fit_model(None))
-    mt._save_name_in.value = "Model 3"
-    asyncio.run(mt._on_save_model(None))
-
-    rt._compare_table.selection = [0, 1]
-    rt._compare_bf_cb.value = True
-    asyncio.run(rt._on_compare_click(None))
-
-    bf_card = next(
-        (obj for obj in rt._compare_result_pane.objects
-         if isinstance(obj, pn.Card) and obj.title == "Bayes Factor"),
-        None,
-    )
-    assert bf_card is not None, rt._compare_status.object
-
-    rendered_names = set()
-    for section in bf_card.objects[0].objects:
-        if isinstance(section, pn.pane.Markdown):
-            continue
-        for child in section.objects:
-            if isinstance(child, pn.pane.Markdown):
-                rendered_names.add(child.object.strip("*"))
-    assert rendered_names == {"Model 2", "Model 3"}
-    assert not any("model_" in n for n in rendered_names)
-
-
 # ---------------------------------------------------------------------------
 # Update Model: max_treedepth, formula template, UserWarning capture
 # ---------------------------------------------------------------------------
-
 def test_update_tab_has_treedepth_override():
     state = AppState()
     tab = UpdateModelTab(state=state)
@@ -843,7 +592,6 @@ def test_update_blocking_captures_user_warning(data_gaussian: pd.DataFrame, monk
 # ---------------------------------------------------------------------------
 # Fit/refit progress feedback (progress bar + elapsed-time ticker)
 # ---------------------------------------------------------------------------
-
 def test_sampling_progress_callback_updates_progress_bar():
     from hbsaemp.app.tabs.model_tab import _make_sampling_progress_callback
 
@@ -882,32 +630,9 @@ def test_fit_progress_bar_hidden_before_and_after(data_gaussian: pd.DataFrame):
     assert mt._fit_progress.value == 100
 
 
-@pytest.mark.slow
-def test_update_progress_bar_hidden_before_and_after(data_gaussian: pd.DataFrame):
-    import asyncio
-
-    state = AppState()
-    state.data = data_gaussian
-    mt = ModelTab(state=state)
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1", "x2"]
-    mt._draws_in.value = 50
-    mt._tune_in.value = 50
-    mt._chains_in.value = 1
-    mt._cores_in.value = 1
-    asyncio.run(mt._on_fit_model(None))
-
-    ut = UpdateModelTab(state=state)
-    assert ut._update_progress.visible is False
-    asyncio.run(ut._on_update(None))
-    assert ut._update_progress.visible is False
-    assert ut._update_progress.value == 100
-
-
 # ---------------------------------------------------------------------------
 # fixed_params pinning
 # ---------------------------------------------------------------------------
-
 def test_pin_widgets_hidden_for_binomial(data_gaussian: pd.DataFrame):
     """pinnable_params == {} for binomial (p is the estimand, can't be
     pinned) — no pin widgets should render at all, not a control that
@@ -1026,46 +751,404 @@ def test_default_predictors_start_empty(data_gaussian: pd.DataFrame):
 # ---------------------------------------------------------------------------
 # Prior Sensitivity in Model Comparison
 # ---------------------------------------------------------------------------
-
 def test_prior_sensitivity_option_defaults_off():
     state = AppState()
     rt = ResultsTab(state=state)
     assert rt._compare_psense_cb.value is False
 
 
-@pytest.mark.slow
-def test_prior_sensitivity_rendered_with_saved_names_when_enabled(data_gaussian: pd.DataFrame):
-    import asyncio
+# ---------------------------------------------------------------------------
+# Tests that use a real (small) MCMC fit, one fit shared per module
+# ---------------------------------------------------------------------------
 
+
+def run(coro):
+    """Drive an async Panel callback to completion."""
+    return asyncio.run(coro)
+
+
+def _csv_bytes(df: pd.DataFrame) -> bytes:
+    return df.to_csv(index=False).encode("utf-8")
+
+
+def _configured_model_tab(state: AppState, data: pd.DataFrame) -> ModelTab:
+    state.data = data
+    tab = ModelTab(state=state)
+    tab._response_sel.value = "y"
+    tab._predictors_sel.value = ["x1", "x2"]
+    tab._group_sel.value = "group"
+    tab._family_sel.value = "gaussian"
+    return tab
+
+
+# ---------------------------------------------------------------------------
+# DataTab
+# ---------------------------------------------------------------------------
+def test_data_tab_loads_builtin_dataset():
     state = AppState()
+    tab = DataTab(state=state)
+    tab._dataset_sel.value = "data_fhnorm"
+    tab._on_load_dataset(None)
+
+    assert isinstance(state.data, pd.DataFrame)
+    assert len(state.data) == 30
+    assert "successfully loaded" in tab._upload_status.object
+    assert "Total Rows:** 30" in tab._summary.object
+
+
+def test_data_tab_requires_a_dataset_selection():
+    state = AppState()
+    tab = DataTab(state=state)
+    tab._on_load_dataset(None)
+
+    assert state.data is None
+    assert "select a built-in dataset" in tab._upload_status.object.lower()
+
+
+def test_data_tab_uploads_csv(data_gaussian: pd.DataFrame):
+    state = AppState()
+    tab = DataTab(state=state)
+    tab._file_input.filename = "areas.csv"
+    tab._file_input.value = _csv_bytes(data_gaussian)
+
+    assert state.data is not None
+    assert list(state.data.columns) == list(data_gaussian.columns)
+    assert len(state.data) == len(data_gaussian)
+    assert "areas.csv" in tab._upload_status.object
+    assert tab.get_dataframe() is state.data
+
+
+def test_data_tab_summary_counts_missing_values():
+    df = pd.DataFrame({"y": [1.0, None, 3.0], "x1": [0.1, 0.2, 0.3]})
+    state = AppState()
+    tab = DataTab(state=state)
+    tab._file_input.filename = "gaps.csv"
+    tab._file_input.value = _csv_bytes(df)
+
+    assert "Missing Values:** 1" in tab._summary.object
+    assert "Total Columns:** 2" in tab._summary.object
+
+
+def test_data_tab_rejects_unreadable_file():
+    state = AppState()
+    tab = DataTab(state=state)
+    tab._file_input.filename = "broken.csv"
+    tab._file_input.value = b"\xff\xfe\xfd\xfc\xfb"
+
+    assert state.data is None
+    assert "Could not read CSV file" in tab._upload_status.object
+
+
+def test_data_tab_rejects_file_over_size_limit():
+    cfg = hb.AppConfig(max_upload_mb=1, open_browser=False)
+    state = AppState()
+    tab = DataTab(state=state, app_config=cfg)
+    tab._file_input.filename = "big.csv"
+    tab._file_input.value = b"a,b\n" + b"1,2\n" * 300_000  # about 1.2 MB
+
+    assert state.data is None
+    assert "File too large" in tab._upload_status.object
+
+
+# ---------------------------------------------------------------------------
+# ExploreTab
+# ---------------------------------------------------------------------------
+def test_explore_tab_refreshes_from_state(data_gaussian: pd.DataFrame):
+    state = AppState()
+    tab = ExploreTab(state=state)
     state.data = data_gaussian
-    mt = ModelTab(state=state)
-    rt = ResultsTab(state=state)
 
-    mt._response_sel.value = "y"
-    mt._predictors_sel.value = ["x1"]
-    mt._draws_in.value = 200
-    mt._tune_in.value = 200
-    mt._chains_in.value = 2
-    mt._cores_in.value = 1
-    asyncio.run(mt._on_fit_model(None))
-    mt._save_name_in.value = "Model A"
-    asyncio.run(mt._on_save_model(None))
+    numeric = data_gaussian.select_dtypes(include="number").columns.tolist()
+    assert list(tab._hist_var.options) == numeric
+    assert list(tab._x_var.options) == numeric
+    assert len(tab._summary_table.value) == len(numeric)
+    assert {"Variable", "Min", "Median", "Mean", "Max"} <= set(tab._summary_table.value.columns)
 
-    rt._compare_table.selection = [0]
-    rt._compare_psense_cb.value = True
-    asyncio.run(rt._on_compare_click(None))
 
-    psense_card = next(
-        (obj for obj in rt._compare_result_pane.objects
-         if isinstance(obj, pn.Card) and obj.title == "Prior Sensitivity"),
-        None,
-    )
-    assert psense_card is not None, rt._compare_status.object
+def test_explore_tab_excludes_non_numeric_columns(data_gaussian: pd.DataFrame):
+    df = data_gaussian.assign(label="area")
+    state = AppState()
+    tab = ExploreTab(state=state)
+    state.data = df
 
-    rendered_names = {
-        section.objects[0].object.strip("*")
-        for section in psense_card.objects[0].objects
-        if isinstance(section, pn.Column)
-    }
-    assert rendered_names == {"Model A"}
+    assert "label" not in list(tab._hist_var.options)
+    assert "y" in list(tab._hist_var.options)
+
+
+def test_explore_tab_correlation_table_has_four_metrics(data_gaussian: pd.DataFrame):
+    state = AppState()
+    tab = ExploreTab(state=state)
+    state.data = data_gaussian
+    tab._x_var.value = "x1"
+    tab._y_var.value = "y"
+
+    table = tab._corr_table.value
+    assert list(table["Metric"]) == [
+        "Pearson's r", "Spearman's rho", "Chatterjee's Xi", "Distance Correlation",
+    ]
+    pearson = float(table.loc[table["Metric"] == "Pearson's r", "Value"].iloc[0])
+    assert -1.0 <= pearson <= 1.0
+
+
+def test_explore_tab_ignores_cleared_data():
+    state = AppState()
+    tab = ExploreTab(state=state)
+    state.data = None  # must not raise
+    assert tab.panel() is not None
+
+
+# ---------------------------------------------------------------------------
+# ModelTab: prior predictive check
+# ---------------------------------------------------------------------------
+def test_prior_blocking_returns_summary_and_leaves_model_unfitted(data_gaussian: pd.DataFrame):
+    state = AppState()
+    tab = _configured_model_tab(state, data_gaussian)
+    draft = tab._model_draft
+    assert draft is not None
+
+    result = ModelTab._prior_blocking(draft, 20)
+
+    assert result.prior_summary is not None and len(result.prior_summary) > 0
+    # The requested number of prior draws is what was simulated.
+    assert result.idata.prior_predictive.sizes["draw"] == 20
+    assert draft.is_fitted is False
+
+
+def test_prior_check_handler_reports_success(data_gaussian: pd.DataFrame):
+    state = AppState()
+    tab = _configured_model_tab(state, data_gaussian)
+    tab._prior_n_draws.value = 20
+
+    run(tab._on_prior_check(None))
+
+    assert "Prior predictive check complete" in tab._prior_status.object
+    assert len(tab._prior_summary_table.value) > 0
+    assert "Parameter" in tab._prior_summary_table.value.columns
+    assert tab._model_draft.is_fitted is False
+    assert state.model is None  # a prior check never becomes the active model
+    assert tab._prior_run_btn.loading is False
+
+
+def test_prior_check_handler_needs_a_valid_model_draft():
+    tab = ModelTab(state=AppState())  # no data loaded, so no draft
+    assert tab._model_draft is None
+
+    run(tab._on_prior_check(None))
+
+    assert "Cannot run prior predictive check" in tab._prior_status.object
+
+
+# ---------------------------------------------------------------------------
+# ModelTab: guards that need no fitted model
+# ---------------------------------------------------------------------------
+def test_posterior_check_requires_fitted_model():
+    tab = ModelTab(state=AppState())
+    run(tab._on_posterior_check(None))
+    assert "Model has not been fitted" in tab._postpc_status.object
+
+
+def test_save_model_requires_fitted_model():
+    tab = ModelTab(state=AppState())
+    run(tab._on_save_model(None))
+    assert "No fitted model" in tab._save_status.object
+
+
+def test_fit_handler_needs_a_valid_model_draft():
+    tab = ModelTab(state=AppState())
+    run(tab._on_fit_model(None))
+    assert "Cannot fit model" in tab._fit_status.object
+
+
+# ---------------------------------------------------------------------------
+# ResultsTab: guards
+# ---------------------------------------------------------------------------
+def test_convergence_requires_fitted_model():
+    tab = ResultsTab(state=AppState())
+    run(tab._on_load_convergence(None))
+    assert "Model has not been fitted" in tab._conv_status.object
+
+
+def test_sae_estimation_requires_fitted_model():
+    tab = ResultsTab(state=AppState())
+    run(tab._on_run_sae_estimation(None))
+    assert "Model has not been fitted" in tab._sae_status.object
+
+
+def _results_tab_with_stub_fitted_model() -> ResultsTab:
+    """A ResultsTab whose handlers see a 'fitted' model without any MCMC.
+
+    The stub replaces ``tab.state`` after construction, because the nested
+    UpdateModelTab reads ``model.config`` when it is built.
+    """
+    tab = ResultsTab(state=AppState())
+    tab.state = SimpleNamespace(model=SimpleNamespace(is_fitted=True))
+    return tab
+
+
+def test_sae_new_area_option_needs_a_file():
+    tab = _results_tab_with_stub_fitted_model()
+    tab._sae_new_data_cb.value = True
+
+    run(tab._on_run_sae_estimation(None))
+
+    assert "No file uploaded" in tab._sae_status.object
+
+
+def test_sae_new_area_file_must_be_readable_csv():
+    tab = _results_tab_with_stub_fitted_model()
+    tab._sae_new_data_cb.value = True
+    tab._sae_new_data_file.value = b"\xff\xfe\xfd\xfc"
+
+    run(tab._on_run_sae_estimation(None))
+
+    assert "Could not read CSV file" in tab._sae_status.object
+
+
+def test_compare_requires_selection_before_running():
+    tab = ResultsTab(state=AppState())
+    run(tab._on_compare_click(None))
+    assert "Select a model" in tab._compare_status.object
+
+
+def _data() -> pd.DataFrame:
+    rng = np.random.default_rng(11)
+    n = 100
+    group = np.repeat(np.arange(1, 11), n // 10)
+    x1, x2 = rng.normal(size=n), rng.normal(size=n)
+    y = 1.0 + 0.3 * x1 - 0.2 * x2 + rng.normal(0, 0.5, 10)[group - 1] + rng.normal(0, 0.5, n)
+    return pd.DataFrame({"y": y, "x1": x1, "x2": x2, "group": group})
+
+
+def _fit_small_model(state: AppState) -> ModelTab:
+    """Configure and fit y ~ x1 + x2 with a group effect, small sampler."""
+    state.data = _data()
+    tab = ModelTab(state=state)
+    tab._response_sel.value = "y"
+    tab._predictors_sel.value = ["x1", "x2"]
+    tab._group_sel.value = "group"
+    tab._family_sel.value = "gaussian"
+    tab._draws_in.value = 100
+    tab._tune_in.value = 100
+    tab._chains_in.value = 2
+    tab._cores_in.value = 1
+    tab._update_preview()
+    run(tab._on_fit_model(None))
+    return tab
+
+
+@pytest.fixture(scope="module")
+def fitted():
+    """(state, model_tab, results_tab) after one real fit. Shared, treat as read-only."""
+    state = AppState()
+    model_tab = _fit_small_model(state)
+    results_tab = ResultsTab(state=state)
+    assert state.model is not None and state.model.is_fitted, "fixture fit failed"
+    return state, model_tab, results_tab
+
+
+# ---------------------------------------------------------------------------
+# ModelTab after a fit
+# ---------------------------------------------------------------------------
+@pytest.mark.slow
+def test_fit_publishes_a_fitted_model_and_enables_save(fitted):
+    state, model_tab, _ = fitted
+    assert state.model.is_fitted is True
+    assert "MCMC sampling has completed" in model_tab._fit_status.object
+    assert model_tab._save_btn.disabled is False
+    assert model_tab._save_name_in.disabled is False
+
+
+@pytest.mark.slow
+def test_posterior_predictive_check_draws_both_plots(fitted):
+    _, model_tab, _ = fitted
+    run(model_tab._on_posterior_check(None))
+
+    assert "Posterior predictive check complete" in model_tab._postpc_status.object
+    assert model_tab._postpc_dist_pane.object is not None
+    assert model_tab._postpc_interval_pane.object is not None
+
+
+@pytest.mark.slow
+def test_save_model_stores_a_named_snapshot_and_keeps_the_active_model():
+    state = AppState()
+    tab = _fit_small_model(state)
+    active = state.model
+
+    tab._save_name_in.value = "Baseline"
+    run(tab._on_save_model(None))
+
+    assert "Saved as" in tab._save_status.object
+    assert list(state.saved_models) == ["Baseline"]
+    assert state.model is active  # saving must not replace the active model
+
+
+@pytest.mark.slow
+def test_save_model_rejects_an_empty_name(fitted):
+    _, model_tab, _ = fitted
+    model_tab._save_name_in.value = ""
+    run(model_tab._on_save_model(None))
+    assert "Name required" in model_tab._save_status.object
+
+
+# ---------------------------------------------------------------------------
+# ResultsTab after a fit
+# ---------------------------------------------------------------------------
+@pytest.mark.slow
+def test_convergence_table_lists_every_parameter_with_rhat_and_ess(fitted):
+    _, _, results_tab = fitted
+    run(results_tab._on_load_convergence(None))
+
+    assert "Diagnostics computed" in results_tab._conv_status.object
+    table = results_tab._rhat_ess_table.value
+    assert not table.empty
+    lowered = {c.lower() for c in table.columns}
+    assert any("rhat" in c or "r_hat" in c or "r-hat" in c for c in lowered)
+    assert any("ess" in c for c in lowered)
+    assert len(table) >= 3  # at least Intercept, two slopes and sigma
+
+
+@pytest.mark.slow
+def test_convergence_values_are_numbers_in_valid_ranges(fitted):
+    _, _, results_tab = fitted
+    run(results_tab._on_load_convergence(None))
+    table = results_tab._rhat_ess_table.value
+
+    rhat_col = next(c for c in table.columns if "hat" in c.lower())
+    ess_cols = [c for c in table.columns if "ess" in c.lower()]
+    assert (pd.to_numeric(table[rhat_col], errors="coerce") > 0).all()
+    for col in ess_cols:
+        assert (pd.to_numeric(table[col], errors="coerce") > 0).all()
+
+
+@pytest.mark.slow
+def test_sae_estimation_returns_one_row_per_area_with_valid_intervals(fitted):
+    state, _, results_tab = fitted
+    run(results_tab._on_run_sae_estimation(None))
+
+    assert "SAE estimation complete" in results_tab._sae_status.object
+    table = results_tab._sae_table.value
+    assert {"mean", "sd", "ci_lower", "ci_upper", "rse_pct"} <= set(table.columns)
+    assert len(table) == len(state.data)
+    assert (table["ci_lower"] <= table["mean"]).all()
+    assert (table["mean"] <= table["ci_upper"]).all()
+    assert (table["sd"] > 0).all()
+
+
+@pytest.mark.slow
+def test_compare_two_saved_models_ranks_both():
+    state = AppState()
+    tab = _fit_small_model(state)
+    results_tab = ResultsTab(state=state)
+
+    tab._save_name_in.value = "Model A"
+    run(tab._on_save_model(None))
+    tab._save_name_in.value = "Model B"
+    run(tab._on_save_model(None))
+    assert list(state.saved_models) == ["Model A", "Model B"]
+
+    assert list(results_tab._compare_table.value["Model"]) == ["Model A", "Model B"]
+    results_tab._compare_table.selection = [0, 1]
+    run(results_tab._on_compare_click(None))
+
+    assert "Compared 2 model(s)" in results_tab._compare_status.object
+    assert results_tab._use_model_sel.options  # a model can now be chosen to use
