@@ -1,18 +1,18 @@
 # 3 · Specify a model
 
 State which column is the response, which carry auxiliary information, pick a
-family, and build the model — without fitting it yet.
+family, and build the model, without fitting it yet.
 
 ## Before you start
 
-You need data loaded — see {doc}`01-load-data`. Everything on this page happens
+You need data loaded. See {doc}`01-load-data`. Everything on this page happens
 on the **Modeling** tab's **Model Building** sub-tab, and none of it samples:
 building a model here is as cheap as it is in the Python API, and mistakes are
 free to fix.
 
 ## Do it
 
-1. Pick a **Response Variable (y)** — the outcome you want to estimate.
+1. Pick a **Response Variable (y)**: the outcome you want to estimate.
 
    ```{figure} images/03-step1-response-variable.png
    :alt: Response Variable (y) selector
@@ -21,7 +21,7 @@ free to fix.
    The **Response Variable (y)** selector.
    ```
 
-2. Check the boxes for your **Auxiliary / Predictor Variables (x)** — one
+2. Check the boxes for your **Auxiliary / Predictor Variables (x)**: one
    checkbox per numeric column. Nothing is pre-checked: the app does not guess
    which columns are meant as predictors, since a wrong guess (picking up a
    simulation ground-truth column, or a column meant for a different family
@@ -34,7 +34,7 @@ free to fix.
    The **Auxiliary / Predictor Variables (x)** checkboxes.
    ```
 
-3. Optionally pick an **Area / Group Variable** — the column identifying each
+3. Optionally pick an **Area / Group Variable**: the column identifying each
    small area.
 
    ```{figure} images/03-step3-group-variable.png
@@ -46,10 +46,10 @@ free to fix.
 
 4. Choose an **HB Family** from the dropdown. The description under it explains
    what that family expects:
-   - **Gaussian** — continuous, unbounded response. Pass a sampling-variance
+   - **Gaussian**: continuous, unbounded response. Pass a sampling-variance
      column to enable the Fay-Herriot offset.
-   - **Beta** — a proportion or rate.
-   - **Binomial** — a count of successes out of a number of trials; the
+   - **Beta**: a proportion or rate.
+   - **Binomial**: a count of successes out of a number of trials; the
      **Trials column (n_i)** becomes a required field once selected.
 
    ```{figure} images/03-step4-family-dropdown.png
@@ -70,13 +70,13 @@ free to fix.
    Family-specific fields, e.g. **Sampling variance column (D_i)** for Gaussian.
    ```
 
-6. **Optional — Pin a parameter.** Some families let you pin a distributional
+6. **Optional: Pin a parameter.** Some families let you pin a distributional
    parameter instead of estimating it:
    - Check **Pin sigma** (Gaussian) or **Pin kappa** (Beta) to reveal a choice
      between **Column** (map it to an existing numeric column) or **Fixed
      value** (a single number for every area).
-   - Pinning a parameter disables the field it would otherwise conflict with
-     — pinning `sigma`, for example, disables **Sampling variance column**,
+   - Pinning a parameter disables the field it would otherwise conflict with.
+     For example, pinning `sigma` disables **Sampling variance column**,
      since supplying both raises an error rather than silently picking one.
 
    ```{figure} images/03-step6-pin-parameter.png
@@ -98,7 +98,7 @@ free to fix.
    The **Sampler Configuration** fields and the **Fix random seed** checkbox.
    ```
 
-8. Read the **Formula Preview** — it updates live as you change any of the
+8. Read the **Formula Preview**. It updates live as you change any of the
    above, and shows an error box instead of a formula if the current
    selection can't build a model yet (e.g. no response chosen).
 
@@ -121,7 +121,7 @@ free to fix.
 ## Check it worked
 
 A green success message reads "Model built and data validated successfully.
-Moving on to Prior Predictive Check." — sometimes followed by a note that some
+Moving on to Prior Predictive Check." Sometimes a note follows saying that some
 rows were dropped for missing values in the columns you're using. Below that,
 a **read-only Python code preview** shows the equivalent `hbsaemp` script for
 this exact model, which you can save with **Save Code (.py)** to reproduce it
@@ -135,7 +135,7 @@ The read-only Python code preview, with the **Save Code (.py)** button.
 ```
 
 If you don't see this, the **Formula Preview** box above the button should
-already be telling you why — clicking **Build Model** re-checks the same
+already be telling you why. Clicking **Build Model** re-checks the same
 thing rather than surfacing a separate error.
 
 ## If it fails
@@ -162,3 +162,7 @@ outside 0–1). Adjust it and retry.
 For why an empty predictor list is the default rather than every remaining
 numeric column, see {doc}`../explanation/index` (a page on this specific
 choice lands with the remaining explanation pages).
+
+## Next
+
+Continue to {doc}`04-check-priors`.

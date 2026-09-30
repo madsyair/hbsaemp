@@ -1,13 +1,13 @@
-# 7 · Estimate the areas
+# 10 · Estimate the areas
 
 Turn the fitted model into a table of per-area estimates, optionally including
 areas that weren't sampled, and download the result.
 
 ## Before you start
 
-You need a fitted model — see {doc}`04-fit-model`. This page covers the
+You need a fitted model. See {doc}`05-fit-model`. This page covers the
 **Results** tab's **SAE Estimation** sub-tab. This is the step whose output
-you'll likely publish, so check {doc}`05-check-convergence` first.
+you'll likely publish, so check {doc}`06-check-convergence` first.
 
 ## Do it
 
@@ -30,9 +30,9 @@ you'll likely publish, so check {doc}`05-check-convergence` first.
    The **Credible interval (ci_prob)** field.
    ```
 
-3. **Optional — estimate for new/unsampled areas.** Check
+3. **Optional: estimate for new/unsampled areas.** Check
    "Estimate for new/unsampled areas" and upload a CSV of predictors (plus an
-   area column) for areas with no survey data — no response column needed.
+   area column) for areas with no survey data. No response column is needed.
    This replaces the training data for this run only; it does not change
    what's loaded on the Data tab.
 
@@ -85,16 +85,16 @@ you'll likely publish, so check {doc}`05-check-convergence` first.
 ## If it fails
 
 **"Model has not been fitted."**
-Fit a model first — see {doc}`04-fit-model`.
+Fit a model first. See {doc}`05-fit-model`.
 
 **"No file uploaded" (with "estimate for new/unsampled areas" checked).**
 Upload a CSV, or uncheck the box to estimate on the original data instead.
 
 **"Could not read CSV file."**
-The uploaded file isn't valid CSV — check its separator and encoding.
+The uploaded file isn't valid CSV. Check its separator and encoding.
 
 **"Estimation failed."**
-The message names what the backend rejected — often a missing predictor
+The message names what the backend rejected, often a missing predictor
 column in the new-area data. Fix the CSV and rerun.
 
 ## Related

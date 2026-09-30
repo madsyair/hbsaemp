@@ -1,12 +1,12 @@
-# 5 · Check convergence
+# 6 · Check convergence
 
 Read the R-hat/ESS table and diagnostic plots for the model currently in use.
-The app shows these numbers as-is — deciding whether a fit is trustworthy is
+The app shows these numbers as-is. Deciding whether a fit is trustworthy is
 left to you (see {doc}`../explanation/convergence`).
 
 ## Before you start
 
-You need a fitted model — see {doc}`04-fit-model`. This page covers the
+You need a fitted model. See {doc}`05-fit-model`. This page covers the
 **Results** tab's **MCMC Convergence Evaluation** sub-tab.
 
 ## Do it
@@ -39,7 +39,7 @@ You need a fitted model — see {doc}`04-fit-model`. This page covers the
    ```
 
 4. Scroll down to the diagnostic plots (trace, density, autocorrelation,
-   R-hat distribution, effective sample size, NUTS energy/BFMI) — only the
+   R-hat distribution, effective sample size, NUTS energy/BFMI). Only the
    ones the backend actually produced are shown.
 
    ```{figure} images/05-step4-diagnostic-plots.png
@@ -62,7 +62,7 @@ You need a fitted model — see {doc}`04-fit-model`. This page covers the
 ## Check it worked
 
 - The description above the table states the commonly used thresholds
-  (**R-hat ≤ 1.01**, **ESS ≥** 100 × the number of chains) — read these
+  (**R-hat ≤ 1.01**, **ESS ≥** 100 × the number of chains). Read these
   against your own study's requirements, not as a pass/fail the app enforces.
 - The table has one row per parameter, with `r_hat`, `ess_bulk`, and
   `ess_tail` columns rounded for display (the underlying numbers used for any
@@ -74,16 +74,21 @@ You need a fitted model — see {doc}`04-fit-model`. This page covers the
 ## If it fails
 
 **"Model has not been fitted." / "Please fit the model first."**
-Go back to {doc}`04-fit-model` and complete a fit before loading diagnostics.
+Go back to {doc}`05-fit-model` and complete a fit before loading diagnostics.
 
 **Plots are missing for some diagnostic types.**
-Not every plot type is always produced by the backend — the page only shows
+Not every plot type is always produced by the backend. The page only shows
 what's actually available; nothing is broken if fewer than six appear.
 
 **"Download Plots (PDF)" is disabled.**
-No plots were generated for this fit yet — load diagnostics first.
+No plots were generated for this fit yet. Load diagnostics first.
 
 ## Related
 
 For why the app doesn't block Save Model or Model Comparison on these
 numbers, see {doc}`../explanation/convergence`.
+
+## Next
+
+If the diagnostics are acceptable for your purpose, continue to {doc}`08-check-fit-and-compare`.
+If they are not, go to {doc}`07-update-model` to change the sampler settings and refit.
