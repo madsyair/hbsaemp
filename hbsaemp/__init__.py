@@ -1,4 +1,4 @@
-"""hbsaemp — Hierarchical Bayesian Small Area Estimation.
+"""hbsaemp — Hierarchical Bayes Small Area Estimation using Python.
 
 Python port of R `hbsaems` (Choir et al., 2025). Single caret-style entry
 point:

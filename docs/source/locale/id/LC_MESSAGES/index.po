@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hbsaemp 1.0.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-28 02:47+0700\n"
+"POT-Creation-Date: 2026-10-01 17:09+0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: id\n"
@@ -23,8 +23,8 @@ msgid "hbsaemp"
 msgstr "hbsaemp"
 
 #: ../../source/index.md:3
-msgid "Hierarchical Bayes small area estimation for Python, built on Bambi, PyMC and ArviZ."
-msgstr "Small area estimation dengan hierarchical Bayes untuk Python, dibangun di atas Bambi, PyMC, dan ArviZ."
+msgid "Hierarchical Bayes Small Area Estimation using Python, built on Bambi, PyMC and ArviZ."
+msgstr "Hierarchical Bayes Small Area Estimation using Python, dibangun di atas Bambi, PyMC, dan ArviZ."
 
 #: ../../source/index.md:5
 msgid "There are two ways to use it, and the documentation is split the same way. Pick one; each track is complete on its own."

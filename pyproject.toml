@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 # ===========================================================================
 [project]
 name        = "hbsaemp"
-description = "Hierarchical Bayesian Small Area Estimation — caret-style unified interface"
+description = "Hierarchical Bayes Small Area Estimation using Python — caret-style unified interface"
 readme      = "README.md"
 license     = "GPL-3.0-or-later"
 requires-python = ">=3.12"

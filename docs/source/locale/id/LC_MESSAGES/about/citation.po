@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hbsaemp 1.0.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"POT-Creation-Date: 2026-10-01 17:09+0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: id\n"
@@ -27,8 +27,8 @@ msgid "To cite hbsaemp in publications, use:"
 msgstr "Untuk mengutip hbsaemp dalam publikasi, gunakan:"
 
 #: ../../source/about/citation.rst:8
-msgid "Choir A, Kaffah MIS, Salsabiela RK (2026). *hbsaemp: Hierarchical Bayesian Small Area Estimation in Python*. Python package version |release|. https://madsyair.github.io/hbsaemp/"
-msgstr "Choir A, Kaffah MIS, Salsabiela RK (2026). *hbsaemp: Hierarchical Bayesian Small Area Estimation in Python*. Python package version |release|. https://madsyair.github.io/hbsaemp/"
+msgid "Choir A, Kaffah MIS, Salsabiela RK (2026). *hbsaemp: Hierarchical Bayes Small Area Estimation using Python*. Python package version |release|. https://madsyair.github.io/hbsaemp/"
+msgstr "Choir A, Kaffah MIS, Salsabiela RK (2026). *hbsaemp: Hierarchical Bayes Small Area Estimation using Python*. Python package version |release|. https://madsyair.github.io/hbsaemp/"
 
 #: ../../source/about/citation.rst:12
 msgid "A BibTeX entry for LaTeX users:"
