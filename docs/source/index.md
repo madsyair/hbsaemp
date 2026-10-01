@@ -1,6 +1,6 @@
 # hbsaemp
 
-Hierarchical Bayes small area estimation for Python, built on Bambi, PyMC and ArviZ.
+Hierarchical Bayes Small Area Estimation using Python, built on Bambi, PyMC and ArviZ.
 
 There are two ways to use it, and the documentation is split the same way.
 Pick one; each track is complete on its own.

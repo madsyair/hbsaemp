@@ -1,6 +1,6 @@
 # hbsaemp
 
-Hierarchical Bayes small area estimation for Python, built on Bambi, PyMC and ArviZ.
+Hierarchical Bayes Small Area Estimation using Python, built on Bambi, PyMC and ArviZ.
 A Python port of the R package [hbsaems](https://madsyair.github.io/hbsaems/).
 
 Documentation: <https://madsyair.github.io/hbsaemp/>
@@ -95,12 +95,12 @@ Version 2.0.0 is planned to add spatial random effects and a lognormal family.
 
 ## Citation
 
-> Choir A, Kaffah MIS, Salsabiela RK (2026). _hbsaemp: Hierarchical Bayesian Small Area
-> Estimation in Python_. Python package version 1.0.0. <https://madsyair.github.io/hbsaemp/>
+> Choir A, Kaffah MIS, Salsabiela RK (2026). _hbsaemp: Hierarchical Bayes Small Area
+> Estimation using Python_. Python package version 1.0.0. <https://madsyair.github.io/hbsaemp/>
 
 ```bibtex
 @Manual{,
-  title = {hbsaemp: Hierarchical Bayesian Small Area Estimation in Python},
+  title = {hbsaemp: Hierarchical Bayes Small Area Estimation using Python},
   author = {Achmad Syahrul Choir and M. Ihsan Silmi Kaffah and Rahmadika Kemala Salsabiela},
   year = {2026},
   note = {Python package version 1.0.0},
