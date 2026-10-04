@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hbsaemp 1.0.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"POT-Creation-Date: 2026-10-04 23:29+0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: id\n"
@@ -23,191 +23,354 @@ msgid "Why family metadata lives in one registry"
 msgstr "Mengapa metadata family disimpan dalam satu registri"
 
 #: ../../source/python/explanation/family-registry.md:3
-msgid "Every fact about a family is written once, so the constructor and the running model always agree."
-msgstr "Setiap fakta tentang sebuah family ditulis sekali, sehingga konstruktor dan model yang berjalan selalu sepakat."
+msgid "Every fact about a family is written once, so the interfaces, the data checks and the fitted model always agree."
+msgstr "Setiap fakta tentang sebuah family ditulis sekali, sehingga antarmuka, pemeriksaan data, dan model yang di-fit selalu sepakat."
 
 #: ../../source/python/explanation/family-registry.md:6
 msgid "The question"
 msgstr "Pertanyaannya"
 
 #: ../../source/python/explanation/family-registry.md:8
-msgid "`family=\"beta\"` decides several things at once: which extra arguments are valid, which links are allowed, the response domain, which columns the preprocessor derives, and the name of the mean parameter in the posterior."
-msgstr "`family=\"beta\"` menetapkan beberapa hal sekaligus: argumen tambahan mana yang valid, link mana yang diizinkan, domain respons, kolom mana yang diturunkan preprocessor, dan nama parameter rata-rata di posterior."
+msgid "`family=\"beta\"` decides several things at once: which extra arguments are valid, which links are allowed, the response domain, which column the preprocessor derives, which parameter the survey design fixes, and the name of the mean parameter in the posterior."
+msgstr "`family=\"beta\"` menetapkan beberapa hal sekaligus: argumen tambahan mana yang valid, link mana yang diizinkan, domain respons, kolom mana yang diturunkan preprocessor, parameter mana yang ditetapkan oleh desain survei, dan nama parameter rata-rata di posterior."
 
 #: ../../source/python/explanation/family-registry.md:12
-msgid "These facts are needed at two moments, when the model is built and while it runs, by code in different modules. The obvious design stores each fact where it is used. This package does not."
-msgstr "Fakta-fakta itu dibutuhkan pada dua saat, ketika model dibangun dan ketika model berjalan, oleh kode di modul yang berbeda. Rancangan yang paling jelas menyimpan setiap fakta di tempat fakta itu dipakai. Paket ini tidak melakukannya."
+msgid "These facts are needed at different moments, by code in different modules. The obvious design stores each fact where it is used. This package does not."
+msgstr "Fakta-fakta itu dibutuhkan pada saat yang berbeda, oleh kode di modul yang berbeda. Rancangan yang paling jelas menyimpan setiap fakta di tempat fakta itu dipakai. Paket ini tidak melakukannya."
 
-#: ../../source/python/explanation/family-registry.md:16
+#: ../../source/python/explanation/family-registry.md:15
 msgid "Background"
 msgstr "Latar belakang"
 
-#: ../../source/python/explanation/family-registry.md:18
-msgid "A family is a bundle of decisions that must stay consistent:"
-msgstr "Sebuah family adalah kumpulan keputusan yang harus tetap konsisten:"
+#: ../../source/python/explanation/family-registry.md:17
+msgid "hbsaems keeps a model registry. Each family is a spec holding its brms family, its link, a response check and a template for the formula's left-hand side, and both `hbm()` and `hbm_flex()` look families up in it (Choir et al., 2026)."
+msgstr "hbsaems memiliki registri model. Setiap family adalah sebuah spesifikasi yang memuat family brms-nya, link-nya, pemeriksaan respons, dan templat untuk sisi kiri formula, dan baik `hbm()` maupun `hbm_flex()` mencari family di registri itu (Choir dkk., 2026)."
+
+#: ../../source/python/explanation/family-registry.md:21
+msgid "hbsaemp keeps the same idea in `FAMILY_SPECS`: one frozen `FamilySpec` per family, read through `list_families()` and `get_family_spec()`. A spec holds four kinds of fact:"
+msgstr "hbsaemp menerapkan gagasan yang sama dalam `FAMILY_SPECS`: satu `FamilySpec` yang tidak dapat diubah (frozen) per family, yang dibaca melalui `list_families()` dan `get_family_spec()`. Sebuah spesifikasi memuat empat jenis fakta:"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Fact"
-msgstr "Fakta"
+msgid "Kind"
+msgstr "Jenis"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Used by"
-msgstr "Dipakai oleh"
+msgid "Fields"
+msgstr "Field"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Used when"
-msgstr "Dipakai saat"
+msgid "For `beta`"
+msgstr "Untuk `beta`"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Which user arguments are valid"
-msgstr "Argumen pengguna mana yang valid"
+msgid "Backend"
+msgstr "Backend"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "the constructor"
-msgstr "konstruktor"
+msgid "`bambi_family`"
+msgstr "`bambi_family`"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "at `create_model()`"
-msgstr "saat `create_model()`"
+msgid "the Bambi family `beta`"
+msgstr "family Bambi `beta`"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Which links are supported"
-msgstr "Link mana yang didukung"
+msgid "Metadata"
+msgstr "Metadata"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "link validation"
-msgstr "validasi link"
+msgid "`mean_param_key`, `default_link`, `supported_links`"
+msgstr "`mean_param_key`, `default_link`, `supported_links`"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "before sampling"
-msgstr "sebelum sampling"
+msgid "mean `mu`; link `logit`, or `probit`"
+msgstr "rata-rata `mu`; link `logit`, atau `probit`"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Response domain and valid ranges"
-msgstr "Domain respons dan rentang yang valid"
+msgid "Wiring"
+msgstr "Penyambungan"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "the validator"
-msgstr "validator"
+msgid "`pipeline_fields`, `user_params`, `required_params`"
+msgstr "`pipeline_fields`, `user_params`, `required_params`"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "during `check_data()`"
-msgstr "selama `check_data()`"
+msgid "the arguments `n`, `deff`, `squeeze`"
+msgstr "argumen `n`, `deff`, `squeeze`"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Which columns to derive"
-msgstr "Kolom mana yang diturunkan"
+msgid "Behaviour"
+msgstr "Perilaku"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "the preprocessor"
-msgstr "preprocessor"
+msgid "`response_check`, `preprocess`, `addition_template`, `fixed_params`"
+msgstr "`response_check`, `preprocess`, `addition_template`, `fixed_params`"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Name of the mean parameter"
-msgstr "Nama parameter rata-rata"
+msgid "response in $(0, 1)$; adds `log_phi`; `kappa` fixed from `n` and `deff`"
+msgstr "respons di $(0, 1)$; menambahkan `log_phi`; `kappa` ditetapkan dari `n` dan `deff`"
+
+#: ../../source/python/explanation/family-registry.md:31
+msgid "The three families of this version compare as follows:"
+msgstr "Ketiga family pada versi ini dibandingkan sebagai berikut:"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "prediction"
-msgstr "prediksi"
+msgid "Family"
+msgstr "Family"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "after sampling"
-msgstr "setelah sampling"
+msgid "Response"
+msgstr "Respons"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "Backend family name"
-msgstr "Nama family di backend"
+msgid "Default link"
+msgstr "Link bawaan"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "the model builder"
-msgstr "pembangun model"
+msgid "Family columns"
+msgstr "Kolom family"
 
 #: ../../source/python/explanation/family-registry.md
-msgid "at build time"
-msgstr "saat pembangunan"
+msgid "Fixed by the design"
+msgstr "Ditetapkan oleh desain"
 
-#: ../../source/python/explanation/family-registry.md:29
+#: ../../source/python/explanation/family-registry.md
+msgid "`gaussian`"
+msgstr "`gaussian`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "any real value"
+msgstr "sembarang bilangan real"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`identity`"
+msgstr "`identity`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`sampling_var`"
+msgstr "`sampling_var`"
+
+#: ../../source/python/explanation/family-registry.md
+#, python-brace-format
+msgid "`sigma`, at $\\sqrt{\\psi_i}$"
+msgstr "`sigma`, pada $\\sqrt{\\psi_i}$"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`beta`"
+msgstr "`beta`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "a proportion in $(0, 1)$"
+msgstr "proporsi di $(0, 1)$"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`logit`"
+msgstr "`logit`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`n`, `deff`, `squeeze`"
+msgstr "`n`, `deff`, `squeeze`"
+
+#: ../../source/python/explanation/family-registry.md
+#, python-brace-format
+msgid "`kappa`, at $n_i / \\text{deff}_i - 1$"
+msgstr "`kappa`, pada $n_i / \\text{deff}_i - 1$"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`binomial`"
+msgstr "`binomial`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "a count, at most `trials`"
+msgstr "cacahan, paling banyak `trials`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`trials` (required)"
+msgstr "`trials` (wajib)"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "nothing"
+msgstr "tidak ada"
+
+#: ../../source/python/explanation/family-registry.md:39
 msgid "The reasoning"
 msgstr "Penalarannya"
 
-#: ../../source/python/explanation/family-registry.md:31
-msgid "The risk is disagreement"
-msgstr "Risikonya adalah ketidaksepakatan"
-
-#: ../../source/python/explanation/family-registry.md:33
-msgid "If the constructor's list of valid arguments lives in one file and the preprocessor's list of derived columns in another, updating one without the other gives a package that accepts an argument and then ignores it."
-msgstr "Jika daftar argumen valid milik konstruktor berada di satu berkas dan daftar kolom turunan milik preprocessor di berkas lain, memperbarui salah satunya saja menghasilkan paket yang menerima sebuah argumen lalu mengabaikannya."
-
-#: ../../source/python/explanation/family-registry.md:37
-msgid "Nothing raises. The user passes `deff=\"deff\"`, the constructor accepts it, the preprocessor never derives the precision column, and the model fits a different model from the one requested."
-msgstr "Tidak ada galat yang muncul. Pengguna memberikan `deff=\"deff\"`, konstruktor menerimanya, preprocessor tidak pernah menurunkan kolom presisi, dan yang di-fit adalah model yang berbeda dari yang diminta."
-
 #: ../../source/python/explanation/family-registry.md:41
-msgid "With one registry, both read the same entry and cannot disagree."
-msgstr "Dengan satu registri, keduanya membaca entri yang sama dan tidak dapat berselisih."
+msgid "The risk is silent disagreement"
+msgstr "Risikonya adalah ketidaksepakatan yang senyap"
 
 #: ../../source/python/explanation/family-registry.md:43
-msgid "One source, two readers"
-msgstr "Satu sumber, dua pembaca"
+msgid "If the constructor's list of valid arguments lived in one file and the preprocessor's list of derived columns in another, updating one without the other would give a package that accepts an argument and then ignores it."
+msgstr "Jika daftar argumen valid milik konstruktor berada di satu berkas dan daftar kolom turunan milik preprocessor di berkas lain, memperbarui salah satunya saja akan menghasilkan paket yang menerima sebuah argumen lalu mengabaikannya."
 
-#: ../../source/python/explanation/family-registry.md:45
-msgid "`FamilySpec` is read by the factory, which needs to know what to accept before a model exists, and by the running model, which needs the same facts afterwards."
-msgstr "`FamilySpec` dibaca oleh factory, yang perlu tahu apa yang diterima sebelum model ada, dan oleh model yang berjalan, yang membutuhkan fakta yang sama sesudahnya."
+#: ../../source/python/explanation/family-registry.md:47
+msgid "Nothing would raise. The user passes `deff=\"deff\"`, the constructor accepts it, the precision is never derived, and a different model is fitted from the one requested. The estimates would still look plausible, which is how such a mistake survives. With one registry, every reader consults the same entry."
+msgstr "Tidak akan ada galat yang muncul. Pengguna memberikan `deff=\"deff\"`, konstruktor menerimanya, presisinya tidak pernah diturunkan, dan yang di-fit adalah model yang berbeda dari yang diminta. Estimasinya tetap akan tampak masuk akal, dan karena itulah kesalahan semacam ini bertahan. Dengan satu registri, setiap pembaca merujuk entri yang sama."
 
-#: ../../source/python/explanation/family-registry.md:48
-msgid "The test: **adding a family means adding an entry**, plus the behaviour specific to that family, not editing several files."
-msgstr "Ujiannya: **menambah family berarti menambah satu entri**, ditambah perilaku khusus family itu, bukan menyunting beberapa berkas."
+#: ../../source/python/explanation/family-registry.md:52
+msgid "One source, several readers"
+msgstr "Satu sumber, beberapa pembaca"
 
-#: ../../source/python/explanation/family-registry.md:51
-msgid "Why cross-family arguments raise"
-msgstr "Mengapa argumen lintas-family memunculkan galat"
+#: ../../source/python/explanation/family-registry.md
+msgid "Reader"
+msgstr "Pembaca"
 
-#: ../../source/python/explanation/family-registry.md:53
-msgid "The registry knows which arguments belong to `gaussian`, so it knows `trials` does not. `create_model(..., family=\"gaussian\", trials=\"n\")` raises instead of dropping the argument. Dropping it would give the caller a Gaussian model when they meant a Binomial one, with no warning and plausible-looking estimates."
-msgstr "Registri tahu argumen mana yang milik `gaussian`, sehingga tahu `trials` bukan miliknya. `create_model(..., family=\"gaussian\", trials=\"n\")` memunculkan galat alih-alih membuang argumen itu. Membuangnya akan memberi pemanggil model Gaussian padahal yang dimaksud Binomial, tanpa peringatan dan dengan estimasi yang tampak masuk akal."
+#: ../../source/python/explanation/family-registry.md
+msgid "What it reads"
+msgstr "Yang dibacanya"
 
-#: ../../source/python/explanation/family-registry.md:58
-msgid "Why the registry is read through accessors"
-msgstr "Mengapa registri dibaca melalui fungsi pengakses"
+#: ../../source/python/explanation/family-registry.md
+msgid "When"
+msgstr "Kapan"
 
-#: ../../source/python/explanation/family-registry.md:60
-msgid "The registry dict is private; `list_families()` and `get_family_spec()` are public. Its internal shape can therefore change without breaking callers, and an unknown name gets an error listing the valid families instead of a bare `KeyError`. Reading is supported, mutating is not: a mutated registry would put the two readers out of step."
-msgstr "Dict registri bersifat privat; `list_families()` dan `get_family_spec()` bersifat publik. Karena itu bentuk internalnya dapat berubah tanpa merusak pemanggil, dan nama yang tidak dikenal menghasilkan galat yang mencantumkan family yang valid, bukan `KeyError` polos. Membaca didukung, mengubah tidak: registri yang diubah akan membuat kedua pembaca tidak lagi sejalan."
+#: ../../source/python/explanation/family-registry.md
+msgid "`create_model()`"
+msgstr "`create_model()`"
 
-#: ../../source/python/explanation/family-registry.md:65
+#: ../../source/python/explanation/family-registry.md
+msgid "valid and required arguments, parameters that can be fixed"
+msgstr "argumen yang valid dan wajib, parameter yang dapat ditetapkan"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "at construction"
+msgstr "saat konstruksi"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`DataValidator`"
+msgstr "`DataValidator`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "the response domain check"
+msgstr "pemeriksaan domain respons"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "in `check_data()`, `check_prior()` and `fit()`"
+msgstr "di `check_data()`, `check_prior()`, dan `fit()`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`DataPreprocessor`"
+msgstr "`DataPreprocessor`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "the offset transform, such as `log_phi`"
+msgstr "transformasi offset, misalnya `log_phi`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "the model"
+msgstr "model"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "the link check, the formula's left-hand side, the fixed parameters, the Bambi family"
+msgstr "pemeriksaan link, sisi kiri formula, parameter yang ditetapkan, family Bambi"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "in `check_prior()` and `fit()`"
+msgstr "di `check_prior()` dan `fit()`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`predict()`, `estimate_areas()`"
+msgstr "`predict()`, `estimate_areas()`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "the mean parameter, `mu` or `p`"
+msgstr "parameter rata-rata, `mu` atau `p`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "after `fit()`"
+msgstr "setelah `fit()`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "`update_model()`"
+msgstr "`update_model()`"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "the design columns to carry over to new data"
+msgstr "kolom desain yang dibawa ke data baru"
+
+#: ../../source/python/explanation/family-registry.md
+msgid "at a refit"
+msgstr "saat fitting ulang"
+
+#: ../../source/python/explanation/family-registry.md:63
+msgid "The test of the design is that **adding a family means adding an entry**, plus the behaviour specific to that family, rather than editing every reader."
+msgstr "Ujian rancangan ini adalah bahwa **menambah family berarti menambah satu entri**, ditambah perilaku khusus family itu, bukan menyunting setiap pembaca."
+
+#: ../../source/python/explanation/family-registry.md:66
+msgid "A fixed parameter is a fact, not code"
+msgstr "Parameter yang ditetapkan adalah fakta, bukan kode"
+
+#: ../../source/python/explanation/family-registry.md:68
+msgid "The registry states that the Beta precision and the Gaussian scale are computed from the survey design, as a `FixedParam`. The model turns that statement into Bambi terms: a sub-formula for the parameter with the design column as an offset, and an intercept held at zero by a normal prior with standard deviation 0.001. A caller's `fixed_params=` becomes the same kind of entry, so one mechanism serves both."
+msgstr "Registri menyatakan bahwa presisi Beta dan skala Gaussian dihitung dari desain survei, dalam bentuk `FixedParam`. Model menerjemahkan pernyataan itu ke dalam suku Bambi: sebuah sub-formula untuk parameter tersebut dengan kolom desain sebagai offset, dan sebuah intersep yang ditahan di nol oleh prior normal dengan simpangan baku 0.001. `fixed_params=` dari pemanggil menjadi entri berjenis sama, sehingga satu mekanisme melayani keduanya."
+
+#: ../../source/python/explanation/family-registry.md:74
+#, python-format
+msgid "The fix is tight rather than exact. hbsaems writes `0 + offset(...)`, which Bambi cannot predict from, so the intercept prior holds the parameter within about 0.1% of its value. The intercept shows in the diagnostics as `sigma_Intercept` or `kappa_Intercept`."
+msgstr "Penetapan ini ketat, tetapi tidak eksak. hbsaems menulis `0 + offset(...)`, yang tidak dapat dipakai Bambi untuk prediksi, sehingga prior intersep menahan parameter itu dalam kisaran sekitar 0.1% dari nilainya. Intersep itu muncul dalam diagnostik sebagai `sigma_Intercept` atau `kappa_Intercept`."
+
+#: ../../source/python/explanation/family-registry.md:78
+msgid "Why arguments from another family raise"
+msgstr "Mengapa argumen dari family lain memunculkan galat"
+
+#: ../../source/python/explanation/family-registry.md:80
+msgid "The registry knows which arguments belong to `gaussian`, so it knows `trials` does not. `create_model(..., family=\"gaussian\", trials=\"n\")` raises a `ValueError` listing the valid arguments, instead of dropping `trials` and fitting a Gaussian model to a binomial question. The same entry sets the arity: `n` and `deff` together fix `kappa`, so one without the other raises too."
+msgstr "Registri tahu argumen mana yang milik `gaussian`, sehingga tahu `trials` bukan miliknya. `create_model(..., family=\"gaussian\", trials=\"n\")` memunculkan `ValueError` yang mencantumkan argumen yang valid, alih-alih membuang `trials` dan melakukan fitting model Gaussian untuk pertanyaan binomial. Entri yang sama menetapkan aritasnya: `n` dan `deff` bersama-sama menetapkan `kappa`, sehingga salah satunya tanpa yang lain juga memunculkan galat."
+
+#: ../../source/python/explanation/family-registry.md:86
+msgid "Why the registry is read-only at run time"
+msgstr "Mengapa registri bersifat baca-saja saat program berjalan"
+
+#: ../../source/python/explanation/family-registry.md:88
+msgid "`list_families()` and `get_family_spec()` are public, and each `FamilySpec` is frozen. hbsaems lets a user add a family at run time with `register_hbsae_model()`. In hbsaemp a family is a change to the package: it needs its `FamilySpec` and a model class in `MODEL_REGISTRY`, and a spec whose parts do not fit together is refused when the package is imported. The two registries change together, in a reviewed change to the code, instead of separately in a user's session."
+msgstr "`list_families()` dan `get_family_spec()` bersifat publik, dan setiap `FamilySpec` tidak dapat diubah. hbsaems memungkinkan pengguna menambah family saat program berjalan dengan `register_hbsae_model()`. Di hbsaemp, family adalah perubahan pada paket: family membutuhkan sebuah `FamilySpec` dan sebuah kelas model di `MODEL_REGISTRY`, dan spesifikasi yang bagian-bagiannya tidak cocok satu sama lain ditolak saat paket diimpor. Kedua registri berubah bersama, dalam perubahan kode yang ditinjau, bukan secara terpisah dalam sesi pengguna."
+
+#: ../../source/python/explanation/family-registry.md:95
 msgid "Why a planned family gets its own message"
 msgstr "Mengapa family yang direncanakan mendapat pesannya sendiri"
 
-#: ../../source/python/explanation/family-registry.md:67
-msgid "The registry can mark a name as known but not yet implemented. Asking for it gives a message saying so, not the error for a typo. A typo is fixed by correcting the spelling; a planned family by waiting or choosing another."
-msgstr "Registri dapat menandai sebuah nama sebagai dikenal tetapi belum diimplementasikan. Memintanya memberikan pesan yang menyatakan hal itu, bukan galat untuk salah ketik. Salah ketik diperbaiki dengan membetulkan ejaan; family yang direncanakan dengan menunggu atau memilih family lain."
+#: ../../source/python/explanation/family-registry.md:97
+msgid "The package can mark a name as known but not yet implemented. `family=\"lognormal\"` raises a message saying it is planned for version 2, not the error for a typo. A typo is fixed by correcting the spelling; a planned family by waiting or choosing another."
+msgstr "Paket dapat menandai sebuah nama sebagai dikenal tetapi belum diimplementasikan. `family=\"lognormal\"` memunculkan pesan yang menyatakan bahwa family itu direncanakan untuk versi 2, bukan galat untuk salah ketik. Salah ketik diperbaiki dengan membetulkan ejaan; family yang direncanakan dengan menunggu atau memilih family lain."
 
-#: ../../source/python/explanation/family-registry.md:71
+#: ../../source/python/explanation/family-registry.md:101
 msgid "Consequences"
 msgstr "Konsekuensi"
 
-#: ../../source/python/explanation/family-registry.md:73
-msgid "**A family change is a registry change.** No fact about a family is stated twice."
-msgstr "**Perubahan family adalah perubahan registri.** Tidak ada fakta tentang family yang dinyatakan dua kali."
+#: ../../source/python/explanation/family-registry.md:103
+msgid "**Adding a family is local.** It takes a registry entry and a model class. The three tiers stay as they are, since `hbm_flex` reaches a new family through `aux_args` and `addition_var`. A tier 1 function for it, such as an `hbm_poisson`, is a convenience added on top."
+msgstr "**Menambah family bersifat lokal.** Penambahan itu membutuhkan satu entri registri dan satu kelas model. Ketiga tingkat tetap seperti semula, karena `hbm_flex` menjangkau family baru melalui `aux_args` dan `addition_var`. Fungsi tingkat 1 untuk family itu, misalnya `hbm_poisson`, adalah kemudahan yang ditambahkan di atasnya."
 
-#: ../../source/python/explanation/family-registry.md:75
+#: ../../source/python/explanation/family-registry.md:107
 msgid "**Errors name the alternatives.** The valid families and arguments are known at the moment of failure, so the message says what would work."
 msgstr "**Galat menyebutkan alternatifnya.** Family dan argumen yang valid diketahui pada saat kegagalan, sehingga pesannya menyebutkan apa yang akan berhasil."
 
-#: ../../source/python/explanation/family-registry.md:78
-msgid "**Validation runs before the backend loads.** The registry is plain Python data, so family, link and argument checks finish in milliseconds."
-msgstr "**Validasi berjalan sebelum backend dimuat.** Registri adalah data Python biasa, sehingga pemeriksaan family, link, dan argumen selesai dalam hitungan milidetik."
+#: ../../source/python/explanation/family-registry.md:110
+msgid "**Validation runs before the backend loads.** The registry is plain Python data, so family, link and argument checks finish in milliseconds, before Bambi is imported."
+msgstr "**Validasi berjalan sebelum backend dimuat.** Registri adalah data Python biasa, sehingga pemeriksaan family, link, dan argumen selesai dalam hitungan milidetik, sebelum Bambi diimpor."
 
-#: ../../source/python/explanation/family-registry.md:81
-msgid "**A new family is small but not free.** The entry is easy; the behaviour it promises, the transformations and the formula shape, is the real work."
-msgstr "**Family baru itu kecil, tetapi bukan tanpa biaya.** Entrinya mudah; perilaku yang dijanjikannya, yaitu transformasi dan bentuk formula, adalah pekerjaan sesungguhnya."
+#: ../../source/python/explanation/family-registry.md:113
+msgid "**The registry can be inspected.** `get_family_spec(\"beta\")` shows the default link and the parameter that can be fixed, as the case-study tutorial does before it builds its model."
+msgstr "**Registri dapat diperiksa.** `get_family_spec(\"beta\")` menampilkan link bawaan dan parameter yang dapat ditetapkan, seperti yang dilakukan tutorial studi kasus sebelum membangun modelnya."
 
-#: ../../source/python/explanation/family-registry.md:84
+#: ../../source/python/explanation/family-registry.md:116
+msgid "**A new family is small but not free.** The entry is short; the behaviour it promises, the domain check, the transformations and the formula shape, is the real work."
+msgstr "**Family baru itu kecil, tetapi bukan tanpa biaya.** Entrinya singkat; perilaku yang dijanjikannya, yaitu pemeriksaan domain, transformasi, dan bentuk formula, adalah pekerjaan sesungguhnya."
+
+#: ../../source/python/explanation/family-registry.md:119
 msgid "Related"
 msgstr "Terkait"
 
-#: ../../source/python/explanation/family-registry.md:86
+#: ../../source/python/explanation/family-registry.md:121
 #, python-brace-format
 msgid "How to choose a family and supply its columns: {doc}`../how-to/02-specify-model`."
 msgstr "Cara memilih family dan menyediakan kolomnya: {doc}`../how-to/02-specify-model`."
+
+#: ../../source/python/explanation/family-registry.md:123
+msgid "References"
+msgstr "Referensi"
+
+#: ../../source/python/explanation/family-registry.md:125
+msgid "Choir, A. S., Nurhayati, S. S., Zamzanah, S., & Oktalia Siregar, A. L. (2026). *hbsaems: Hierarchical Bayesian Area-Level Small Area Estimation Models*. R package version 1.1.0."
+msgstr "Choir, A. S., Nurhayati, S. S., Zamzanah, S., & Oktalia Siregar, A. L. (2026). *hbsaems: Hierarchical Bayesian Area-Level Small Area Estimation Models*. R package version 1.1.0."
 

@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: hbsaemp 1.0.0\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-09-26 00:13+0700\n"
+"POT-Creation-Date: 2026-10-04 23:29+0700\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: id\n"
@@ -23,6 +23,6 @@ msgid "Explanation"
 msgstr "Explanation"
 
 #: ../../source/python/explanation/index.md:3
-msgid "Context and reasoning. These pages answer *why*, and contain no steps to follow."
-msgstr "Konteks dan penalaran. Halaman-halaman ini menjawab *mengapa*, dan tidak memuat langkah yang harus diikuti."
+msgid "Context and reasoning: the statistics behind the package, and the design decisions in it. These pages answer *why*, and contain no steps to follow."
+msgstr "Konteks dan penalaran: statistika di balik paket ini, dan keputusan rancangan di dalamnya. Halaman-halaman ini menjawab *mengapa*, dan tidak memuat langkah yang harus diikuti."
 
